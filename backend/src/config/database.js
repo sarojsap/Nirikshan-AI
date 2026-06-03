@@ -1,6 +1,8 @@
 import { DataSource } from 'typeorm';
 import dotenv from 'dotenv';
 import { User } from '../entities/User.js';
+import { Camera } from '../entities/Camera.js';
+import { Incident } from '../entities/Incident.js';
 
 dotenv.config();
 
@@ -13,5 +15,5 @@ export const AppDataSource = new DataSource({
   database: process.env.DB_NAME,
   synchronize: true, // Auto-creates tables based on our entities
   logging: false, // Set to true if you want to see the SQL queries in terminal
-  entities: [User], // Add all new entities to this array!
+  entities: [User, Camera, Incident], // Add all new entities to this array!
 });
