@@ -1,5 +1,6 @@
 import express from 'express';
 import authRoutes from './routes/auth.routes.js';
+import cameraRoutes from './routes/camera.routes.js';
 
 const app = express();
 
@@ -8,5 +9,8 @@ app.use(express.json());
 
 // Auth Routes
 app.use('/api/auth', authRoutes);
+
+// Camera Routes
+app.use('/api/cameras', cameraRoutes);
 
 export default app;
