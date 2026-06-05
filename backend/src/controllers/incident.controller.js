@@ -32,9 +32,18 @@ export const logIncident = async (req, res) => {
 
 export const getIncidents = async (req, res) => {
   try {
-    const incidents = await incidentService.getAllIncidents();
-    res.status(200).json(incidents);
-  } catch (error) {
+    // Extract page and limit from the query string, and procide default values
+    const page = parseInt(req.query.page, 10) || 1;
+    const limit = parseInt(req.query.limit, 10) || 10;
+
+    // Validation to ensure valid numbers
+    if (page < 1 || limit < 1) {
+      return res.status(400).json({ error: 'Page and limit must be positive integers.' });
+    }
+
+    const result = await incidentService.getAllIncidents(page, limit);
+    res.status(200).json(result);
+  } catch {
     res.status(500).json({ error: error.message });
   }
 };
