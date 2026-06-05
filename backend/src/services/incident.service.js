@@ -24,12 +24,30 @@ export const createIncident = async incidentData => {
   return await incidentRepo.save(newIncident);
 };
 
-export const getAllIncidents = async () => {
+export const getAllIncidents = async (page = 1, limit = 10) => {
   const incidentRepo = AppDataSource.getRepository(Incident);
 
-  // We use 'relations' to fetch the camera details along with the incident.
-  return await incidentRepo.find({
-    relations: {camera: true},
+  // Calculate how many records to skip
+  const skip = (page - 1) * limit;
+
+  // findAndCount fetches the paginated data and the total count of all records in the DB
+  const [incidents, total] = await incidentRepo.findAndCount({
+    relations: { camera: true },
     order: { timestamp: 'DESC' },
+    skip: skip,
+    take: limit,
   });
+
+  // Calculate total pages for the frontend
+  const totalPages = Math.ceil(total / limit);
+
+  return {
+    data: incidents,
+    pagination: {
+      totalRecords: total,
+      totalPages: totalPages,
+      currentPage: page,
+      limit: limit,
+    },
+  };
 };
