@@ -1,0 +1,58 @@
+# ====================================================================
+# YOLO / Deep Learning Models & Weights
+# ====================================================================
+# Ignore heavy model weight files (YOLOv3 to YOLOv11+)
+*.weights
+*.pt
+*.onnx
+*.engine
+*.tflite
+*.pb
+
+# Ignore datasets and heavy media folders
+datasets/
+data/coco/
+runs/
+predict/
+
+# ====================================================================
+# OpenCV & Media Outputs
+# ====================================================================
+# Ignore locally generated outputs from OpenCV scripts
+output_*.jpg
+output_*.png
+output_*.mp4
+output_video/
+processed_images/
+
+# ====================================================================
+# Python Environment & Caches
+# ====================================================================
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Virtual environments (Conda or pip venv)
+.venv/
+venv/
+env/
+ENV/
+conda-env/
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# ====================================================================
+# IDE / Editor Environments
+# ====================================================================
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.swp
