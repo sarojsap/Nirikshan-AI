@@ -1,6 +1,7 @@
 import cv2
 import os
 import time
+from datetime import datetime
 from ultralytics import YOLO
 from shapely.geometry import Point, Polygon
 from dotenv import load_dotenv
@@ -12,19 +13,44 @@ CAMERA_ID = os.getenv('CAMERA_ID')
 
 # Initialize API Client
 api = APIClient()
-
-# Load YOLOv8 Nano model (downloads automatically the first time)
-print("Loading YOLOv8 model...")
 model = YOLO('yolov8n.pt')
 
 # Open WebCam (Use 0 for default camera, or replace with an RTSP URL / video path)
 cap = cv2.VideoCapture(0)
 
-# --- Configuration ---
-# 1. Restricted Area Polygon (X, Y coordinates on the frame)
-# You may need to adjust these based on your camera resolution
-RESTRICTED_ZONE = Polygon([(100, 100), (500, 100), (500, 400), (100, 400)])
-CROWD_THRESHOLD = 3  # Alert if more than 3 people are in frame
+# 1. Fetch Dynamic Configuration from Node.js Backend
+camera_config = api.get_camera_config(CAMERA_ID)
+
+# Fallbacks in case config is missing
+CROWD_THRESHOLD = camera_config.get('crowdThreshold') if camera_config else 3
+restricted_polygon_data = camera_config.get('restrictedPolygon') if camera_config else None
+
+# Convert JSON polygon [{"x":100, "y":100}, ...] to Shapely format [(100,100), ...]
+if restricted_polygon_data:
+    polygon_points = [(pt['x'], pt['y']) for pt in restricted_polygon_data]
+    RESTRICTED_ZONE = Polygon(polygon_points)
+else:
+    # Default fallback polygon if the Admin hasn't drawn one yet
+    RESTRICTED_ZONE = Polygon([(100, 100), (500, 100), (500, 400), (100, 400)])
+
+# Time restriction strings (e.g., "22:00:00", "06:00:00")
+start_time_str = camera_config.get('restrictedStartTime') if camera_config else None
+end_time_str = camera_config.get('restrictedEndTime') if camera_config else None
+
+# Helper function to check if current time is inside the restricted window
+def is_restricted_time():
+    if not start_time_str or not end_time_str:
+        return True # If no time set, it's always restricted!
+        
+    now = datetime.now().time()
+    start = datetime.strptime(start_time_str, "%H:%M:%S").time()
+    end = datetime.strptime(end_time_str, "%H:%M:%S").time()
+    
+    # Handle overnight times (e.g., 22:00 to 06:00)
+    if start <= end:
+        return start <= now <= end
+    else: # Crosses midnight
+        return start <= now or now <= end
 
 # --- Cooldown Timers (to avoid spamming the DB) ---
 # We store the last time an alert was sent. 
@@ -94,6 +120,15 @@ while cap.isOpened():
             severity="CRITICAL",
             camera_id=CAMERA_ID
         )
+
+    if intrusion_detected and is_restricted_time():
+        if check_cooldown("INTRUSION"):
+            api.send_incidents(
+                incident_type="INTRUSION",
+                description=f"Perimeter breached during restricted hours.",
+                severity="CRITICAL",
+                camera_id=CAMERA_ID
+            )
     
     if person_count >= CROWD_THRESHOLD and check_cooldown("CROWD"):
         api.send_incidents(

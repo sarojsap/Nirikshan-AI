@@ -21,7 +21,7 @@ class APIClient:
             })
             response.raise_for_status()
             data = response.json()
-            self.token = data.get('token')
+            self.token = data.get('data', {}).get('token')
             print('Successfully logged into Node.js Backend')
         
         except Exception as e:
@@ -33,7 +33,7 @@ class APIClient:
             return
         
         headers = {
-            "Authorization": f"Bearer {self.toke}",
+            "Authorization": f"Bearer {self.token}",
             "Content-Type": "application/json"
         }
 
@@ -51,3 +51,19 @@ class APIClient:
             print(f"Alert Sent: {incident_type} - {description}")
         except Exception as e:
             print(f"Failed to send incidents: {e}")
+
+    def get_camera_config(self, camera_id):
+        if not self.token:
+            print("No token available.")
+            return None
+            
+        headers = {"Authorization": f"Bearer {self.token}"}
+        try:
+            res = requests.get(f"{API_URL}/cameras/{camera_id}", headers=headers)
+            res.raise_for_status()
+            config = res.json()
+            print("Successfully fetched dynamic camera configuration.")
+            return config
+        except Exception as e:
+            print(f"Failed to fetch camera config: {e}")
+            return None
