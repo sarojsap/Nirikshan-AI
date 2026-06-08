@@ -1,5 +1,10 @@
 import { Router } from 'express';
-import { createCamera, getCamera } from '../controllers/camera.controller.js';
+import {
+  createCamera,
+  getCameras,
+  getCamera,
+  updateSettings,
+} from '../controllers/camera.controller.js';
 import { verifyToken, requireAdmin } from '../middlewares/auth.middleware.js';
 
 const router = Router();
@@ -8,9 +13,15 @@ const router = Router();
 router.use(verifyToken);
 
 // Allowed for both OPERATOR and ADMIN
-router.get('/', getCamera);
+router.get('/', getCameras);
+
+// Fetch specific camera config
+router.get('/:id', getCamera);
 
 // Only ADMIN can add a new camera
 router.post('/', requireAdmin, createCamera);
+
+// Update configs
+router.put('/:id/settings', requireAdmin, updateSettings);
 
 export default router;
