@@ -23,6 +23,22 @@ export const Camera = new EntitySchema({
       enum: ['ACTIVE', 'INACTIVE', 'MAINTENANCE'],
       default: 'ACTIVE',
     },
+    crowdThreshold: {
+      type: 'int',
+      default: 3,
+    },
+    restrictedPolygon: {
+      type: 'json',
+      nullable: true,
+    },
+    restrictedStartTime: {
+      type: 'time',
+      nullable: true,
+    },
+    restrictedEndTime: {
+      type: 'time',
+      nullable: true,
+    },
     createdAt: {
       type: 'timestamp',
       createDate: true,
