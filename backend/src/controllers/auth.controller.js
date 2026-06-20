@@ -2,14 +2,15 @@ import * as authService from '../services/auth.service.js';
 
 export const register = async (req, res) => {
   try {
-    const { username, password, role } = req.body;
+    const { username, password } = req.body;
 
     if (!username || !password) {
       return res.status(400).json({ error: 'Username And Password Are Required!' });
     }
 
-    const user = await authService.registerUser(username, password, role);
-    res.status(201).json({ message: 'User regstered successfully!', user });
+    // Enforce OPERATOR role on registration for security purposes
+    const user = await authService.registerUser(username, password, 'OPERATOR');
+    res.status(201).json({ message: 'User registered successfully!', user });
   } catch (error) {
     res.status(400).json({ error: error.message });
   }

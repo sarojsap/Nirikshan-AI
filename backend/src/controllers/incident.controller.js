@@ -43,7 +43,7 @@ export const getIncidents = async (req, res) => {
 
     const result = await incidentService.getAllIncidents(page, limit);
     res.status(200).json(result);
-  } catch {
+  } catch (error) {
     res.status(500).json({ error: error.message });
   }
 };

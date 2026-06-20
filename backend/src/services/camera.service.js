@@ -13,7 +13,7 @@ export const getAllCameras = async () => {
 };
 
 export const getCameraById = async id => {
-  const cameraRepo = AppDataSource.getMongoRepository(Camera);
+  const cameraRepo = AppDataSource.getRepository(Camera);
   const camera = await cameraRepo.findOne({ where: { id } });
 
   if (!camera) throw new Error('Camera not found');

@@ -20,7 +20,7 @@ export const getCameras = async (req, res) => {
     const cameras = await cameraService.getAllCameras();
     res.status(200).json(cameras);
   } catch (error) {
-    res.status(500).json({ error: error, message });
+    res.status(500).json({ error: error.message });
   }
 };
 
