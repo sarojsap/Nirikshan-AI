@@ -27,7 +27,7 @@ class APIClient:
         except Exception as e:
             print(f"Failed to login to API: {e}")
 
-    def send_incidents(self, incident_type, description, severity, camera_id):
+    def send_incident(self, incident_type, description, severity, camera_id):
         if not self.token:
             print("No token available. Cannot send incidents.")
             return

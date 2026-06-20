@@ -56,7 +56,10 @@ def is_restricted_time():
 
 # Generator function that captures frames, processes them, and yields them to the web server
 def generate_frames():
-    cap = cv2.VideoCapture(0) # 0 for webcam, or RTSP link
+    # Use RTSP URL if provided in config, otherwise fallback to local webcam (0)
+    rtsp_url = camera_config.get('rtspUrl') if camera_config else None
+    video_source = rtsp_url if rtsp_url else 0
+    cap = cv2.VideoCapture(video_source)
     
     while cap.isOpened():
         ret, frame = cap.read()
