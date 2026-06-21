@@ -9,7 +9,7 @@ export const User = new EntitySchema({
       type: 'uuid',
       generated: 'uuid',
     },
-    username: {
+    email: {
       type: 'varchar',
       unique: true,
     },
@@ -20,6 +20,14 @@ export const User = new EntitySchema({
       type: 'enum',
       enum: ['ADMIN', 'OPERATOR'],
       default: 'OPERATOR',
+    },
+    resetToken: {
+      type: 'varchar',
+      nullable: true,
+    },
+    resetTokenExpiry: {
+      type: 'timestamp',
+      nullable: true,
     },
     createdAt: {
       type: 'timestamp',
