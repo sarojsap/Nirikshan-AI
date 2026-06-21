@@ -1,60 +1,99 @@
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
+import crypto from 'crypto';
 import { AppDataSource } from '../config/database.js';
 import { User } from '../entities/User.js';
+import { sendPasswordResetEmail } from './email.service.js';
 
-// User Registration
-export const registerUser = async (username, password, role) => {
+export const registerUser = async (email, password, role) => {
   const userRepository = AppDataSource.getRepository(User);
 
-  // check if user already exists
-  const existingUser = await userRepository.findOne({ where: { username } });
+  const existingUser = await userRepository.findOne({ where: { email } });
   if (existingUser) {
-    throw new Error('Username already exists!');
+    throw new Error('Email already exists!');
   }
 
-  // Hash the password
   const salt = await bcrypt.genSalt(10);
   const hashedPassword = await bcrypt.hash(password, salt);
 
-  // Create and save the new user
   const newUser = userRepository.create({
-    username,
+    email,
     password: hashedPassword,
-    role: role || `OPERATOR`, // Default to operator if not provided
+    role: role || 'OPERATOR',
   });
 
   await userRepository.save(newUser);
 
-  // Return user without password
   const { password: _, ...userWithoutPassword } = newUser;
   return userWithoutPassword;
 };
 
-// User Login
-export const loginUser = async (username, password) => {
+export const loginUser = async (email, password) => {
   const userRepository = AppDataSource.getRepository(User);
 
-  // Find user
-  const user = await userRepository.findOne({ where: { username } });
+  const user = await userRepository.findOne({ where: { email } });
 
   if (!user) {
     throw new Error('Invalid Credentials!');
   }
 
-  // Compare passwords
   const isMatch = await bcrypt.compare(password, user.password);
   if (!isMatch) {
     throw new Error('Invalid Credentials!');
   }
 
-  // Generate JWT Token
   const token = jwt.sign(
-    { id: user.id, role: user.role }, // Payload
-    process.env.JWT_SECRET, // Sercret Key
+    { id: user.id, role: user.role },
+    process.env.JWT_SECRET,
     { expiresIn: process.env.JWT_EXPIRES_IN }
   );
 
   const { password: _, ...userWithoutPassword } = user;
   return { user: userWithoutPassword, token };
+};
+
+export const forgotPassword = async (email) => {
+  const userRepository = AppDataSource.getRepository(User);
+
+  const user = await userRepository.findOne({ where: { email } });
+  if (!user) {
+    return;
+  }
+
+  const rawToken = crypto.randomBytes(32).toString('hex');
+  const hashedToken = crypto.createHash('sha256').update(rawToken).digest('hex');
+
+  const expiry = new Date();
+  expiry.setMinutes(expiry.getMinutes() + 15);
+
+  user.resetToken = hashedToken;
+  user.resetTokenExpiry = expiry;
+  await userRepository.save(user);
+
+  const resetLink = `${process.env.CLIENT_URL}/reset-password?token=${rawToken}&email=${email}`;
+
+  console.log(`\n[DEV] Password reset link: ${resetLink}`);
+  console.log(`[DEV] Raw token for API: ${rawToken}\n`);
+
+  await sendPasswordResetEmail(email, resetLink);
+};
+
+export const resetPassword = async (token, newPassword) => {
+  const userRepository = AppDataSource.getRepository(User);
+
+  const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
+
+  const user = await userRepository.findOne({
+    where: { resetToken: hashedToken },
+  });
+
+  if (!user || !user.resetTokenExpiry || user.resetTokenExpiry < new Date()) {
+    throw new Error('Invalid or expired reset token!');
+  }
+
+  const salt = await bcrypt.genSalt(10);
+  user.password = await bcrypt.hash(newPassword, salt);
+  user.resetToken = null;
+  user.resetTokenExpiry = null;
+  await userRepository.save(user);
 };

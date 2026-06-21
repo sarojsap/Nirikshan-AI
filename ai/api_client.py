@@ -16,7 +16,7 @@ class APIClient:
     def login(self):
         try:
             response = requests.post(f"{API_URL}/auth/login", json={
-                "username": USERNAME,
+                "email": USERNAME,
                 "password": PASSWORD
             })
             response.raise_for_status()
