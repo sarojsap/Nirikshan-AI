@@ -1,6 +1,7 @@
 import bcrypt from 'bcrypt';
 import { User } from '../entities/User.js';
 import { AppDataSource } from './database.js';
+import 'dotenv/config';
 
 export const seedAdminUser = async () => {
   try {
@@ -11,9 +12,10 @@ export const seedAdminUser = async () => {
       console.log('No users found in database. Seeding default admin user...');
 
       const salt = await bcrypt.genSalt(10);
-      const hashedPassword = await bcrypt.hash('password123', salt);
+      const hashedPassword = await bcrypt.hash(process.env.SUPER_ADMIN_PASSWORD, salt);
 
       const adminUser = userRepository.create({
+        name: 'Super Admin',
         email: process.env.SUPER_ADMIN_EMAIL,
         password: hashedPassword,
         role: 'ADMIN',

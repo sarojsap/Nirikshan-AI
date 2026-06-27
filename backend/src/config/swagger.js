@@ -27,6 +27,7 @@ const swaggerDocument = {
         type: 'object',
         properties: {
           id: { type: 'string', format: 'uuid' },
+          name: { type: 'string' },
           email: { type: 'string' },
           role: { type: 'string', enum: ['ADMIN', 'OPERATOR'] },
           createdAt: { type: 'string', format: 'date-time' },
@@ -69,40 +70,11 @@ const swaggerDocument = {
     },
   ],
   paths: {
-    '/api/auth/register': {
-      post: {
-        summary: 'Register a new user',
-        security: [], // No authentication required
-        requestBody: {
-          required: true,
-          content: {
-            'application/json': {
-              schema: {
-                type: 'object',
-                required: ['email', 'password'],
-                properties: {
-                  email: { type: 'string' },
-                  password: { type: 'string' },
-                  role: { type: 'string', enum: ['ADMIN', 'OPERATOR'], default: 'OPERATOR' },
-                },
-              },
-            },
-          },
-        },
-        responses: {
-          201: {
-            description: 'User registered successfully',
-          },
-          400: {
-            description: 'Invalid input or user already exists',
-          },
-        },
-      },
-    },
     '/api/auth/login': {
       post: {
+        tags: ['Auth'],
         summary: 'Login and get a JWT token',
-        security: [], // No authentication required
+        security: [],
         requestBody: {
           required: true,
           content: {
@@ -145,8 +117,284 @@ const swaggerDocument = {
         },
       },
     },
+    '/api/auth/forgot-password': {
+      post: {
+        tags: ['Auth'],
+        summary: 'Request a password reset email',
+        security: [],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['email'],
+                properties: {
+                  email: { type: 'string' },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          200: {
+            description: 'If the email exists, a reset link has been sent.',
+          },
+        },
+      },
+    },
+    '/api/auth/reset-password': {
+      post: {
+        tags: ['Auth'],
+        summary: 'Reset password using token from email',
+        security: [],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['token', 'password'],
+                properties: {
+                  token: { type: 'string' },
+                  password: { type: 'string', minLength: 6 },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          200: {
+            description: 'Password reset successful',
+          },
+          400: {
+            description: 'Invalid or expired reset token',
+          },
+        },
+      },
+    },
+
+    // ========================
+    // Operator Management (Admin only)
+    // ========================
+    '/api/operators': {
+      post: {
+        tags: ['Operators'],
+        summary: 'Create a new operator account (Admin only)',
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['name', 'email', 'password'],
+                properties: {
+                  name: { type: 'string', description: 'Display name of the operator' },
+                  email: { type: 'string' },
+                  password: { type: 'string', minLength: 6 },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          201: {
+            description: 'Operator created successfully',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    message: { type: 'string' },
+                    data: { $ref: '#/components/schemas/User' },
+                  },
+                },
+              },
+            },
+          },
+          400: {
+            description: 'Invalid input or email already exists',
+          },
+          403: {
+            description: 'Access denied. Admins only.',
+          },
+        },
+      },
+      get: {
+        tags: ['Operators'],
+        summary: 'Get all operators (Admin only)',
+        parameters: [
+          {
+            name: 'search',
+            in: 'query',
+            schema: { type: 'string' },
+            description: 'Search operators by name or email',
+          },
+        ],
+        responses: {
+          200: {
+            description: 'List of operators',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    data: {
+                      type: 'array',
+                      items: { $ref: '#/components/schemas/User' },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          403: {
+            description: 'Access denied. Admins only.',
+          },
+        },
+      },
+    },
+    '/api/operators/{id}': {
+      get: {
+        tags: ['Operators'],
+        summary: 'Get a single operator by ID (Admin only)',
+        parameters: [
+          {
+            name: 'id',
+            in: 'path',
+            required: true,
+            schema: { type: 'string', format: 'uuid' },
+          },
+        ],
+        responses: {
+          200: {
+            description: 'Operator details',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    data: { $ref: '#/components/schemas/User' },
+                  },
+                },
+              },
+            },
+          },
+          404: {
+            description: 'Operator not found',
+          },
+          403: {
+            description: 'Access denied. Admins only.',
+          },
+        },
+      },
+      put: {
+        tags: ['Operators'],
+        summary: 'Update operator profile (Admin only)',
+        parameters: [
+          {
+            name: 'id',
+            in: 'path',
+            required: true,
+            schema: { type: 'string', format: 'uuid' },
+          },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                properties: {
+                  name: { type: 'string' },
+                  email: { type: 'string' },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          200: {
+            description: 'Operator updated successfully',
+          },
+          400: {
+            description: 'Invalid input or email already exists',
+          },
+          403: {
+            description: 'Access denied. Admins only.',
+          },
+        },
+      },
+      delete: {
+        tags: ['Operators'],
+        summary: 'Delete an operator account (Admin only)',
+        parameters: [
+          {
+            name: 'id',
+            in: 'path',
+            required: true,
+            schema: { type: 'string', format: 'uuid' },
+          },
+        ],
+        responses: {
+          200: {
+            description: 'Operator deleted successfully',
+          },
+          400: {
+            description: 'Operator not found or invalid role',
+          },
+          403: {
+            description: 'Access denied. Admins only.',
+          },
+        },
+      },
+    },
+    '/api/operators/{id}/password': {
+      patch: {
+        tags: ['Operators'],
+        summary: 'Change operator password without verification (Admin only)',
+        parameters: [
+          {
+            name: 'id',
+            in: 'path',
+            required: true,
+            schema: { type: 'string', format: 'uuid' },
+          },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['newPassword'],
+                properties: {
+                  newPassword: { type: 'string', minLength: 6, description: 'New password for the operator' },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          200: {
+            description: 'Operator password changed successfully',
+          },
+          400: {
+            description: 'Invalid input or operator not found',
+          },
+          403: {
+            description: 'Access denied. Admins only.',
+          },
+        },
+      },
+    },
+
+    // ========================
+    // Cameras
+    // ========================
     '/api/cameras': {
       get: {
+        tags: ['Cameras'],
         summary: 'Get all cameras',
         responses: {
           200: {
@@ -163,6 +411,7 @@ const swaggerDocument = {
         },
       },
       post: {
+        tags: ['Cameras'],
         summary: 'Add a new camera (Admin only)',
         requestBody: {
           required: true,
@@ -195,6 +444,7 @@ const swaggerDocument = {
     },
     '/api/cameras/{id}/settings': {
       put: {
+        tags: ['Cameras'],
         summary: 'Update camera settings (Admin only)',
         parameters: [
           {
@@ -243,8 +493,13 @@ const swaggerDocument = {
         },
       },
     },
+
+    // ========================
+    // Incidents
+    // ========================
     '/api/incidents': {
       get: {
+        tags: ['Incidents'],
         summary: 'Get all incidents (Paginated)',
         parameters: [
           {
@@ -265,6 +520,7 @@ const swaggerDocument = {
         },
       },
       post: {
+        tags: ['Incidents'],
         summary: 'Log a new incident (Called by AI service)',
         requestBody: {
           required: true,
@@ -291,8 +547,13 @@ const swaggerDocument = {
         },
       },
     },
+
+    // ========================
+    // Analytics
+    // ========================
     '/api/analytics/summary': {
       get: {
+        tags: ['Analytics'],
         summary: 'Get dashboard summary metrics',
         responses: {
           200: {

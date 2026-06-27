@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import authRoutes from './routes/auth.routes.js';
+import operatorRoutes from './routes/operator.routes.js';
 import cameraRoutes from './routes/camera.routes.js';
 import incidentRoutes from './routes/incident.routes.js';
 import analyticsRoutes from './routes/analytics.routes.js';
@@ -18,6 +19,9 @@ app.use('/api-docs', serveSwagger, setupSwagger);
 
 // Auth Routes
 app.use('/api/auth', authRoutes);
+
+// Operator Management Routes (Admin only)
+app.use('/api/operators', operatorRoutes);
 
 // Camera Routes
 app.use('/api/cameras', cameraRoutes);
