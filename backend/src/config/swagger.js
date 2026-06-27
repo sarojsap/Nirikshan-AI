@@ -27,7 +27,7 @@ const swaggerDocument = {
         type: 'object',
         properties: {
           id: { type: 'string', format: 'uuid' },
-          username: { type: 'string' },
+          email: { type: 'string' },
           role: { type: 'string', enum: ['ADMIN', 'OPERATOR'] },
           createdAt: { type: 'string', format: 'date-time' },
           updatedAt: { type: 'string', format: 'date-time' },
@@ -79,9 +79,9 @@ const swaggerDocument = {
             'application/json': {
               schema: {
                 type: 'object',
-                required: ['username', 'password'],
+                required: ['email', 'password'],
                 properties: {
-                  username: { type: 'string' },
+                  email: { type: 'string' },
                   password: { type: 'string' },
                   role: { type: 'string', enum: ['ADMIN', 'OPERATOR'], default: 'OPERATOR' },
                 },
@@ -109,9 +109,9 @@ const swaggerDocument = {
             'application/json': {
               schema: {
                 type: 'object',
-                required: ['username', 'password'],
+                required: ['email', 'password'],
                 properties: {
-                  username: { type: 'string' },
+                  email: { type: 'string' },
                   password: { type: 'string' },
                 },
               },

@@ -42,17 +42,15 @@ export const loginUser = async (email, password) => {
     throw new Error('Invalid Credentials!');
   }
 
-  const token = jwt.sign(
-    { id: user.id, role: user.role },
-    process.env.JWT_SECRET,
-    { expiresIn: process.env.JWT_EXPIRES_IN }
-  );
+  const token = jwt.sign({ id: user.id, role: user.role }, process.env.JWT_SECRET, {
+    expiresIn: process.env.JWT_EXPIRES_IN,
+  });
 
   const { password: _, ...userWithoutPassword } = user;
   return { user: userWithoutPassword, token };
 };
 
-export const forgotPassword = async (email) => {
+export const forgotPassword = async email => {
   const userRepository = AppDataSource.getRepository(User);
 
   const user = await userRepository.findOne({ where: { email } });
