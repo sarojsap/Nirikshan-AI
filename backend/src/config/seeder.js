@@ -14,13 +14,13 @@ export const seedAdminUser = async () => {
       const hashedPassword = await bcrypt.hash('password123', salt);
 
       const adminUser = userRepository.create({
-        email: 'admin@nirikshan.com',
+        email: process.env.SUPER_ADMIN_EMAIL,
         password: hashedPassword,
         role: 'ADMIN',
       });
 
       await userRepository.save(adminUser);
-      console.log('Default admin user created: admin@nirikshan.com / password123');
+      console.log('Default admin user created: sarojsapkota9883@gmail.com / password123');
     } else {
       console.log('Database already has users. Skipping seeder.');
     }
