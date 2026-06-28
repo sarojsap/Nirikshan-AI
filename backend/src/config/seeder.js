@@ -12,20 +12,22 @@ export const seedAdminUser = async () => {
       console.log('No users found in database. Seeding default admin user...');
 
       const adminPassword = process.env.SUPER_ADMIN_PASSWORD || 'password123';
-      const adminUsername = process.env.SUPER_ADMIN_USERNAME || 'admin';
+      const adminEmail = process.env.SUPER_ADMIN_EMAIL || 'admin@nirikshan.com';
+      const adminName = process.env.SUPER_ADMIN_NAME || 'Super Admin';
 
       const salt = await bcrypt.genSalt(10);
       const hashedPassword = await bcrypt.hash(adminPassword, salt);
 
       const adminUser = userRepository.create({
-        username: adminUsername,
+        name: adminName,
+        email: adminEmail,
         password: hashedPassword,
         role: 'ADMIN',
       });
 
       await userRepository.save(adminUser);
       console.log(`Default admin user created successfully!`);
-      console.log(`Username: ${adminUsername} | Password: ${adminPassword}`);
+      console.log(`Email: ${adminEmail} | Password: ${adminPassword}`);
     } else {
       console.log('Database already has users. Skipping seeder.');
     }
