@@ -19,15 +19,8 @@ export default function Dashboard({ token, user, onLogout }) {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [modalError, setModalError] = useState('');
-  const [activeMenuCameraId, setActiveMenuCameraId] = useState(null);
+  const [contextMenu, setContextMenu] = useState(null); // { x, y, cameraId, cameraName }
   
-  // Close menus on click outside
-  useEffect(() => {
-    const handleCloseMenu = () => setActiveMenuCameraId(null);
-    window.addEventListener('click', handleCloseMenu);
-    return () => window.removeEventListener('click', handleCloseMenu);
-  }, []);
-
   // Add Camera Form States
   const [camName, setCamName] = useState('');
   const [camLocation, setCamLocation] = useState('');
@@ -35,6 +28,15 @@ export default function Dashboard({ token, user, onLogout }) {
   const [camRtspUrl, setCamRtspUrl] = useState('0');
 
   const socketRef = useRef(null);
+
+  // Close menus on click outside
+  useEffect(() => {
+    const handleCloseMenu = () => {
+      setContextMenu(null);
+    };
+    window.addEventListener('click', handleCloseMenu);
+    return () => window.removeEventListener('click', handleCloseMenu);
+  }, []);
 
   // Synthesize a premium notification beep using Web Audio API (no external file needed)
   const playAlertSound = () => {
@@ -193,7 +195,7 @@ export default function Dashboard({ token, user, onLogout }) {
   // Delete Camera API call
   const handleDeleteCamera = async (e, camId, camName) => {
     e.stopPropagation();
-    setActiveMenuCameraId(null);
+    setContextMenu(null);
 
     const confirmDelete = window.confirm(`Are you sure you want to delete camera "${camName}"? This action cannot be undone.`);
     if (!confirmDelete) return;
@@ -226,6 +228,19 @@ export default function Dashboard({ token, user, onLogout }) {
     } catch (err) {
       alert(err.message);
     }
+  };
+
+  // Right-Click Context Menu handler
+  const handleContextMenu = (e, cam) => {
+    if (user?.role !== 'ADMIN') return;
+    e.preventDefault();
+    e.stopPropagation();
+    setContextMenu({
+      x: e.clientX,
+      y: e.clientY,
+      cameraId: cam.id,
+      cameraName: cam.name,
+    });
   };
 
   return (
@@ -301,10 +316,8 @@ export default function Dashboard({ token, user, onLogout }) {
                 <div
                   key={cam.id}
                   className={`camera-card ${selectedCamera?.id === cam.id ? 'active-card' : ''}`}
-                  onClick={(e) => {
-                    setSelectedCamera(cam);
-                    setActiveMenuCameraId(activeMenuCameraId === cam.id ? null : cam.id);
-                  }}
+                  onClick={() => setSelectedCamera(cam)}
+                  onContextMenu={(e) => handleContextMenu(e, cam)}
                 >
                   <div className="camera-card-top">
                     <span className="camera-name">{cam.name}</span>
@@ -314,19 +327,7 @@ export default function Dashboard({ token, user, onLogout }) {
                     <span>📍 {cam.location}</span>
                     <span>Source: {cam.rtspUrl.length === 1 ? 'Webcam' : 'Network'}</span>
                   </div>
-
-                  {/* Floating Options Dropdown */}
-                  {activeMenuCameraId === cam.id && user?.role === 'ADMIN' && (
-                    <div className="camera-options-dropdown" onClick={(e) => e.stopPropagation()}>
-                      <button
-                        className="camera-options-item delete-item"
-                        onClick={(e) => handleDeleteCamera(e, cam.id, cam.name)}
-                      >
-                        🗑️ Delete Camera
-                      </button>
-                    </div>
-                  )}
-                </div>
+                  </div>
               ))
             )}
           </div>
@@ -491,6 +492,26 @@ export default function Dashboard({ token, user, onLogout }) {
               </div>
             </form>
           </div>
+        </div>
+      )}
+
+      {/* Custom Right-Click Context Menu */}
+      {contextMenu && (
+        <div
+          className="custom-context-menu"
+          style={{
+            position: 'fixed',
+            top: `${contextMenu.y}px`,
+            left: `${contextMenu.x}px`,
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button
+            className="context-menu-item delete-item"
+            onClick={(e) => handleDeleteCamera(e, contextMenu.cameraId, contextMenu.cameraName)}
+          >
+            🗑️ Delete Camera
+          </button>
         </div>
       )}
     </div>
