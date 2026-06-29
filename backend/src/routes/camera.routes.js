@@ -4,6 +4,7 @@ import {
   getCameras,
   getCamera,
   updateSettings,
+  deleteCamera,
 } from '../controllers/camera.controller.js';
 import { verifyToken, requireAdmin } from '../middlewares/auth.middleware.js';
 
@@ -23,5 +24,8 @@ router.post('/', requireAdmin, createCamera);
 
 // Update configs
 router.put('/:id/settings', requireAdmin, updateSettings);
+
+// Delete camera
+router.delete('/:id', requireAdmin, deleteCamera);
 
 export default router;

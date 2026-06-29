@@ -50,3 +50,13 @@ export const updateSettings = async (req, res) => {
     res.status(400).json({ error: error.message });
   }
 };
+
+export const deleteCamera = async (req, res) => {
+  try {
+    const { id } = req.params;
+    await cameraService.deleteCamera(id);
+    res.status(200).json({ message: 'Camera deleted successfully!' });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+};

@@ -31,3 +31,11 @@ export const updateCameraSettings = async (id, settings) => {
 
   return await cameraRepo.save(camera);
 };
+
+export const deleteCamera = async id => {
+  const cameraRepo = AppDataSource.getRepository(Camera);
+  const camera = await cameraRepo.findOne({ where: { id } });
+
+  if (!camera) throw new Error('Camera not found');
+  return await cameraRepo.remove(camera);
+};
