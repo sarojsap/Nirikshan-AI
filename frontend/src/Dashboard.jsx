@@ -359,7 +359,7 @@ export default function Dashboard({ token, user, onLogout }) {
               // Point directly to our local python stream port 8000
               // In production we would use the camera's RTSP source or proxy through backend
               <img
-                src="http://localhost:8000/video_feed"
+                src={`http://localhost:8000/video_feed?camera_id=${selectedCamera.id}`}
                 alt="Live Surveillance Stream"
                 className="feed-image"
                 onError={(e) => {

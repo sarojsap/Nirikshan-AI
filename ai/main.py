@@ -19,8 +19,15 @@ api = APIClient()
 model = YOLO('yolov8n.pt')
 
 # Automate camera ID configuration
-if not CAMERA_ID or CAMERA_ID == 'your-camera-uuid-here' or CAMERA_ID.strip() == '':
-    print("[AUTO-CONFIG] CAMERA_ID is missing or placeholder. Attempting auto-registration...")
+camera_exists = False
+if CAMERA_ID and CAMERA_ID != 'your-camera-uuid-here' and CAMERA_ID.strip() != '':
+    # Check if this camera ID actually exists in the backend database
+    config = api.get_camera_config(CAMERA_ID)
+    if config:
+        camera_exists = True
+
+if not camera_exists:
+    print("[AUTO-CONFIG] CAMERA_ID is missing, placeholder, or does not exist in backend database. Attempting auto-registration...")
     CAMERA_ID = api.get_or_create_camera_id()
     if CAMERA_ID:
         env_path = os.path.join(os.path.dirname(__file__), '.env')
@@ -51,20 +58,6 @@ if not CAMERA_ID or CAMERA_ID == 'your-camera-uuid-here' or CAMERA_ID.strip() ==
     else:
         print("[AUTO-CONFIG] Warning: Could not retrieve or create a Camera ID from backend!")
 
-# Fetch Dynamic Config
-camera_config = api.get_camera_config(CAMERA_ID)
-CROWD_THRESHOLD = camera_config.get('crowdThreshold') if camera_config else 3
-restricted_polygon_data = camera_config.get('restrictedPolygon') if camera_config else None
-
-if restricted_polygon_data:
-    polygon_points = [(pt['x'], pt['y']) for pt in restricted_polygon_data]
-    RESTRICTED_ZONE = Polygon(polygon_points)
-else:
-    RESTRICTED_ZONE = Polygon([(100, 100), (500, 100), (500, 400), (100, 400)])
-
-start_time_str = camera_config.get('restrictedStartTime') if camera_config else None
-end_time_str = camera_config.get('restrictedEndTime') if camera_config else None
-
 # Cooldown config
 cooldowns = {"INTRUSION": 0, "CROWD": 0}
 COOLDOWN_SECONDS = 10
@@ -76,29 +69,56 @@ def check_cooldown(alert_type):
         return True
     return False
 
-def is_restricted_time():
-    if not start_time_str or not end_time_str:
-        return True
-    now = datetime.now().time()
-    start = datetime.strptime(start_time_str, "%H:%M:%S").time()
-    end = datetime.strptime(end_time_str, "%H:%M:%S").time()
-    if start <= end:
-        return start <= now <= end
-    else:
-        return start <= now or now <= end
-
 # Generator function that captures frames, processes them, and yields them to the web server
-def generate_frames():
-    rtsp_url = camera_config.get('rtspUrl') if camera_config else None
+def generate_frames(camera_id=None):
+    cid = camera_id if camera_id else CAMERA_ID
+    
+    # Fetch Dynamic Config for this camera
+    print(f"[DEBUG] Fetching configuration for camera: {cid}")
+    config = api.get_camera_config(cid)
+    
+    crowd_threshold = config.get('crowdThreshold') if config else 3
+    restricted_polygon_data = config.get('restrictedPolygon') if config else None
+    
+    if restricted_polygon_data:
+        try:
+            polygon_points = [(pt['x'], pt['y']) for pt in restricted_polygon_data]
+            restricted_zone = Polygon(polygon_points)
+        except Exception as e:
+            print(f"[DEBUG] Error building polygon: {e}")
+            restricted_zone = Polygon([(100, 100), (500, 100), (500, 400), (100, 400)])
+    else:
+        restricted_zone = Polygon([(100, 100), (500, 100), (500, 400), (100, 400)])
+        
+    start_time_str = config.get('restrictedStartTime') if config else None
+    end_time_str = config.get('restrictedEndTime') if config else None
+    
+    def check_restricted_time():
+        if not start_time_str or not end_time_str:
+            return True
+        try:
+            now = datetime.now().time()
+            start = datetime.strptime(start_time_str, "%H:%M:%S").time()
+            end = datetime.strptime(end_time_str, "%H:%M:%S").time()
+            if start <= end:
+                return start <= now <= end
+            else:
+                return start <= now or now <= end
+        except Exception as e:
+            print(f"[DEBUG] Error parsing time limit: {e}")
+            return True
+
+    rtsp_url = config.get('rtspUrl') if config else None
     video_source = 0
     if rtsp_url:
         if rtsp_url.isdigit():
             video_source = int(rtsp_url)
         else:
             video_source = rtsp_url
+            
     print(f"[DEBUG] Attempting to open video source: {video_source} (type: {type(video_source).__name__})")
     
-    # On Windows, DirectShow (cv2.CAP_DSHOW) is preferred for local webcams
+    # On Windows, DirectShow (cv2.CAP_DSHOW) is preferred for local webcams (integers)
     if isinstance(video_source, int):
         cap = cv2.VideoCapture(video_source, cv2.CAP_DSHOW)
     else:
@@ -136,24 +156,27 @@ def generate_frames():
                 cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
                 cv2.circle(frame, (foot_x, foot_y), 5, (0, 0, 255), -1)
 
-                if RESTRICTED_ZONE.contains(Point(foot_x, foot_y)):
+                if restricted_zone.contains(Point(foot_x, foot_y)):
                     intrusion_detected = True
                     cv2.putText(frame, "INTRUDER!", (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 0, 255), 2)
 
         # Draw Restricted Zone
-        pts = [(int(x), int(y)) for x, y in RESTRICTED_ZONE.exterior.coords]
-        for i in range(len(pts) - 1):
-            cv2.line(frame, pts[i], pts[i+1], (0, 0, 255) if intrusion_detected else (255, 0, 0), 2)
+        try:
+            pts = [(int(x), int(y)) for x, y in restricted_zone.exterior.coords]
+            for i in range(len(pts) - 1):
+                cv2.line(frame, pts[i], pts[i+1], (0, 0, 255) if intrusion_detected else (255, 0, 0), 2)
+        except Exception as e:
+            pass
 
         # UI Stats
         cv2.putText(frame, f"People Count: {person_count}", (20, 40), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 0), 2)
 
         # Alerts Logic
-        if intrusion_detected and is_restricted_time() and check_cooldown("INTRUSION"):
-            api.send_incident("INTRUSION", "Perimeter breached during restricted hours.", "CRITICAL", CAMERA_ID)
+        if intrusion_detected and check_restricted_time() and check_cooldown("INTRUSION"):
+            api.send_incident("INTRUSION", "Perimeter breached during restricted hours.", "CRITICAL", cid)
         
-        if person_count >= CROWD_THRESHOLD and check_cooldown("CROWD"):
-            api.send_incident("CROWD", f"Crowd threshold exceeded. {person_count} people detected.", "MEDIUM", CAMERA_ID)
+        if person_count >= crowd_threshold and check_cooldown("CROWD"):
+            api.send_incident("CROWD", f"Crowd threshold exceeded. {person_count} people detected.", "MEDIUM", cid)
 
         # --- MJPEG ENCODING ---
         # Compress the frame to JPEG
@@ -213,7 +236,9 @@ def index():
 # Flask route for the video feed
 @app.route('/video_feed')
 def video_feed():
-    return Response(generate_frames(), mimetype='multipart/x-mixed-replace; boundary=frame')
+    from flask import request
+    camera_id = request.args.get('camera_id')
+    return Response(generate_frames(camera_id), mimetype='multipart/x-mixed-replace; boundary=frame')
 
 if __name__ == '__main__':
     # Start the local Flask web server
