@@ -56,15 +56,37 @@ def is_restricted_time():
 
 # Generator function that captures frames, processes them, and yields them to the web server
 def generate_frames():
-    # Use RTSP URL if provided in config, otherwise fallback to local webcam (0)
     rtsp_url = camera_config.get('rtspUrl') if camera_config else None
-    video_source = rtsp_url if rtsp_url else 0
-    cap = cv2.VideoCapture(video_source)
+    video_source = 0
+    if rtsp_url:
+        if rtsp_url.isdigit():
+            video_source = int(rtsp_url)
+        else:
+            video_source = rtsp_url
+    print(f"[DEBUG] Attempting to open video source: {video_source} (type: {type(video_source).__name__})")
     
+    # On Windows, DirectShow (cv2.CAP_DSHOW) is preferred for local webcams
+    if isinstance(video_source, int):
+        cap = cv2.VideoCapture(video_source, cv2.CAP_DSHOW)
+    else:
+        cap = cv2.VideoCapture(video_source)
+    
+    if not cap.isOpened():
+        print(f"[DEBUG] Error: Could not open video source {video_source}")
+        return
+        
+    print(f"[DEBUG] Video source {video_source} opened successfully!")
+    
+    frame_count = 0
     while cap.isOpened():
         ret, frame = cap.read()
         if not ret:
+            print("[DEBUG] Error: Failed to read frame from camera")
             break
+            
+        frame_count += 1
+        if frame_count == 1:
+            print("[DEBUG] Successfully read first frame from camera!")
 
         # Run YOLOv8
         results = model(frame, classes=[0], verbose=False)
@@ -110,6 +132,50 @@ def generate_frames():
                b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
 
     cap.release()
+
+# Flask route for root index page
+@app.route('/')
+def index():
+    return """
+    <html>
+      <head>
+        <title>Nirikshan AI Video Feed</title>
+        <style>
+          body {
+            margin: 0;
+            background-color: #0d0d15;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            font-family: Arial, sans-serif;
+            color: #ffffff;
+          }
+          .container {
+            text-align: center;
+          }
+          h2 {
+            margin-bottom: 20px;
+            color: #ffffff;
+            text-shadow: 0 0 10px rgba(170, 59, 255, 0.6);
+          }
+          img {
+            border: 4px solid #aa3bff;
+            border-radius: 12px;
+            box-shadow: 0 0 30px rgba(170, 59, 255, 0.4);
+            max-width: 90vw;
+            max-height: 80vh;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <h2>Nirikshan AI - Live Stream</h2>
+          <img src="/video_feed" />
+        </div>
+      </body>
+    </html>
+    """
 
 # Flask route for the video feed
 @app.route('/video_feed')
