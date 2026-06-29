@@ -19,7 +19,6 @@ export default function Dashboard({ token, user, onLogout }) {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [modalError, setModalError] = useState('');
-  const [activeMenuCameraId, setActiveMenuCameraId] = useState(null);
   
   // Add Camera Form States
   const [camName, setCamName] = useState('');
@@ -28,13 +27,6 @@ export default function Dashboard({ token, user, onLogout }) {
   const [camRtspUrl, setCamRtspUrl] = useState('0');
 
   const socketRef = useRef(null);
-
-  // Close menus on click outside
-  useEffect(() => {
-    const handleCloseMenu = () => setActiveMenuCameraId(null);
-    window.addEventListener('click', handleCloseMenu);
-    return () => window.removeEventListener('click', handleCloseMenu);
-  }, []);
 
   // Synthesize a premium notification beep using Web Audio API (no external file needed)
   const playAlertSound = () => {
@@ -193,7 +185,6 @@ export default function Dashboard({ token, user, onLogout }) {
   // Delete Camera API call
   const handleDeleteCamera = async (e, camId, camName) => {
     e.stopPropagation();
-    setActiveMenuCameraId(null);
 
     const confirmDelete = window.confirm(`Are you sure you want to delete camera "${camName}"? This action cannot be undone.`);
     if (!confirmDelete) return;
@@ -312,24 +303,11 @@ export default function Dashboard({ token, user, onLogout }) {
                     <span>Source: {cam.rtspUrl.length === 1 ? 'Webcam' : 'Network'}</span>
                   </div>
 
-                  {/* Kebab Options Menu Button (Admin Only) */}
-                  {user?.role === 'ADMIN' && (
-                    <button
-                      className="camera-options-btn"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setActiveMenuCameraId(activeMenuCameraId === cam.id ? null : cam.id);
-                      }}
-                    >
-                      ⋮
-                    </button>
-                  )}
-
-                  {/* Floating Options Dropdown */}
-                  {activeMenuCameraId === cam.id && (
-                    <div className="camera-options-dropdown" onClick={(e) => e.stopPropagation()}>
+                  {/* Canva-Style Selection Actions Bar (Admin Only) */}
+                  {selectedCamera?.id === cam.id && user?.role === 'ADMIN' && (
+                    <div className="camera-card-options-bar" onClick={(e) => e.stopPropagation()}>
                       <button
-                        className="camera-options-item delete-item"
+                        className="options-bar-btn delete-btn"
                         onClick={(e) => handleDeleteCamera(e, cam.id, cam.name)}
                       >
                         🗑️ Delete Camera
