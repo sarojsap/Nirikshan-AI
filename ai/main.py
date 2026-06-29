@@ -18,6 +18,39 @@ app = Flask(__name__)
 api = APIClient()
 model = YOLO('yolov8n.pt')
 
+# Automate camera ID configuration
+if not CAMERA_ID or CAMERA_ID == 'your-camera-uuid-here' or CAMERA_ID.strip() == '':
+    print("[AUTO-CONFIG] CAMERA_ID is missing or placeholder. Attempting auto-registration...")
+    CAMERA_ID = api.get_or_create_camera_id()
+    if CAMERA_ID:
+        env_path = os.path.join(os.path.dirname(__file__), '.env')
+        try:
+            if os.path.exists(env_path):
+                with open(env_path, 'r') as f:
+                    lines = f.readlines()
+                
+                updated = False
+                for i, line in enumerate(lines):
+                    if line.strip().startswith('CAMERA_ID='):
+                        lines[i] = f"CAMERA_ID={CAMERA_ID}\n"
+                        updated = True
+                        break
+                
+                if not updated:
+                    lines.append(f"\nCAMERA_ID={CAMERA_ID}\n")
+                
+                with open(env_path, 'w') as f:
+                    f.writelines(lines)
+                print(f"[AUTO-CONFIG] Successfully saved CAMERA_ID={CAMERA_ID} to .env file!")
+            else:
+                with open(env_path, 'w') as f:
+                    f.write(f"CAMERA_ID={CAMERA_ID}\n")
+                print(f"[AUTO-CONFIG] Created .env and saved CAMERA_ID={CAMERA_ID}!")
+        except Exception as e:
+            print(f"[AUTO-CONFIG] Failed to write CAMERA_ID to .env file: {e}")
+    else:
+        print("[AUTO-CONFIG] Warning: Could not retrieve or create a Camera ID from backend!")
+
 # Fetch Dynamic Config
 camera_config = api.get_camera_config(CAMERA_ID)
 CROWD_THRESHOLD = camera_config.get('crowdThreshold') if camera_config else 3

@@ -67,3 +67,43 @@ class APIClient:
         except Exception as e:
             print(f"Failed to fetch camera config: {e}")
             return None
+
+    def get_or_create_camera_id(self):
+        if not self.token:
+            print("No token available. Cannot get or create camera.")
+            return None
+
+        headers = {
+            "Authorization": f"Bearer {self.token}",
+            "Content-Type": "application/json"
+        }
+
+        # 1. Fetch existing cameras
+        try:
+            res = requests.get(f"{API_URL}/cameras", headers=headers)
+            res.raise_for_status()
+            cameras = res.json()
+            if isinstance(cameras, list) and len(cameras) > 0:
+                print(f"Found {len(cameras)} registered cameras in backend. Using the first camera.")
+                return cameras[0].get('id')
+        except Exception as e:
+            print(f"Failed to fetch cameras: {e}")
+
+        # 2. No cameras found, register a default camera
+        print("No cameras found in backend. Registering default local webcam...")
+        payload = {
+            "name": "Auto Local Webcam",
+            "location": "Office Room",
+            "rtspUrl": "0"
+        }
+        try:
+            res = requests.post(f"{API_URL}/cameras", json=payload, headers=headers)
+            res.raise_for_status()
+            res_data = res.json()
+            camera = res_data.get('camera')
+            if camera:
+                print(f"Registered camera successfully: {camera.get('name')} (ID: {camera.get('id')})")
+                return camera.get('id')
+        except Exception as e:
+            print(f"Failed to auto-register camera: {e}")
+            return None
