@@ -82,6 +82,9 @@ def generate_frames(camera_id=None):
     
     if restricted_polygon_data:
         try:
+            if isinstance(restricted_polygon_data, str):
+                import json
+                restricted_polygon_data = json.loads(restricted_polygon_data)
             polygon_points = [(pt['x'], pt['y']) for pt in restricted_polygon_data]
             restricted_zone = Polygon(polygon_points)
         except Exception as e:
