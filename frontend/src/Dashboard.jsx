@@ -16,10 +16,28 @@ export default function Dashboard({ token, user, onLogout }) {
   });
 
   // UI States
+  const [activeTab, setActiveTab] = useState('surveillance'); // 'surveillance' or 'operators'
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [modalError, setModalError] = useState('');
   const [contextMenu, setContextMenu] = useState(null); // { x, y, cameraId, cameraName }
+  const [isDrawingPerimeter, setIsDrawingPerimeter] = useState(false);
+  const [drawingPoints, setDrawingPoints] = useState([]);
+  const [mousePos, setMousePos] = useState(null);
+  const [isDrawingClosed, setIsDrawingClosed] = useState(false);
+  const [streamTimestamp, setStreamTimestamp] = useState(Date.now());
+  
+  const imgRef = useRef(null);
+  const canvasRef = useRef(null);
+  const frozenFrameRef = useRef(null);
+  
+  // Operator Management States
+  const [operators, setOperators] = useState([]);
+  const [newOpName, setNewOpName] = useState('');
+  const [newOpEmail, setNewOpEmail] = useState('');
+  const [newOpPassword, setNewOpPassword] = useState('');
+  const [opError, setOpError] = useState('');
+  const [opSuccess, setOpSuccess] = useState('');
   
   // Add Camera Form States
   const [camName, setCamName] = useState('');
@@ -134,6 +152,300 @@ export default function Dashboard({ token, user, onLogout }) {
       }
     };
   }, [token]);
+
+  // Fetch all operator accounts (Admin only)
+  const fetchOperators = async () => {
+    if (user?.role !== 'ADMIN') return;
+    try {
+      const res = await fetch('http://localhost:5000/api/operators', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.status === 401) {
+        onLogout();
+        return;
+      }
+      if (res.ok) {
+        const data = await res.json();
+        setOperators(data.data || []);
+      }
+    } catch (err) {
+      console.error('Error fetching operators:', err);
+    }
+  };
+
+  // Sync operators when tab is active
+  useEffect(() => {
+    if (activeTab === 'operators') {
+      fetchOperators();
+    }
+  }, [activeTab]);
+
+  // Add operator
+  const handleAddOperator = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setOpError('');
+    setOpSuccess('');
+    
+    try {
+      const res = await fetch('http://localhost:5000/api/operators', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          name: newOpName,
+          email: newOpEmail,
+          password: newOpPassword
+        })
+      });
+      
+      if (res.status === 401) {
+        onLogout();
+        return;
+      }
+      
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to add operator.');
+      }
+      
+      setOpSuccess('Operator added successfully!');
+      setNewOpName('');
+      setNewOpEmail('');
+      setNewOpPassword('');
+      fetchOperators();
+    } catch (err) {
+      setOpError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Delete operator
+  const handleDeleteOperator = async (opId, opName) => {
+    const confirmDelete = window.confirm(`Are you sure you want to delete operator "${opName}"?`);
+    if (!confirmDelete) return;
+
+    try {
+      const res = await fetch(`http://localhost:5000/api/operators/${opId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.status === 401) {
+        onLogout();
+        return;
+      }
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || 'Failed to delete operator.');
+      }
+      alert('Operator deleted successfully!');
+      fetchOperators();
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
+  // Freeze frame and open canvas editor
+  const startDrawingMode = () => {
+    const img = imgRef.current;
+    if (!img) {
+      alert("Stream not loaded yet. Please wait for the video feed to load.");
+      return;
+    }
+    
+    // Create an offscreen canvas to freeze the current frame
+    const offscreen = document.createElement('canvas');
+    offscreen.width = img.naturalWidth || img.clientWidth || 640;
+    offscreen.height = img.naturalHeight || img.clientHeight || 480;
+    const ctx = offscreen.getContext('2d');
+    
+    try {
+      ctx.drawImage(img, 0, 0, offscreen.width, offscreen.height);
+      frozenFrameRef.current = offscreen;
+      
+      // Load existing boundary points
+      let existingPoints = [];
+      if (selectedCamera?.restrictedPolygon) {
+        try {
+          existingPoints = typeof selectedCamera.restrictedPolygon === 'string'
+            ? JSON.parse(selectedCamera.restrictedPolygon)
+            : selectedCamera.restrictedPolygon;
+        } catch (e) {
+          existingPoints = selectedCamera.restrictedPolygon;
+        }
+      }
+      setDrawingPoints(existingPoints || []);
+      setIsDrawingClosed(existingPoints && existingPoints.length >= 3);
+      setIsDrawingPerimeter(true);
+    } catch (err) {
+      console.error("Failed to snapshot stream frame:", err);
+      setIsDrawingPerimeter(true);
+    }
+  };
+
+  // Redraw canvas loop on point updates
+  const redrawCanvas = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const frozenCanvas = frozenFrameRef.current;
+    
+    if (frozenCanvas && (canvas.width !== frozenCanvas.width || canvas.height !== frozenCanvas.height)) {
+      canvas.width = frozenCanvas.width;
+      canvas.height = frozenCanvas.height;
+    }
+    
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    if (frozenCanvas) {
+      ctx.drawImage(frozenCanvas, 0, 0, canvas.width, canvas.height);
+    }
+    
+    // Draw connecting lines
+    if (drawingPoints.length > 0) {
+      ctx.beginPath();
+      ctx.moveTo(drawingPoints[0].x, drawingPoints[0].y);
+      for (let i = 1; i < drawingPoints.length; i++) {
+        ctx.lineTo(drawingPoints[i].x, drawingPoints[i].y);
+      }
+      
+      if (mousePos && !isDrawingClosed) {
+        ctx.lineTo(mousePos.x, mousePos.y);
+      }
+      
+      // If we are showing a completed polygon (not drawing anymore)
+      if (drawingPoints.length > 2 && (isDrawingClosed || !mousePos)) {
+        ctx.closePath();
+        ctx.fillStyle = 'rgba(239, 68, 68, 0.2)';
+        ctx.fill();
+      }
+      
+      ctx.strokeStyle = '#ef4444';
+      ctx.lineWidth = 3;
+      ctx.stroke();
+    }
+    
+    // Draw vertex handles
+    drawingPoints.forEach((pt, idx) => {
+      ctx.beginPath();
+      ctx.arc(pt.x, pt.y, 6, 0, 2 * Math.PI);
+      ctx.fillStyle = idx === 0 ? '#10b981' : '#ef4444'; // Green for first point
+      ctx.fill();
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+    });
+  };
+
+  useEffect(() => {
+    if (isDrawingPerimeter) {
+      redrawCanvas();
+    }
+  }, [drawingPoints, mousePos, isDrawingPerimeter, isDrawingClosed]);
+
+  // Canvas interaction click handlers
+  const handleCanvasClick = (e) => {
+    if (isDrawingClosed) return; // Prevent adding points when closed
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    
+    const rect = canvas.getBoundingClientRect();
+    const clientX = e.clientX - rect.left;
+    const clientY = e.clientY - rect.top;
+    
+    const canvasX = Math.round((clientX / rect.width) * canvas.width);
+    const canvasY = Math.round((clientY / rect.height) * canvas.height);
+    
+    // Close polygon if clicking near first point
+    if (drawingPoints.length >= 3) {
+      const firstPt = drawingPoints[0];
+      const dist = Math.sqrt(Math.pow(canvasX - firstPt.x, 2) + Math.pow(canvasY - firstPt.y, 2));
+      if (dist < 15) {
+        setIsDrawingClosed(true);
+        setMousePos(null);
+        return;
+      }
+    }
+    
+    setDrawingPoints([...drawingPoints, { x: canvasX, y: canvasY }]);
+  };
+
+  const handleCanvasMouseMove = (e) => {
+    if (isDrawingClosed || drawingPoints.length === 0) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    
+    const rect = canvas.getBoundingClientRect();
+    const clientX = e.clientX - rect.left;
+    const clientY = e.clientY - rect.top;
+    
+    const canvasX = Math.round((clientX / rect.width) * canvas.width);
+    const canvasY = Math.round((clientY / rect.height) * canvas.height);
+    
+    setMousePos({ x: canvasX, y: canvasY });
+  };
+
+  // Canvas Action controls
+  const clearDrawing = () => {
+    setDrawingPoints([]);
+    setMousePos(null);
+    setIsDrawingClosed(false);
+  };
+
+  const cancelDrawing = () => {
+    setIsDrawingPerimeter(false);
+    setDrawingPoints([]);
+    setMousePos(null);
+    setIsDrawingClosed(false);
+    frozenFrameRef.current = null;
+  };
+
+  const saveDrawing = async () => {
+    if (drawingPoints.length < 3) {
+      alert("Please draw a closed perimeter boundary (requires at least 3 points).");
+      return;
+    }
+    
+    try {
+      const res = await fetch(`http://localhost:5000/api/cameras/${selectedCamera.id}/settings`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          restrictedPolygon: drawingPoints
+        })
+      });
+      
+      if (res.status === 401) {
+        onLogout();
+        return;
+      }
+      
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to save perimeter settings.');
+      }
+      
+      alert("Virtual perimeter zone updated successfully!");
+      
+      const updatedCam = { ...selectedCamera, restrictedPolygon: drawingPoints };
+      setSelectedCamera(updatedCam);
+      setCameras(cameras.map(c => c.id === selectedCamera.id ? updatedCam : c));
+      
+      setIsDrawingPerimeter(false);
+      setDrawingPoints([]);
+      setMousePos(null);
+      setIsDrawingClosed(false);
+      frozenFrameRef.current = null;
+      setStreamTimestamp(Date.now()); // Force reload video stream with dynamic parameter
+    } catch (err) {
+      alert(err.message);
+    }
+  };
 
   // Handle source toggle click in modal
   const handleSourceTypeChange = (type) => {
@@ -256,6 +568,23 @@ export default function Dashboard({ token, user, onLogout }) {
           <span className="brand-title">Nirikshan AI</span>
         </div>
 
+        {user?.role === 'ADMIN' && (
+          <div className="header-tabs">
+            <button
+              className={`tab-btn ${activeTab === 'surveillance' ? 'active' : ''}`}
+              onClick={() => setActiveTab('surveillance')}
+            >
+              🖥️ Surveillance
+            </button>
+            <button
+              className={`tab-btn ${activeTab === 'operators' ? 'active' : ''}`}
+              onClick={() => setActiveTab('operators')}
+            >
+              👥 Operators
+            </button>
+          </div>
+        )}
+
         <div className="user-controls">
           <div className="profile-card">
             <span className="profile-name">{user?.name || 'Administrator'}</span>
@@ -293,112 +622,259 @@ export default function Dashboard({ token, user, onLogout }) {
       </section>
 
       {/* Main Grid Workspace */}
-      <main className="dashboard-grid">
-        {/* Left sidebar: Cameras */}
-        <section className="sidebar-panel glass-panel">
-          <div className="panel-header">
-            <h3 className="panel-title">📹 Cameras</h3>
-            {user?.role === 'ADMIN' && (
-              <button 
-                className="btn-add-camera" 
-                onClick={() => setIsAddModalOpen(true)}
-                style={{ padding: '4px 10px', fontSize: '12px', width: 'auto' }}
-              >
-                + Add
-              </button>
-            )}
-          </div>
-          <div className="sidebar-content">
-            {cameras.length === 0 ? (
-              <p style={{ color: '#475569', fontSize: '14px', marginTop: '20px' }}>No cameras registered.</p>
-            ) : (
-              cameras.map((cam) => (
-                <div
-                  key={cam.id}
-                  className={`camera-card ${selectedCamera?.id === cam.id ? 'active-card' : ''}`}
-                  onClick={() => setSelectedCamera(cam)}
-                  onContextMenu={(e) => handleContextMenu(e, cam)}
+      {activeTab === 'surveillance' || user?.role !== 'ADMIN' ? (
+        <main className="dashboard-grid">
+          {/* Left sidebar: Cameras */}
+          <section className="sidebar-panel glass-panel">
+            <div className="panel-header">
+              <h3 className="panel-title">📹 Cameras</h3>
+              {user?.role === 'ADMIN' && (
+                <button 
+                  className="btn-add-camera" 
+                  onClick={() => setIsAddModalOpen(true)}
+                  style={{ padding: '4px 10px', fontSize: '12px', width: 'auto' }}
                 >
-                  <div className="camera-card-top">
-                    <span className="camera-name">{cam.name}</span>
-                    <span className={`camera-status-dot ${cam.status.toLowerCase()}`}></span>
-                  </div>
-                  <div className="camera-card-bottom">
-                    <span>📍 {cam.location}</span>
-                    <span>Source: {cam.rtspUrl.length === 1 ? 'Webcam' : 'Network'}</span>
-                  </div>
-                  </div>
-              ))
-            )}
-          </div>
-        </section>
-
-        {/* Center Panel: Video Feed */}
-        <section className="feed-panel glass-panel">
-          <div className="panel-header">
-            <h3 className="panel-title">
-              🖥️ Live Stream Feed: <span style={{ color: '#c084fc' }}>{selectedCamera?.name || 'None'}</span>
-            </h3>
-            {selectedCamera && (
-              <span className="status-badge active" style={{ padding: '3px 8px', fontSize: '11px' }}>
-                <span className="pulse-dot"></span> Live
-              </span>
-            )}
-          </div>
-          <div className="feed-content">
-            {selectedCamera ? (
-              // Point directly to our local python stream port 8000
-              // In production we would use the camera's RTSP source or proxy through backend
-              <img
-                src={`http://localhost:8000/video_feed?camera_id=${selectedCamera.id}`}
-                alt="Live Surveillance Stream"
-                className="feed-image"
-                onError={(e) => {
-                  e.target.style.display = 'none';
-                  e.target.nextSibling.style.display = 'flex';
-                }}
-              />
-            ) : null}
-
-            {/* Error Placeholder fallback */}
-            <div className="feed-placeholder" style={{ display: selectedCamera ? 'none' : 'flex' }}>
-              <div className="feed-placeholder-icon">📹</div>
-              <span style={{ fontSize: '15px' }}>
-                {selectedCamera ? 'Camera Stream Offline or Connecting...' : 'Select a camera to start surveillance'}
-              </span>
+                  + Add
+                </button>
+              )}
             </div>
-          </div>
-        </section>
+            <div className="sidebar-content">
+              {cameras.length === 0 ? (
+                <p style={{ color: '#475569', fontSize: '14px', marginTop: '20px' }}>No cameras registered.</p>
+              ) : (
+                cameras.map((cam) => (
+                  <div
+                    key={cam.id}
+                    className={`camera-card ${selectedCamera?.id === cam.id ? 'active-card' : ''}`}
+                    onClick={() => setSelectedCamera(cam)}
+                    onContextMenu={(e) => handleContextMenu(e, cam)}
+                  >
+                    <div className="camera-card-top">
+                      <span className="camera-name">{cam.name}</span>
+                      <span className={`camera-status-dot ${cam.status.toLowerCase()}`}></span>
+                    </div>
+                    <div className="camera-card-bottom">
+                      <span>📍 {cam.location}</span>
+                      <span>Source: {cam.rtspUrl.length === 1 ? 'Webcam' : 'Network'}</span>
+                    </div>
+                    </div>
+                ))
+              )}
+            </div>
+          </section>
 
-        {/* Right sidebar: Alerts Feed */}
-        <section className="alerts-panel glass-panel">
-          <div className="panel-header">
-            <h3 className="panel-title">🚨 Real-time Security Alerts</h3>
-          </div>
-          <div className="alerts-content">
-            {incidents.length === 0 ? (
-              <p style={{ color: '#475569', fontSize: '14px', marginTop: '20px' }}>No security events logged.</p>
-            ) : (
-              incidents.map((incident) => (
-                <div key={incident.id} className={`alert-item severity-${incident.severity}`}>
-                  <div className="alert-top">
-                    <span className="alert-type">{incident.type.replace('_', ' ')}</span>
-                    <span className="alert-time">
-                      {new Date(incident.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-                    </span>
-                  </div>
-                  <p className="alert-desc">{incident.description}</p>
-                  <div className="alert-footer">
-                    <span>📍 {incident.camera?.location || 'Unknown'}</span>
-                    <span>•</span>
-                    <span>Camera: {incident.camera?.name || 'Main'}</span>
+          {/* Center Panel: Video Feed */}
+          <section className="feed-panel glass-panel">
+            <div className="panel-header">
+              <h3 className="panel-title">
+                🖥️ Live Stream Feed: <span style={{ color: '#c084fc' }}>{selectedCamera?.name || 'None'}</span>
+              </h3>
+              <div style={{ display: 'flex', alignItems: 'center' }}>
+                {selectedCamera && user?.role === 'ADMIN' && !isDrawingPerimeter && (
+                  <button
+                    className="btn-draw-perimeter"
+                    onClick={startDrawingMode}
+                  >
+                    🚧 Virtual Perimeter
+                  </button>
+                )}
+                {selectedCamera && (
+                  <span className="status-badge active" style={{ padding: '3px 8px', fontSize: '11px' }}>
+                    <span className="pulse-dot"></span> Live
+                  </span>
+                )}
+              </div>
+            </div>
+            <div className="feed-content">
+              {selectedCamera && (
+                <img
+                  ref={imgRef}
+                  src={`http://localhost:8000/video_feed?camera_id=${selectedCamera.id}&t=${streamTimestamp}`}
+                  alt="Live Surveillance Stream"
+                  className="feed-image"
+                  style={{ display: isDrawingPerimeter ? 'none' : 'block' }}
+                  onError={(e) => {
+                    e.target.style.display = 'none';
+                    if (e.target.nextSibling) {
+                      e.target.nextSibling.style.display = 'flex';
+                    }
+                  }}
+                />
+              )}
+
+              {isDrawingPerimeter && (
+                <div className="perimeter-drawing-container">
+                  <canvas
+                    ref={canvasRef}
+                    className="perimeter-canvas"
+                    onClick={handleCanvasClick}
+                    onMouseMove={handleCanvasMouseMove}
+                    style={{ cursor: 'crosshair' }}
+                  />
+                  <div className="drawing-actions">
+                    <button className="drawing-btn btn-clear" onClick={clearDrawing}>🧹 Clear</button>
+                    <button className="drawing-btn btn-save" onClick={saveDrawing}>💾 Save Perimeter</button>
+                    <button className="drawing-btn btn-cancel" onClick={cancelDrawing}>❌ Cancel</button>
                   </div>
                 </div>
-              ))
-            )}
-          </div>
-        </section>
-      </main>
+              )}
+
+              {/* Error Placeholder fallback */}
+              <div className="feed-placeholder" style={{ display: selectedCamera && !isDrawingPerimeter ? 'none' : 'flex' }}>
+                <div className="feed-placeholder-icon">📹</div>
+                <span style={{ fontSize: '15px' }}>
+                  {isDrawingPerimeter
+                    ? 'Place at least 3 points, then click near the green start node to close the perimeter.'
+                    : selectedCamera
+                      ? 'Camera Stream Offline or Connecting...'
+                      : 'Select a camera to start surveillance'}
+                </span>
+              </div>
+            </div>
+          </section>
+
+          {/* Right sidebar: Alerts Feed */}
+          <section className="alerts-panel glass-panel">
+            <div className="panel-header">
+              <h3 className="panel-title">🚨 Real-time Security Alerts</h3>
+            </div>
+            <div className="alerts-content">
+              {incidents.length === 0 ? (
+                <p style={{ color: '#475569', fontSize: '14px', marginTop: '20px' }}>No security events logged.</p>
+              ) : (
+                incidents.map((incident) => (
+                  <div key={incident.id} className={`alert-item severity-${incident.severity}`}>
+                    <div className="alert-top">
+                      <span className="alert-type">{incident.type.replace('_', ' ')}</span>
+                      <span className="alert-time">
+                        {new Date(incident.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                      </span>
+                    </div>
+                    <p className="alert-desc">{incident.description}</p>
+                    <div className="alert-footer">
+                      <span>📍 {incident.camera?.location || 'Unknown'}</span>
+                      <span>•</span>
+                      <span>Camera: {incident.camera?.name || 'Main'}</span>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </section>
+        </main>
+      ) : (
+        <main className="operators-container">
+          {/* Left panel: List of Operators */}
+          <section className="operator-list-card glass-panel" style={{ padding: '24px' }}>
+            <div className="panel-header" style={{ padding: 0 }}>
+              <h3 className="panel-title">👥 Registered Operators</h3>
+            </div>
+            <div className="operator-table-wrapper">
+              {operators.length === 0 ? (
+                <p style={{ color: '#475569', fontSize: '14px', marginTop: '20px' }}>No operators registered yet.</p>
+              ) : (
+                <table className="operator-table">
+                  <thead>
+                    <tr>
+                      <th>Name</th>
+                      <th>Email</th>
+                      <th style={{ textAlign: 'right' }}>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {operators.map((op) => (
+                      <tr key={op.id}>
+                        <td>
+                          <div className="op-row-name-cell">
+                            <div className="operator-avatar">
+                              {op.name.charAt(0).toUpperCase()}
+                            </div>
+                            <span>{op.name}</span>
+                          </div>
+                        </td>
+                        <td style={{ color: '#94a3b8' }}>{op.email}</td>
+                        <td style={{ textAlign: 'right' }}>
+                          <button
+                            className="btn-delete-op"
+                            onClick={() => handleDeleteOperator(op.id, op.name)}
+                          >
+                            🗑️ Delete
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </section>
+
+          {/* Right panel: Add New Operator */}
+          <section className="operator-form-card glass-panel" style={{ padding: '24px' }}>
+            <div className="panel-header" style={{ padding: 0 }}>
+              <h3 className="panel-title">➕ Add New Operator</h3>
+            </div>
+            
+            <form onSubmit={handleAddOperator} className="op-form-container">
+              {opError && (
+                <div className="op-feedback-msg error">
+                  {opError}
+                </div>
+              )}
+              {opSuccess && (
+                <div className="op-feedback-msg success">
+                  {opSuccess}
+                </div>
+              )}
+
+              <div className="op-form-group">
+                <label className="modal-label">Operator Name</label>
+                <input
+                  type="text"
+                  className="op-input"
+                  placeholder="e.g. John Doe"
+                  value={newOpName}
+                  onChange={(e) => setNewOpName(e.target.value)}
+                  required
+                />
+              </div>
+
+              <div className="op-form-group">
+                <label className="modal-label">Email Address</label>
+                <input
+                  type="email"
+                  className="op-input"
+                  placeholder="e.g. john@nirikshan.com"
+                  value={newOpEmail}
+                  onChange={(e) => setNewOpEmail(e.target.value)}
+                  required
+                />
+              </div>
+
+              <div className="op-form-group">
+                <label className="modal-label">Password</label>
+                <input
+                  type="password"
+                  className="op-input"
+                  placeholder="At least 6 characters"
+                  value={newOpPassword}
+                  onChange={(e) => setNewOpPassword(e.target.value)}
+                  required
+                  minLength={6}
+                />
+              </div>
+
+              <button
+                type="submit"
+                className="btn-save-op"
+                disabled={loading}
+              >
+                {loading ? 'Adding...' : 'Create Operator'}
+              </button>
+            </form>
+          </section>
+        </main>
+      )}
 
       {/* Add Camera Modal Dialog */}
       {isAddModalOpen && (
@@ -506,6 +982,23 @@ export default function Dashboard({ token, user, onLogout }) {
           }}
           onClick={(e) => e.stopPropagation()}
         >
+          <button
+            className="context-menu-item"
+            style={{ color: '#fbbf24' }}
+            onClick={(e) => {
+              e.stopPropagation();
+              setContextMenu(null);
+              const rightClickedCam = cameras.find(c => c.id === contextMenu.cameraId);
+              if (rightClickedCam) {
+                setSelectedCamera(rightClickedCam);
+                setTimeout(() => {
+                  startDrawingMode();
+                }, 300);
+              }
+            }}
+          >
+            🚧 Virtual Perimeter
+          </button>
           <button
             className="context-menu-item delete-item"
             onClick={(e) => handleDeleteCamera(e, contextMenu.cameraId, contextMenu.cameraName)}

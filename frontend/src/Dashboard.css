@@ -714,4 +714,306 @@
   color: #ef4444;
 }
 
+/* Header Tabs Switcher */
+.header-tabs {
+  display: flex;
+  gap: 8px;
+  margin-left: 24px;
+}
+
+.tab-btn {
+  padding: 8px 16px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  color: #94a3b8;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.tab-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.15);
+  color: #ffffff;
+}
+
+.tab-btn.active {
+  background: rgba(170, 59, 255, 0.15);
+  border-color: rgba(170, 59, 255, 0.4);
+  color: #c084fc;
+  box-shadow: 0 0 15px rgba(170, 59, 255, 0.25);
+}
+
+/* Operator Management Layout */
+.operators-container {
+  display: grid;
+  grid-template-columns: 1.6fr 1fr;
+  gap: 24px;
+  padding: 0 2px;
+  height: calc(100vh - 290px);
+  min-height: 500px;
+}
+
+.operator-list-card, .operator-form-card {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.operator-table-wrapper {
+  flex: 1;
+  overflow-y: auto;
+  margin-top: 16px;
+  padding-right: 4px;
+}
+
+/* Scrollbar styling for operator list */
+.operator-table-wrapper::-webkit-scrollbar {
+  width: 6px;
+}
+
+.operator-table-wrapper::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.operator-table-wrapper::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+}
+
+.operator-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.operator-table th, .operator-table td {
+  padding: 14px 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.operator-table th {
+  color: #94a3b8;
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.operator-table td {
+  color: #e2e8f0;
+  font-size: 14px;
+}
+
+.operator-table tr:hover td {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.operator-avatar {
+  width: 32px;
+  height: 32px;
+  background: linear-gradient(135deg, #a78bfa 0%, #7c3aed 100%);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.op-row-name-cell {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.btn-delete-op {
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #f87171;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-delete-op:hover {
+  background: rgba(239, 68, 68, 0.25);
+  border-color: rgba(239, 68, 68, 0.4);
+  color: #ffffff;
+}
+
+.op-form-container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.op-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.op-input {
+  width: 100%;
+  padding: 12px 14px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  color: #ffffff;
+  font-size: 14px;
+  transition: all 0.2s ease;
+  box-sizing: border-box;
+}
+
+.op-input:focus {
+  outline: none;
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(170, 59, 255, 0.5);
+  box-shadow: 0 0 10px rgba(170, 59, 255, 0.15);
+}
+
+.btn-save-op {
+  padding: 12px;
+  margin-top: 8px;
+  background: linear-gradient(135deg, #aa3bff 0%, #7c3aed 100%);
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 4px 15px rgba(124, 58, 237, 0.3);
+  transition: all 0.2s ease;
+}
+
+.btn-save-op:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(124, 58, 237, 0.45);
+}
+
+.btn-save-op:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.op-feedback-msg {
+  padding: 10px 14px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.op-feedback-msg.error {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  color: #f87171;
+}
+
+.op-feedback-msg.success {
+  background: rgba(34, 197, 94, 0.1);
+  border: 1px solid rgba(34, 197, 94, 0.2);
+  color: #4ade80;
+}
+
+/* Virtual Perimeter Drawing Mode styling */
+.btn-draw-perimeter {
+  padding: 6px 12px;
+  background: rgba(245, 158, 11, 0.1);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  color: #fbbf24;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin-right: 8px;
+}
+
+.btn-draw-perimeter:hover {
+  background: rgba(245, 158, 11, 0.25);
+  border-color: rgba(245, 158, 11, 0.5);
+  color: #ffffff;
+}
+
+.perimeter-drawing-container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.perimeter-canvas {
+  border-radius: 8px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  width: 100%;
+  height: auto;
+  max-height: 480px;
+  background: #000000;
+}
+
+.drawing-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 16px;
+  justify-content: center;
+  width: 100%;
+}
+
+.drawing-btn {
+  padding: 10px 20px;
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: 8px;
+  cursor: pointer;
+  border: none;
+  transition: all 0.2s ease;
+}
+
+.drawing-btn.btn-clear {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #cbd5e1;
+}
+
+.drawing-btn.btn-clear:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+}
+
+.drawing-btn.btn-save {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: #ffffff;
+  box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3);
+}
+
+.drawing-btn.btn-save:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(16, 185, 129, 0.45);
+}
+
+.drawing-btn.btn-cancel {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  color: #f87171;
+}
+
+.drawing-btn.btn-cancel:hover {
+  background: rgba(239, 68, 68, 0.2);
+  color: #ffffff;
+}
+
 
