@@ -3,9 +3,13 @@ import { Server } from 'socket.io';
 let io; // This will hold our Socket.IO instance
 
 export const initSocket = httpServer => {
+  const allowedOrigins = process.env.CLIENT_URL
+    ? process.env.CLIENT_URL.split(',')
+    : ['http://localhost:5173'];
+
   io = new Server(httpServer, {
     cors: {
-      origin: '*',
+      origin: allowedOrigins,
       methods: ['GET', 'POST'],
     },
   });

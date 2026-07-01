@@ -25,7 +25,7 @@ export const registerUser = async (name, email, password, role) => {
 
   await userRepository.save(newUser);
 
-  const { password: _, ...userWithoutPassword } = newUser;
+  const { password: _password, ...userWithoutPassword } = newUser;
   return userWithoutPassword;
 };
 
@@ -47,7 +47,7 @@ export const loginUser = async (email, password) => {
     expiresIn: process.env.JWT_EXPIRES_IN,
   });
 
-  const { password: _, ...userWithoutPassword } = user;
+  const { password: _password, ...userWithoutPassword } = user;
   return { user: userWithoutPassword, token };
 };
 
@@ -145,7 +145,7 @@ export const getOperatorById = async (id) => {
     return null;
   }
 
-  const { password: _, resetToken: _rt, resetTokenExpiry: _rte, ...userWithoutSensitiveData } = user;
+  const { password: _password, resetToken: _resetToken, resetTokenExpiry: _resetTokenExpiry, ...userWithoutSensitiveData } = user;
   return userWithoutSensitiveData;
 };
 
@@ -208,7 +208,7 @@ export const updateOperator = async (operatorId, updates) => {
 
   await userRepository.save(user);
 
-  const { password: _, resetToken: _rt, resetTokenExpiry: _rte, ...userWithoutSensitiveData } = user;
+  const { password: _password, resetToken: _resetToken, resetTokenExpiry: _resetTokenExpiry, ...userWithoutSensitiveData } = user;
   return userWithoutSensitiveData;
 };
 

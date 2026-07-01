@@ -39,6 +39,26 @@ export const Camera = new EntitySchema({
       type: 'time',
       nullable: true,
     },
+    confidenceThreshold: {
+      type: 'float',
+      default: 0.5,
+    },
+    cooldownSeconds: {
+      type: 'int',
+      default: 10,
+    },
+    alertsEnabled: {
+      type: 'boolean',
+      default: true,
+    },
+    intrusionEnabled: {
+      type: 'boolean',
+      default: true,
+    },
+    crowdEnabled: {
+      type: 'boolean',
+      default: true,
+    },
     createdAt: {
       type: 'timestamp',
       createDate: true,

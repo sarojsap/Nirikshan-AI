@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { io } from 'socket.io-client';
+import { API, STREAM } from './config';
 import './Dashboard.css';
 
 export default function Dashboard({ token, user, onLogout }) {
@@ -25,11 +26,20 @@ export default function Dashboard({ token, user, onLogout }) {
   const [drawingPoints, setDrawingPoints] = useState([]);
   const [mousePos, setMousePos] = useState(null);
   const [isDrawingClosed, setIsDrawingClosed] = useState(false);
-  const [streamTimestamp, setStreamTimestamp] = useState(Date.now());
+  const [streamTimestamp, setStreamTimestamp] = useState(() => Date.now());
+  
+  // Settings Panel States
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [configSchema, setConfigSchema] = useState([]);
+  const [settingsValues, setSettingsValues] = useState({});
+  const [settingsLoading, setSettingsLoading] = useState(false);
+  const [settingsError, setSettingsError] = useState('');
+  const [settingsSuccess, setSettingsSuccess] = useState('');
   
   const imgRef = useRef(null);
   const canvasRef = useRef(null);
   const frozenFrameRef = useRef(null);
+  const settingsSuccessTimeoutRef = useRef(null);
   
   // Operator Management States
   const [operators, setOperators] = useState([]);
@@ -79,17 +89,16 @@ export default function Dashboard({ token, user, onLogout }) {
       
       oscillator.start();
       oscillator.stop(audioCtx.currentTime + 0.35);
-    } catch (e) {
+    } catch {
       console.warn('Audio feedback blocked by browser autoplay policy');
     }
   };
 
   // Fetch initial cameras and analytics summary
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     const headers = { Authorization: `Bearer ${token}` };
     try {
-      // 1. Fetch Cameras
-      const camRes = await fetch('http://localhost:5000/api/cameras', { headers });
+      const camRes = await fetch(`${API.CAMERAS}`, { headers });
       if (camRes.status === 401) {
         onLogout();
         return;
@@ -97,13 +106,9 @@ export default function Dashboard({ token, user, onLogout }) {
       if (camRes.ok) {
         const camData = await camRes.json();
         setCameras(camData);
-        if (camData.length > 0 && !selectedCamera) {
-          setSelectedCamera(camData[0]); // Default to first camera
-        }
       }
 
-      // 2. Fetch Analytics
-      const statsRes = await fetch('http://localhost:5000/api/analytics/summary', { headers });
+      const statsRes = await fetch(`${API.ANALYTICS}/summary`, { headers });
       if (statsRes.status === 401) {
         onLogout();
         return;
@@ -120,13 +125,104 @@ export default function Dashboard({ token, user, onLogout }) {
     } catch (err) {
       console.error('Error fetching dashboard data:', err);
     }
+  }, [token, onLogout]);
+
+  const fetchConfigSchema = useCallback(async () => {
+    if (!selectedCamera) return;
+    setSettingsLoading(true);
+    setSettingsError('');
+    setSettingsSuccess('');
+    try {
+      const res = await fetch(`${API.CAMERAS}/${selectedCamera.id}/config-schema`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.status === 401) {
+        onLogout();
+        return;
+      }
+      if (res.ok) {
+        const schemaData = await res.json();
+        setConfigSchema(schemaData);
+        const vals = {};
+        schemaData.forEach(entry => {
+          vals[entry.key] = entry.value !== undefined ? entry.value : entry.default;
+        });
+        setSettingsValues(vals);
+      } else {
+        const errData = await res.json();
+        setSettingsError(errData.error || 'Failed to load configuration schema.');
+      }
+    } catch (err) {
+      setSettingsError('Error loading settings.');
+      console.error(err);
+    } finally {
+      setSettingsLoading(false);
+    }
+  }, [selectedCamera, token, onLogout]);
+
+  useEffect(() => {
+    if (selectedCamera && isSettingsOpen) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      fetchConfigSchema();
+    }
+  }, [selectedCamera, isSettingsOpen, fetchConfigSchema]);
+
+  const handleSaveSettings = async (e) => {
+    e.preventDefault();
+    setSettingsLoading(true);
+    setSettingsError('');
+    setSettingsSuccess('');
+    try {
+      const res = await fetch(`${API.CAMERAS}/${selectedCamera.id}/settings`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify(settingsValues)
+      });
+
+      if (res.status === 401) {
+        onLogout();
+        return;
+      }
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to save settings.');
+      }
+
+      setSettingsSuccess('Settings applied and saved successfully!');
+      
+      const updatedCam = data.camera;
+      setSelectedCamera(updatedCam);
+      setCameras(cameras.map(c => c.id === updatedCam.id ? updatedCam : c));
+
+      if (settingsSuccessTimeoutRef.current) {
+        clearTimeout(settingsSuccessTimeoutRef.current);
+      }
+      settingsSuccessTimeoutRef.current = setTimeout(() => {
+        setSettingsSuccess('');
+      }, 3000);
+    } catch (err) {
+      setSettingsError(err.message);
+    } finally {
+      setSettingsLoading(false);
+    }
   };
 
   useEffect(() => {
+    if (cameras.length > 0 && !selectedCamera) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setSelectedCamera(cameras[0]);
+    }
+  }, [cameras, selectedCamera]);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchData();
 
-    // Establish WebSocket Connection for real-time incidents
-    socketRef.current = io('http://localhost:5000');
+    socketRef.current = io(API.SOCKET);
 
     socketRef.current.on('connect', () => {
       console.log('Connected to incident stream server.');
@@ -136,10 +232,8 @@ export default function Dashboard({ token, user, onLogout }) {
       console.log('Real-time incident received:', incident);
       playAlertSound();
 
-      // Insert new incident at the top of the feed
       setIncidents((prev) => [incident, ...prev.slice(0, 19)]);
       
-      // Update counters
       setStats((prev) => ({
         ...prev,
         totalIncidents: prev.totalIncidents + 1,
@@ -150,14 +244,16 @@ export default function Dashboard({ token, user, onLogout }) {
       if (socketRef.current) {
         socketRef.current.disconnect();
       }
+      if (settingsSuccessTimeoutRef.current) {
+        clearTimeout(settingsSuccessTimeoutRef.current);
+      }
     };
-  }, [token]);
+  }, [token, fetchData]);
 
-  // Fetch all operator accounts (Admin only)
-  const fetchOperators = async () => {
+  const fetchOperators = useCallback(async () => {
     if (user?.role !== 'ADMIN') return;
     try {
-      const res = await fetch('http://localhost:5000/api/operators', {
+      const res = await fetch(API.OPERATORS, {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (res.status === 401) {
@@ -171,14 +267,14 @@ export default function Dashboard({ token, user, onLogout }) {
     } catch (err) {
       console.error('Error fetching operators:', err);
     }
-  };
+  }, [token, user, onLogout]);
 
-  // Sync operators when tab is active
   useEffect(() => {
     if (activeTab === 'operators') {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       fetchOperators();
     }
-  }, [activeTab]);
+  }, [activeTab, fetchOperators]);
 
   // Add operator
   const handleAddOperator = async (e) => {
@@ -188,7 +284,7 @@ export default function Dashboard({ token, user, onLogout }) {
     setOpSuccess('');
     
     try {
-      const res = await fetch('http://localhost:5000/api/operators', {
+      const res = await fetch(API.OPERATORS, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -229,7 +325,7 @@ export default function Dashboard({ token, user, onLogout }) {
     if (!confirmDelete) return;
 
     try {
-      const res = await fetch(`http://localhost:5000/api/operators/${opId}`, {
+      const res = await fetch(`${API.OPERATORS}/${opId}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -250,6 +346,7 @@ export default function Dashboard({ token, user, onLogout }) {
 
   // Freeze frame and open canvas editor
   const startDrawingMode = () => {
+    setIsSettingsOpen(false); // Close settings panel when entering drawing mode
     const img = imgRef.current;
     if (!img) {
       alert("Stream not loaded yet. Please wait for the video feed to load.");
@@ -273,7 +370,7 @@ export default function Dashboard({ token, user, onLogout }) {
           existingPoints = typeof selectedCamera.restrictedPolygon === 'string'
             ? JSON.parse(selectedCamera.restrictedPolygon)
             : selectedCamera.restrictedPolygon;
-        } catch (e) {
+        } catch {
           existingPoints = selectedCamera.restrictedPolygon;
         }
       }
@@ -286,8 +383,7 @@ export default function Dashboard({ token, user, onLogout }) {
     }
   };
 
-  // Redraw canvas loop on point updates
-  const redrawCanvas = () => {
+  const redrawCanvas = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
@@ -303,7 +399,6 @@ export default function Dashboard({ token, user, onLogout }) {
       ctx.drawImage(frozenCanvas, 0, 0, canvas.width, canvas.height);
     }
     
-    // Draw connecting lines
     if (drawingPoints.length > 0) {
       ctx.beginPath();
       ctx.moveTo(drawingPoints[0].x, drawingPoints[0].y);
@@ -315,7 +410,6 @@ export default function Dashboard({ token, user, onLogout }) {
         ctx.lineTo(mousePos.x, mousePos.y);
       }
       
-      // If we are showing a completed polygon (not drawing anymore)
       if (drawingPoints.length > 2 && (isDrawingClosed || !mousePos)) {
         ctx.closePath();
         ctx.fillStyle = 'rgba(239, 68, 68, 0.2)';
@@ -327,23 +421,22 @@ export default function Dashboard({ token, user, onLogout }) {
       ctx.stroke();
     }
     
-    // Draw vertex handles
     drawingPoints.forEach((pt, idx) => {
       ctx.beginPath();
       ctx.arc(pt.x, pt.y, 6, 0, 2 * Math.PI);
-      ctx.fillStyle = idx === 0 ? '#10b981' : '#ef4444'; // Green for first point
+      ctx.fillStyle = idx === 0 ? '#10b981' : '#ef4444';
       ctx.fill();
       ctx.strokeStyle = '#ffffff';
       ctx.lineWidth = 1.5;
       ctx.stroke();
     });
-  };
+  }, [drawingPoints, mousePos, isDrawingClosed]);
 
   useEffect(() => {
     if (isDrawingPerimeter) {
       redrawCanvas();
     }
-  }, [drawingPoints, mousePos, isDrawingPerimeter, isDrawingClosed]);
+  }, [isDrawingPerimeter, redrawCanvas]);
 
   // Canvas interaction click handlers
   const handleCanvasClick = (e) => {
@@ -409,7 +502,7 @@ export default function Dashboard({ token, user, onLogout }) {
     }
     
     try {
-      const res = await fetch(`http://localhost:5000/api/cameras/${selectedCamera.id}/settings`, {
+      const res = await fetch(`${API.CAMERAS}/${selectedCamera.id}/settings`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -464,7 +557,7 @@ export default function Dashboard({ token, user, onLogout }) {
     setLoading(true);
 
     try {
-      const response = await fetch('http://localhost:5000/api/cameras', {
+      const response = await fetch(`${API.CAMERAS}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -513,7 +606,7 @@ export default function Dashboard({ token, user, onLogout }) {
     if (!confirmDelete) return;
 
     try {
-      const response = await fetch(`http://localhost:5000/api/cameras/${camId}`, {
+      const response = await fetch(`${API.CAMERAS}/${camId}`, {
         method: 'DELETE',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -671,65 +764,196 @@ export default function Dashboard({ token, user, onLogout }) {
               </h3>
               <div style={{ display: 'flex', alignItems: 'center' }}>
                 {selectedCamera && user?.role === 'ADMIN' && !isDrawingPerimeter && (
-                  <button
-                    className="btn-draw-perimeter"
-                    onClick={startDrawingMode}
-                  >
-                    🚧 Virtual Perimeter
-                  </button>
+                  <>
+                    <button
+                      className="btn-draw-perimeter"
+                      onClick={startDrawingMode}
+                    >
+                      🚧 Virtual Perimeter
+                    </button>
+                    <button
+                      className="btn-draw-perimeter"
+                      style={{
+                        background: isSettingsOpen ? 'rgba(170, 59, 255, 0.15)' : 'rgba(255, 255, 255, 0.03)',
+                        borderColor: isSettingsOpen ? 'rgba(170, 59, 255, 0.4)' : 'rgba(255, 255, 255, 0.1)',
+                        color: isSettingsOpen ? '#c084fc' : '#cbd5e1',
+                        marginLeft: '8px'
+                      }}
+                      onClick={() => setIsSettingsOpen(!isSettingsOpen)}
+                    >
+                      ⚙️ AI Settings
+                    </button>
+                  </>
                 )}
                 {selectedCamera && (
-                  <span className="status-badge active" style={{ padding: '3px 8px', fontSize: '11px' }}>
+                  <span className="status-badge active" style={{ padding: '3px 8px', fontSize: '11px', marginLeft: '8px' }}>
                     <span className="pulse-dot"></span> Live
                   </span>
                 )}
               </div>
             </div>
-            <div className="feed-content">
-              {selectedCamera && (
-                <img
-                  ref={imgRef}
-                  src={`http://localhost:8000/video_feed?camera_id=${selectedCamera.id}&t=${streamTimestamp}`}
-                  alt="Live Surveillance Stream"
-                  className="feed-image"
-                  style={{ display: isDrawingPerimeter ? 'none' : 'block' }}
-                  onError={(e) => {
-                    e.target.style.display = 'none';
-                    if (e.target.nextSibling) {
-                      e.target.nextSibling.style.display = 'flex';
-                    }
-                  }}
-                />
-              )}
-
-              {isDrawingPerimeter && (
-                <div className="perimeter-drawing-container">
-                  <canvas
-                    ref={canvasRef}
-                    className="perimeter-canvas"
-                    onClick={handleCanvasClick}
-                    onMouseMove={handleCanvasMouseMove}
-                    style={{ cursor: 'crosshair' }}
+            <div className="feed-content" style={{ padding: 0, display: 'flex', flexDirection: 'row', alignItems: 'stretch' }}>
+              <div className="feed-stream-area" style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', overflow: 'hidden', background: '#06060c' }}>
+                {selectedCamera && (
+                  <img
+                    ref={imgRef}
+                    src={`${STREAM.VIDEO_FEED}?camera_id=${selectedCamera.id}&t=${streamTimestamp}`}
+                    alt="Live Surveillance Stream"
+                    className="feed-image"
+                    style={{ display: isDrawingPerimeter ? 'none' : 'block' }}
+                    onError={(e) => {
+                      e.target.style.display = 'none';
+                    }}
                   />
-                  <div className="drawing-actions">
-                    <button className="drawing-btn btn-clear" onClick={clearDrawing}>🧹 Clear</button>
-                    <button className="drawing-btn btn-save" onClick={saveDrawing}>💾 Save Perimeter</button>
-                    <button className="drawing-btn btn-cancel" onClick={cancelDrawing}>❌ Cancel</button>
+                )}
+
+                {isDrawingPerimeter && (
+                  <div className="perimeter-drawing-container">
+                    <canvas
+                      ref={canvasRef}
+                      className="perimeter-canvas"
+                      onClick={handleCanvasClick}
+                      onMouseMove={handleCanvasMouseMove}
+                      style={{ cursor: 'crosshair' }}
+                    />
+                    <div className="drawing-actions">
+                      <button className="drawing-btn btn-clear" onClick={clearDrawing}>🧹 Clear</button>
+                      <button className="drawing-btn btn-save" onClick={saveDrawing}>💾 Save Perimeter</button>
+                      <button className="drawing-btn btn-cancel" onClick={cancelDrawing}>❌ Cancel</button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Error Placeholder fallback */}
+                <div className="feed-placeholder" style={{ display: selectedCamera && !isDrawingPerimeter ? 'none' : 'flex' }}>
+                  <div className="feed-placeholder-icon">📹</div>
+                  <span style={{ fontSize: '15px' }}>
+                    {isDrawingPerimeter
+                      ? 'Place at least 3 points, then click near the green start node to close the perimeter.'
+                      : selectedCamera
+                        ? 'Camera Stream Offline or Connecting...'
+                        : 'Select a camera to start surveillance'}
+                  </span>
+                </div>
+              </div>
+
+              {isSettingsOpen && selectedCamera && (
+                <div className="settings-side-pane">
+                  <div className="settings-pane-header">
+                    <h4 className="settings-pane-title">⚙️ AI Parameters</h4>
+                    <button 
+                      className="btn-close-modal" 
+                      onClick={() => setIsSettingsOpen(false)}
+                      style={{ fontSize: '18px' }}
+                    >
+                      ×
+                    </button>
+                  </div>
+                  
+                  <div className="settings-pane-content">
+                    {settingsError && (
+                      <div className="settings-feedback error">
+                        {settingsError}
+                      </div>
+                    )}
+                    {settingsSuccess && (
+                      <div className="settings-feedback success">
+                        {settingsSuccess}
+                      </div>
+                    )}
+                    
+                    {settingsLoading && configSchema.length === 0 ? (
+                      <p style={{ color: '#94a3b8', fontSize: '13px' }}>Loading settings...</p>
+                    ) : (
+                      Object.entries(
+                        configSchema.reduce((acc, entry) => {
+                          const cat = entry.category || 'General';
+                          if (!acc[cat]) acc[cat] = [];
+                          acc[cat].push(entry);
+                          return acc;
+                        }, {})
+                      ).map(([category, entries]) => (
+                        <div key={category} className="settings-category-group">
+                          <h5 className="settings-category-title">{category}</h5>
+                          {entries.map(entry => (
+                            <div key={entry.key} className="settings-field-group">
+                              <div className="settings-label-row">
+                                <span className="settings-field-label">{entry.label}</span>
+                                {entry.type !== 'boolean' && entry.type !== 'time' && (
+                                  <span className="settings-field-value-badge">
+                                    {settingsValues[entry.key]}
+                                  </span>
+                                )}
+                              </div>
+                              
+                              {entry.type === 'boolean' ? (
+                                <label className="settings-switch">
+                                  <input
+                                    type="checkbox"
+                                    checked={!!settingsValues[entry.key]}
+                                    onChange={(e) => setSettingsValues({
+                                      ...settingsValues,
+                                      [entry.key]: e.target.checked
+                                    })}
+                                  />
+                                  <span className="settings-slider-round"></span>
+                                </label>
+                              ) : entry.type === 'integer' || entry.type === 'float' ? (
+                                <input
+                                  type="range"
+                                  className="settings-range-input"
+                                  min={entry.min !== undefined ? entry.min : 0}
+                                  max={entry.max !== undefined ? entry.max : 100}
+                                  step={entry.step !== undefined ? entry.step : 1}
+                                  value={settingsValues[entry.key] !== undefined ? settingsValues[entry.key] : entry.default}
+                                  onChange={(e) => setSettingsValues({
+                                    ...settingsValues,
+                                    [entry.key]: entry.type === 'integer' ? parseInt(e.target.value, 10) : parseFloat(e.target.value)
+                                  })}
+                                />
+                              ) : entry.type === 'time' ? (
+                                <input
+                                  type="time"
+                                  step="1"
+                                  className="settings-time-input"
+                                  value={settingsValues[entry.key] ? settingsValues[entry.key].substring(0, 8) : ''}
+                                  onChange={(e) => setSettingsValues({
+                                    ...settingsValues,
+                                    [entry.key]: e.target.value ? e.target.value : null
+                                  })}
+                                />
+                              ) : (
+                                <input
+                                  type="text"
+                                  className="settings-time-input"
+                                  value={settingsValues[entry.key] || ''}
+                                  onChange={(e) => setSettingsValues({
+                                    ...settingsValues,
+                                    [entry.key]: e.target.value
+                                  })}
+                                />
+                              )}
+                              <span className="settings-field-description">
+                                {entry.description}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      ))
+                    )}
+                  </div>
+                  
+                  <div className="settings-pane-footer">
+                    <button 
+                      className="btn-settings-save"
+                      onClick={handleSaveSettings}
+                      disabled={settingsLoading}
+                    >
+                      {settingsLoading ? 'Saving...' : '💾 Save Settings'}
+                    </button>
                   </div>
                 </div>
               )}
-
-              {/* Error Placeholder fallback */}
-              <div className="feed-placeholder" style={{ display: selectedCamera && !isDrawingPerimeter ? 'none' : 'flex' }}>
-                <div className="feed-placeholder-icon">📹</div>
-                <span style={{ fontSize: '15px' }}>
-                  {isDrawingPerimeter
-                    ? 'Place at least 3 points, then click near the green start node to close the perimeter.'
-                    : selectedCamera
-                      ? 'Camera Stream Offline or Connecting...'
-                      : 'Select a camera to start surveillance'}
-                </span>
-              </div>
             </div>
           </section>
 
@@ -977,8 +1201,8 @@ export default function Dashboard({ token, user, onLogout }) {
           className="custom-context-menu"
           style={{
             position: 'fixed',
-            top: `${contextMenu.y}px`,
-            left: `${contextMenu.x}px`,
+            top: `${Math.min(contextMenu.y, window.innerHeight - 120)}px`,
+            left: `${Math.min(contextMenu.x, window.innerWidth - 180)}px`,
           }}
           onClick={(e) => e.stopPropagation()}
         >

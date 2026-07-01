@@ -14,7 +14,7 @@ export const getDashboardSummary = async () => {
   const totalIncidents = await incidentRepo.count();
 
   // Get Incidents grouped by severity
-  // We use QueryBuilder beacause it is great for aggregation
+  // We use QueryBuilder because it is great for aggregation
   const incidentBySeverity = await incidentRepo
     .createQueryBuilder('incident')
     .select('incident.severity', 'severity')

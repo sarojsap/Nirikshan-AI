@@ -1,9 +1,11 @@
 import nodemailer from 'nodemailer';
 
+const SMTP_PORT = parseInt(process.env.SMTP_PORT, 10) || 587;
+
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST,
-  port: process.env.SMTP_PORT,
-  secure: false,
+  port: SMTP_PORT,
+  secure: SMTP_PORT === 465,
   auth: {
     user: process.env.SMTP_USER,
     pass: process.env.SMTP_PASS,
@@ -29,5 +31,9 @@ export const sendPasswordResetEmail = async (email, resetLink) => {
     `,
   };
 
-  await transporter.sendMail(mailOptions);
+  try {
+    await transporter.sendMail(mailOptions);
+  } catch (error) {
+    console.error('Failed to send password reset email:', error.message);
+  }
 };
