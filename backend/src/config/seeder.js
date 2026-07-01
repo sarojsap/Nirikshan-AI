@@ -1,7 +1,6 @@
 import bcrypt from 'bcrypt';
 import { User } from '../entities/User.js';
 import { AppDataSource } from './database.js';
-import 'dotenv/config';
 
 export const seedAdminUser = async () => {
   try {

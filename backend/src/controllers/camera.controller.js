@@ -33,18 +33,21 @@ export const getCamera = async (req, res) => {
   }
 };
 
+export const getConfigSchema = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const schema = await cameraService.getConfigSchemaForCamera(id);
+    res.status(200).json(schema);
+  } catch (error) {
+    res.status(404).json({ error: error.message });
+  }
+};
+
 export const updateSettings = async (req, res) => {
   try {
     const { id } = req.params;
-    const { crowdThreshold, restrictedPolygon, restrictedStartTime, restrictedEndTime } = req.body;
-
-    const updatedCamera = await cameraService.updateCameraSettings(id, {
-      crowdThreshold,
-      restrictedPolygon,
-      restrictedStartTime,
-      restrictedEndTime,
-    });
-
+    // Dynamically pass all settings from body to be validated and saved by service
+    const updatedCamera = await cameraService.updateCameraSettings(id, req.body);
     res.status(200).json({ message: 'Settings updated successfully', camera: updatedCamera });
   } catch (error) {
     res.status(400).json({ error: error.message });

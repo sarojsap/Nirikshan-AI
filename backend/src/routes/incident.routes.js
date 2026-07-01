@@ -5,7 +5,7 @@ import { verifyToken } from '../middlewares/auth.middleware.js';
 const router = Router();
 
 // Apply authentication middleware to all incident routes
-router.use(verifyToken)
+router.use(verifyToken);
 
 // GET /api/incidents -> Fetch all incidents for the dashboard
 router.get('/', getIncidents);

@@ -3,6 +3,7 @@ import {
   createCamera,
   getCameras,
   getCamera,
+  getConfigSchema,
   updateSettings,
   deleteCamera,
 } from '../controllers/camera.controller.js';
@@ -10,7 +11,7 @@ import { verifyToken, requireAdmin } from '../middlewares/auth.middleware.js';
 
 const router = Router();
 
-// Apply veriyToken to all routes in this file
+// Apply verifyToken to all routes in this file
 router.use(verifyToken);
 
 // Allowed for both OPERATOR and ADMIN
@@ -18,6 +19,9 @@ router.get('/', getCameras);
 
 // Fetch specific camera config
 router.get('/:id', getCamera);
+
+// Fetch specific camera dynamic config schema
+router.get('/:id/config-schema', getConfigSchema);
 
 // Only ADMIN can add a new camera
 router.post('/', requireAdmin, createCamera);

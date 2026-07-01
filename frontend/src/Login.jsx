@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { API } from './config';
 import './Login.css';
 
 export default function Login({ onAuthSuccess }) {
@@ -11,6 +12,15 @@ export default function Login({ onAuthSuccess }) {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [registerComplete, setRegisterComplete] = useState(false);
+  const authTimeoutRef = useRef(null);
+
+  useEffect(() => {
+    return () => {
+      if (authTimeoutRef.current) {
+        clearTimeout(authTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -19,8 +29,8 @@ export default function Login({ onAuthSuccess }) {
     setLoading(true);
 
     const url = isLogin
-      ? 'http://localhost:5000/api/auth/login'
-      : 'http://localhost:5000/api/auth/register';
+      ? `${API.AUTH}/login`
+      : `${API.AUTH}/register`;
 
     const payload = isLogin
       ? { email, password }
@@ -43,7 +53,7 @@ export default function Login({ onAuthSuccess }) {
 
       if (isLogin) {
         setSuccess('Authentication successful! Loading dashboard...');
-        setTimeout(() => {
+        authTimeoutRef.current = setTimeout(() => {
           if (onAuthSuccess) {
             onAuthSuccess(data.data.token, data.data.user);
           }
@@ -51,9 +61,8 @@ export default function Login({ onAuthSuccess }) {
       } else {
         setSuccess('Account created successfully!');
         setRegisterComplete(true);
-        // Clean fields
         setPassword('');
-        setTimeout(() => {
+        authTimeoutRef.current = setTimeout(() => {
           setRegisterComplete(false);
           setIsLogin(true);
           setSuccess('');
