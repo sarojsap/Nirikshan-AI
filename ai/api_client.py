@@ -1,4 +1,6 @@
 import os
+import time
+import logging
 import requests
 from dotenv import load_dotenv
 
@@ -8,102 +10,117 @@ API_URL = os.getenv('API_URL')
 USERNAME = os.getenv('AI_USERNAME')
 PASSWORD = os.getenv('AI_PASSWORD')
 
+logger = logging.getLogger(__name__)
+
+
 class APIClient:
     def __init__(self):
         self.token = None
+        self._session = requests.Session()
+        self._last_login_attempt = 0
+        self._login_retry_delay = 5
         self.login()
 
+    def _ensure_authenticated(self):
+        if not self.token:
+            return self.login()
+        return True
+
     def login(self):
+        now = time.time()
+        if now - self._last_login_attempt < self._login_retry_delay:
+            return False
+        self._last_login_attempt = now
         try:
-            response = requests.post(f"{API_URL}/auth/login", json={
-                "email": USERNAME,
-                "password": PASSWORD
-            })
-            response.raise_for_status()
-            data = response.json()
+            resp = self._session.post(
+                f"{API_URL}/auth/login",
+                json={"email": USERNAME, "password": PASSWORD},
+                timeout=10,
+            )
+            resp.raise_for_status()
+            data = resp.json()
             self.token = data.get('data', {}).get('token')
-            print('Successfully logged into Node.js Backend')
-        
+            self._session.headers.update({"Authorization": f"Bearer {self.token}"})
+            logger.info('Successfully logged into Node.js Backend')
+            self._login_retry_delay = 5
+            return True
         except Exception as e:
-            print(f"Failed to login to API: {e}")
+            logger.error(f"Failed to login to API: {e}")
+            self.token = None
+            self._login_retry_delay = min(self._login_retry_delay * 2, 300)
+            return False
+
+    def _request(self, method, path, **kwargs):
+        kwargs.setdefault('timeout', 10)
+        if self.token:
+            self._session.headers.update({"Authorization": f"Bearer {self.token}"})
+        for attempt in range(3):
+            try:
+                resp = self._session.request(method, f"{API_URL}{path}", **kwargs)
+                if resp.status_code == 401 and attempt < 2:
+                    if self.login():
+                        continue
+                    return None
+                resp.raise_for_status()
+                return resp.json()
+            except requests.RequestException as e:
+                logger.warning(f"Request failed (attempt {attempt + 1}/3): {e}")
+                if attempt < 2:
+                    time.sleep(1 * (2 ** attempt))
+                else:
+                    logger.error(f"Request failed after 3 attempts: {e}")
+                    return None
 
     def send_incident(self, incident_type, description, severity, camera_id):
-        if not self.token:
-            print("No token available. Cannot send incidents.")
+        if not self._ensure_authenticated():
+            logger.error("Cannot send incident: not authenticated")
             return
-        
-        headers = {
-            "Authorization": f"Bearer {self.token}",
-            "Content-Type": "application/json"
-        }
 
         payload = {
             "type": incident_type,
             "description": description,
             "severity": severity,
             "cameraId": camera_id,
-            "imageUrl": "https://via.placeholder.com/600x400?text=Incident+Snapshot" # Dummy for now
         }
 
-        try:
-            res = requests.post(f"{API_URL}/incidents", json=payload, headers=headers)
-            res.raise_for_status()
-            print(f"Alert Sent: {incident_type} - {description}")
-        except Exception as e:
-            print(f"Failed to send incidents: {e}")
+        result = self._request("POST", "/incidents", json=payload)
+        if result:
+            logger.info(f"Alert Sent: {incident_type} - {description}")
+        else:
+            logger.error(f"Failed to send incident: {incident_type}")
 
     def get_camera_config(self, camera_id):
-        if not self.token:
-            print("No token available.")
+        if not self._ensure_authenticated():
             return None
-            
-        headers = {"Authorization": f"Bearer {self.token}"}
-        try:
-            res = requests.get(f"{API_URL}/cameras/{camera_id}", headers=headers)
-            res.raise_for_status()
-            config = res.json()
-            print("Successfully fetched dynamic camera configuration.")
-            return config
-        except Exception as e:
-            print(f"Failed to fetch camera config: {e}")
-            return None
+
+        result = self._request("GET", f"/cameras/{camera_id}")
+        if result:
+            logger.debug("Successfully fetched dynamic camera configuration.")
+            return result
+        return None
 
     def get_or_create_camera_id(self):
-        if not self.token:
-            print("No token available. Cannot get or create camera.")
+        if not self._ensure_authenticated():
             return None
 
-        headers = {
-            "Authorization": f"Bearer {self.token}",
-            "Content-Type": "application/json"
-        }
+        cameras = self._request("GET", "/cameras")
+        if isinstance(cameras, list) and len(cameras) > 0:
+            found = cameras[0].get('id')
+            logger.info(f"Found {len(cameras)} registered cameras. Using camera ID: {found}")
+            return found
 
-        # 1. Fetch existing cameras
-        try:
-            res = requests.get(f"{API_URL}/cameras", headers=headers)
-            res.raise_for_status()
-            cameras = res.json()
-            if isinstance(cameras, list) and len(cameras) > 0:
-                print(f"Found {len(cameras)} registered cameras in backend. Using the first camera.")
-                return cameras[0].get('id')
-        except Exception as e:
-            print(f"Failed to fetch cameras: {e}")
-
-        # 2. No cameras found, register a default camera
-        print("No cameras found in backend. Registering default local webcam...")
+        logger.info("No cameras found. Registering default local webcam...")
         payload = {
             "name": "Auto Local Webcam",
             "location": "Office Room",
-            "rtspUrl": "0"
+            "rtspUrl": "0",
         }
-        try:
-            res = requests.post(f"{API_URL}/cameras", json=payload, headers=headers)
-            res.raise_for_status()
-            res_data = res.json()
-            camera = res_data.get('camera')
+        result = self._request("POST", "/cameras", json=payload)
+        if result:
+            camera = result.get('camera')
             if camera:
-                print(f"Registered camera successfully: {camera.get('name')} (ID: {camera.get('id')})")
-                return camera.get('id')
-        except Exception as e:
-            print(f"Failed to auto-register camera: {e}")
-            return None
+                cid = camera.get('id')
+                logger.info(f"Registered camera: {camera.get('name')} (ID: {cid})")
+                return cid
+        logger.error("Failed to auto-register camera")
+        return None
