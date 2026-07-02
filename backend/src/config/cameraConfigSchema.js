@@ -153,14 +153,12 @@ export function validateConfigValue(schemaEntry, value) {
       return { valid: true, sanitized: b };
     }
     case 'time': {
-      // Expect HH:MM:SS or HH:MM string
       if (typeof value !== 'string' || !/^\d{2}:\d{2}(:\d{2})?$/.test(value)) {
         return {
           valid: false,
           error: `"${key}" must be a time string (HH:MM or HH:MM:SS).`,
         };
       }
-      // Normalise to HH:MM:SS
       const sanitized = value.length === 5 ? `${value}:00` : value;
       return { valid: true, sanitized };
     }
@@ -170,4 +168,34 @@ export function validateConfigValue(schemaEntry, value) {
     default:
       return { valid: false, error: `Unknown type "${type}" for key "${key}".` };
   }
+}
+
+/**
+ * Validate cross-field constraints across multiple settings.
+ * Currently enforces that restrictedStartTime and restrictedEndTime
+ * must be either both set or both null.
+ *
+ * @param {object} settings - The full settings object being updated.
+ * @returns {{ valid: boolean, error?: string }}
+ */
+export function validateSettingsConstraints(settings) {
+  const hasStart = 'restrictedStartTime' in settings;
+  const hasEnd = 'restrictedEndTime' in settings;
+
+  const startVal = settings.restrictedStartTime;
+  const endVal = settings.restrictedEndTime;
+
+  if (hasStart && hasEnd) {
+    const startNull = startVal === null || startVal === undefined || startVal === '';
+    const endNull = endVal === null || endVal === undefined || endVal === '';
+
+    if (startNull !== endNull) {
+      return {
+        valid: false,
+        error: 'Both restricted start time and end time must be set or both must be cleared.',
+      };
+    }
+  }
+
+  return { valid: true };
 }

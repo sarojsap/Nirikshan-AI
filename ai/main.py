@@ -1,8 +1,10 @@
 import cv2
 import os
 import time
-from datetime import datetime
-from flask import Flask, Response
+import base64
+import logging
+from datetime import datetime, timezone, timedelta
+from flask import Flask, request, Response, jsonify
 from ultralytics import YOLO
 from shapely.geometry import Point, Polygon
 from dotenv import load_dotenv
@@ -12,56 +14,74 @@ load_dotenv()
 CAMERA_ID = os.getenv('CAMERA_ID')
 STREAM_PORT = int(os.getenv('STREAM_PORT', 8000))
 
-# Initialize Flask app
+logging.basicConfig(
+    level=logging.INFO,
+    format='[%(asctime)s] %(levelname)s %(name)s: %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S',
+)
+logger = logging.getLogger('nirikshan-ai')
+
 app = Flask(__name__)
 
 api = APIClient()
 model = YOLO('yolov8n.pt')
 
-# Automate camera ID configuration
 camera_exists = False
 if CAMERA_ID and CAMERA_ID != 'your-camera-uuid-here' and CAMERA_ID.strip() != '':
-    # Check if this camera ID actually exists in the backend database
     config = api.get_camera_config(CAMERA_ID)
     if config:
         camera_exists = True
 
 if not camera_exists:
-    print("[AUTO-CONFIG] CAMERA_ID is missing, placeholder, or does not exist in backend database. Attempting auto-registration...")
+    logger.info("CAMERA_ID missing or does not exist. Attempting auto-registration...")
     CAMERA_ID = api.get_or_create_camera_id()
     if CAMERA_ID:
         env_path = os.path.join(os.path.dirname(__file__), '.env')
         try:
+            lines = []
             if os.path.exists(env_path):
                 with open(env_path, 'r') as f:
                     lines = f.readlines()
-                
-                updated = False
-                for i, line in enumerate(lines):
-                    if line.strip().startswith('CAMERA_ID='):
-                        lines[i] = f"CAMERA_ID={CAMERA_ID}\n"
-                        updated = True
-                        break
-                
-                if not updated:
-                    lines.append(f"\nCAMERA_ID={CAMERA_ID}\n")
-                
-                with open(env_path, 'w') as f:
-                    f.writelines(lines)
-                print(f"[AUTO-CONFIG] Successfully saved CAMERA_ID={CAMERA_ID} to .env file!")
-            else:
-                with open(env_path, 'w') as f:
-                    f.write(f"CAMERA_ID={CAMERA_ID}\n")
-                print(f"[AUTO-CONFIG] Created .env and saved CAMERA_ID={CAMERA_ID}!")
+            updated = False
+            for i, line in enumerate(lines):
+                if line.strip().startswith('CAMERA_ID='):
+                    lines[i] = f"CAMERA_ID={CAMERA_ID}\n"
+                    updated = True
+                    break
+            if not updated:
+                lines.append(f"CAMERA_ID={CAMERA_ID}\n")
+            with open(env_path, 'w') as f:
+                f.writelines(lines)
+            logger.info(f"Saved CAMERA_ID={CAMERA_ID} to .env")
         except Exception as e:
-            print(f"[AUTO-CONFIG] Failed to write CAMERA_ID to .env file: {e}")
+            logger.error(f"Failed to write CAMERA_ID to .env: {e}")
     else:
-        print("[AUTO-CONFIG] Warning: Could not retrieve or create a Camera ID from backend!")
+        logger.warning("Could not retrieve or create a Camera ID from backend!")
 
-# Camera-specific alert cooldown registry
-cooldowns = {} # key: (camera_id, alert_type) -> float (last alert timestamp)
+cooldowns = {}
+COOLDOWN_CLEANUP_INTERVAL = 3600
+_last_cooldown_cleanup = time.time()
+
+INCIDENT_SNAPSHOT_DIR = os.path.join(os.path.dirname(__file__), 'snapshots')
+os.makedirs(INCIDENT_SNAPSHOT_DIR, exist_ok=True)
+
+
+def _cleanup_stale_cooldowns():
+    global _last_cooldown_cleanup
+    now = time.time()
+    if now - _last_cooldown_cleanup < COOLDOWN_CLEANUP_INTERVAL:
+        return
+    stale_before = now - 3600
+    to_delete = [k for k, v in cooldowns.items() if v < stale_before]
+    for k in to_delete:
+        del cooldowns[k]
+    if to_delete:
+        logger.debug(f"Cleaned up {len(to_delete)} stale cooldown entries")
+    _last_cooldown_cleanup = now
+
 
 def check_cooldown(camera_id, alert_type, cooldown_seconds):
+    _cleanup_stale_cooldowns()
     current_time = time.time()
     key = (camera_id, alert_type)
     last_alert_time = cooldowns.get(key, 0)
@@ -70,11 +90,12 @@ def check_cooldown(camera_id, alert_type, cooldown_seconds):
         return True
     return False
 
-def check_restricted_time(start_time_str, end_time_str):
+
+def is_within_time_window(start_time_str, end_time_str):
     if not start_time_str or not end_time_str:
         return True
     try:
-        now = datetime.now().time()
+        now = datetime.now(timezone.utc).time()
         start = datetime.strptime(start_time_str, "%H:%M:%S").time()
         end = datetime.strptime(end_time_str, "%H:%M:%S").time()
         if start <= end:
@@ -82,20 +103,27 @@ def check_restricted_time(start_time_str, end_time_str):
         else:
             return start <= now or now <= end
     except Exception as e:
-        print(f"[DEBUG] Error parsing time limit: {e}")
+        logger.warning(f"Error parsing time window '{start_time_str}-{end_time_str}': {e}")
         return True
+
+
+def _encode_frame_as_data_uri(frame):
+    ret, buffer = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 75])
+    if not ret:
+        return None
+    return "data:image/jpeg;base64," + base64.b64encode(buffer).decode('utf-8')
+
 
 def load_camera_config(cid):
     config = api.get_camera_config(cid)
-    
-    # Sensible defaults
+
     crowd_threshold = 3
     confidence_threshold = 0.5
     cooldown_seconds = 10
     alerts_enabled = True
     intrusion_enabled = True
     crowd_enabled = True
-    restricted_zone = Polygon([(100, 100), (500, 100), (500, 400), (100, 400)])
+    restricted_zone = None
     start_time_str = None
     end_time_str = None
     rtsp_url = None
@@ -117,11 +145,12 @@ def load_camera_config(cid):
                 if isinstance(restricted_polygon_data, str):
                     import json
                     restricted_polygon_data = json.loads(restricted_polygon_data)
-                polygon_points = [(pt['x'], pt['y']) for pt in restricted_polygon_data]
-                restricted_zone = Polygon(polygon_points)
+                if isinstance(restricted_polygon_data, list) and len(restricted_polygon_data) >= 3:
+                    polygon_points = [(pt['x'], pt['y']) for pt in restricted_polygon_data]
+                    restricted_zone = Polygon(polygon_points)
             except Exception as e:
-                print(f"[DEBUG] Error building polygon: {e}")
-        
+                logger.warning(f"Error building polygon: {e}")
+
     return {
         'crowd_threshold': crowd_threshold,
         'confidence_threshold': confidence_threshold,
@@ -132,111 +161,128 @@ def load_camera_config(cid):
         'restricted_zone': restricted_zone,
         'start_time_str': start_time_str,
         'end_time_str': end_time_str,
-        'rtsp_url': rtsp_url
+        'rtsp_url': rtsp_url,
     }
 
-# Generator function that captures frames, processes them, and yields them to the web server
+
+def open_video_source(source):
+    if isinstance(source, int) or (isinstance(source, str) and source.isdigit()):
+        cam_index = int(source) if isinstance(source, str) else source
+        cap = cv2.VideoCapture(cam_index)
+    else:
+        cap = cv2.VideoCapture(source)
+    return cap
+
+
 def generate_frames(camera_id=None):
     cid = camera_id if camera_id else CAMERA_ID
-    
-    # Fetch Dynamic Config for this camera
-    print(f"[DEBUG] Fetching configuration for camera: {cid}")
+
+    logger.info(f"Starting stream for camera: {cid}")
     cfg = load_camera_config(cid)
     last_config_fetch = time.time()
-    
-    video_source = 0
-    if cfg['rtsp_url']:
-        if cfg['rtsp_url'].isdigit():
-            video_source = int(cfg['rtsp_url'])
-        else:
-            video_source = cfg['rtsp_url']
-            
-    print(f"[DEBUG] Attempting to open video source: {video_source} (type: {type(video_source).__name__})")
-    
-    # On Windows, DirectShow (cv2.CAP_DSHOW) is preferred for local webcams (integers)
-    if isinstance(video_source, int):
-        cap = cv2.VideoCapture(video_source, cv2.CAP_DSHOW)
-    else:
-        cap = cv2.VideoCapture(video_source)
-    
+
+    video_source = cfg['rtsp_url'] if cfg['rtsp_url'] else 0
+    logger.info(f"Opening video source: {video_source}")
+
+    cap = open_video_source(video_source)
     if not cap.isOpened():
-        print(f"[DEBUG] Error: Could not open video source {video_source}")
+        logger.error(f"Failed to open video source: {video_source}")
         return
-        
-    print(f"[DEBUG] Video source {video_source} opened successfully!")
-    
+
+    logger.info(f"Video source opened successfully for camera: {cid}")
+
     frame_count = 0
-    while cap.isOpened():
-        ret, frame = cap.read()
-        if not ret:
-            print("[DEBUG] Error: Failed to read frame from camera")
-            break
-            
-        frame_count += 1
-        if frame_count % 100 == 0:
-            print(f"[DEBUG] Read {frame_count} frames from camera")
+    last_snapshot = None
+    try:
+        while True:
+            ret, frame = cap.read()
+            if not ret:
+                logger.warning("Failed to read frame, attempting reconnection...")
+                cap.release()
+                time.sleep(2)
+                cap = open_video_source(video_source)
+                if not cap.isOpened():
+                    logger.error("Reconnection failed, ending stream")
+                    break
+                continue
 
-        # Periodically refresh settings from DB every 5 seconds
-        if time.time() - last_config_fetch > 5.0:
-            try:
-                cfg = load_camera_config(cid)
-                last_config_fetch = time.time()
-            except Exception as e:
-                print(f"[DEBUG] Error reloading camera config: {e}")
+            frame_count += 1
+            if frame_count % 300 == 0:
+                logger.info(f"Camera {cid}: processed {frame_count} frames")
 
-        # Run YOLOv8 with dynamically configured confidence threshold
-        results = model(frame, conf=cfg['confidence_threshold'], classes=[0], verbose=False)
-        person_count = 0
-        intrusion_detected = False
+            if time.time() - last_config_fetch > 5.0:
+                try:
+                    cfg = load_camera_config(cid)
+                    last_config_fetch = time.time()
+                except Exception as e:
+                    logger.warning(f"Error reloading config: {e}")
 
-        for r in results:
-            for box in r.boxes:
-                person_count += 1
-                x1, y1, x2, y2 = map(int, box.xyxy[0])
-                foot_x = int((x1 + x2) / 2)
-                foot_y = y2
-                
-                cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
-                cv2.circle(frame, (foot_x, foot_y), 5, (0, 0, 255), -1)
+            results = model(frame, conf=cfg['confidence_threshold'], classes=[0], verbose=False)
+            person_count = 0
+            intrusion_detected = False
+            current_snapshot = None
 
-                if cfg['restricted_zone'] and cfg['restricted_zone'].contains(Point(foot_x, foot_y)):
-                    intrusion_detected = True
-                    cv2.putText(frame, "INTRUDER!", (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 0, 255), 2)
+            for r in results:
+                for box in r.boxes:
+                    person_count += 1
+                    x1, y1, x2, y2 = map(int, box.xyxy[0])
+                    foot_x = int((x1 + x2) / 2)
+                    foot_y = y2
 
-        # Draw Restricted Zone
-        try:
+                    cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
+                    cv2.circle(frame, (foot_x, foot_y), 5, (0, 0, 255), -1)
+
+                    if cfg['restricted_zone'] and cfg['restricted_zone'].contains(Point(foot_x, foot_y)):
+                        intrusion_detected = True
+                        cv2.putText(frame, "INTRUDER!", (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 0, 255), 2)
+
             if cfg['restricted_zone']:
-                pts = [(int(x), int(y)) for x, y in cfg['restricted_zone'].exterior.coords]
-                for i in range(len(pts) - 1):
-                    cv2.line(frame, pts[i], pts[i+1], (0, 0, 255) if intrusion_detected else (255, 0, 0), 2)
-        except Exception as e:
-            pass
+                try:
+                    pts = [(int(x), int(y)) for x, y in cfg['restricted_zone'].exterior.coords]
+                    for i in range(len(pts) - 1):
+                        cv2.line(frame, pts[i], pts[i + 1], (0, 0, 255) if intrusion_detected else (255, 0, 0), 2)
+                except Exception:
+                    pass
 
-        # UI Stats
-        cv2.putText(frame, f"People Count: {person_count}", (20, 40), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 0), 2)
+            cv2.putText(frame, f"People Count: {person_count}", (20, 40), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 0), 2)
 
-        # Alerts Logic
-        if cfg['alerts_enabled']:
-            if cfg['intrusion_enabled'] and intrusion_detected and check_restricted_time(cfg['start_time_str'], cfg['end_time_str']):
-                if check_cooldown(cid, "INTRUSION", cfg['cooldown_seconds']):
-                    api.send_incident("INTRUSION", "Perimeter breached during restricted hours.", "CRITICAL", cid)
-            
-            if cfg['crowd_enabled'] and person_count >= cfg['crowd_threshold']:
-                if check_cooldown(cid, "CROWD", cfg['cooldown_seconds']):
-                    api.send_incident("CROWD", f"Crowd threshold exceeded. {person_count} people detected.", "MEDIUM", cid)
+            if cfg['alerts_enabled'] and is_within_time_window(cfg['start_time_str'], cfg['end_time_str']):
+                if cfg['intrusion_enabled'] and intrusion_detected:
+                    if check_cooldown(cid, "INTRUSION", cfg['cooldown_seconds']):
+                        if current_snapshot is None:
+                            current_snapshot = _encode_frame_as_data_uri(frame)
+                            last_snapshot = current_snapshot
+                        api.send_incident(
+                            "INTRUSION", "Perimeter breached during restricted hours.", "CRITICAL", cid
+                        )
 
-        # --- MJPEG ENCODING ---
-        # Compress the frame to JPEG
-        ret, buffer = cv2.imencode('.jpg', frame)
-        frame_bytes = buffer.tobytes()
-        
-        # Yield the output frame in byte format (multipart/x-mixed-replace)
-        yield (b'--frame\r\n'
-               b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
+                if cfg['crowd_enabled'] and person_count >= cfg['crowd_threshold']:
+                    if check_cooldown(cid, "CROWD", cfg['cooldown_seconds']):
+                        if current_snapshot is None:
+                            current_snapshot = _encode_frame_as_data_uri(frame)
+                            last_snapshot = current_snapshot
+                        api.send_incident(
+                            "CROWD",
+                            f"Crowd threshold exceeded. {person_count} people detected.",
+                            "MEDIUM",
+                            cid,
+                        )
 
-    cap.release()
+            ret, buffer = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 80])
+            frame_bytes = buffer.tobytes()
 
-# Flask route for root index page
+            yield (b'--frame\r\n'
+                   b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
+
+    except GeneratorExit:
+        logger.info(f"Client disconnected from camera {cid}")
+    except Exception as e:
+        logger.error(f"Stream error for camera {cid}: {e}")
+    finally:
+        cap.release()
+        logger.info(f"Camera {cid} stream ended")
+
+
 @app.route('/')
 def index():
     return """
@@ -244,31 +290,10 @@ def index():
       <head>
         <title>Nirikshan AI Video Feed</title>
         <style>
-          body {
-            margin: 0;
-            background-color: #0d0d15;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            font-family: Arial, sans-serif;
-            color: #ffffff;
-          }
-          .container {
-            text-align: center;
-          }
-          h2 {
-            margin-bottom: 20px;
-            color: #ffffff;
-            text-shadow: 0 0 10px rgba(170, 59, 255, 0.6);
-          }
-          img {
-            border: 4px solid #aa3bff;
-            border-radius: 12px;
-            box-shadow: 0 0 30px rgba(170, 59, 255, 0.4);
-            max-width: 90vw;
-            max-height: 80vh;
-          }
+          body { margin: 0; background-color: #0d0d15; display: flex; justify-content: center; align-items: center; height: 100vh; font-family: Arial, sans-serif; color: #ffffff; }
+          .container { text-align: center; }
+          h2 { margin-bottom: 20px; color: #ffffff; text-shadow: 0 0 10px rgba(170, 59, 255, 0.6); }
+          img { border: 4px solid #aa3bff; border-radius: 12px; box-shadow: 0 0 30px rgba(170, 59, 255, 0.4); max-width: 90vw; max-height: 80vh; }
         </style>
       </head>
       <body>
@@ -280,13 +305,25 @@ def index():
     </html>
     """
 
-# Flask route for the video feed
+
 @app.route('/video_feed')
 def video_feed():
-    from flask import request
     camera_id = request.args.get('camera_id')
-    return Response(generate_frames(camera_id), mimetype='multipart/x-mixed-replace; boundary=frame')
+    return Response(
+        generate_frames(camera_id),
+        mimetype='multipart/x-mixed-replace; boundary=frame',
+    )
+
+
+@app.route('/health')
+def health():
+    return jsonify({
+        "status": "ok",
+        "camera_id": CAMERA_ID,
+        "uptime": time.time(),
+    })
+
 
 if __name__ == '__main__':
-    # Start the local Flask web server
+    logger.info(f"Starting Nirikshan AI server on port {STREAM_PORT}")
     app.run(host='0.0.0.0', port=STREAM_PORT, threaded=True)

@@ -27,6 +27,7 @@ export default function Dashboard({ token, user, onLogout }) {
   const [mousePos, setMousePos] = useState(null);
   const [isDrawingClosed, setIsDrawingClosed] = useState(false);
   const [streamTimestamp, setStreamTimestamp] = useState(() => Date.now());
+  const [streamError, setStreamError] = useState('');
   
   // Settings Panel States
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -172,6 +173,15 @@ export default function Dashboard({ token, user, onLogout }) {
     setSettingsLoading(true);
     setSettingsError('');
     setSettingsSuccess('');
+
+    const body = { ...settingsValues };
+    const startTime = body.restrictedStartTime;
+    const endTime = body.restrictedEndTime;
+    if ((startTime && !endTime) || (!startTime && endTime)) {
+      body.restrictedStartTime = null;
+      body.restrictedEndTime = null;
+    }
+
     try {
       const res = await fetch(`${API.CAMERAS}/${selectedCamera.id}/settings`, {
         method: 'PUT',
@@ -179,7 +189,7 @@ export default function Dashboard({ token, user, onLogout }) {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`
         },
-        body: JSON.stringify(settingsValues)
+        body: JSON.stringify(body)
       });
 
       if (res.status === 401) {
@@ -222,10 +232,22 @@ export default function Dashboard({ token, user, onLogout }) {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchData();
 
-    socketRef.current = io(API.SOCKET);
+    socketRef.current = io(API.SOCKET, {
+      transports: ['websocket', 'polling'],
+      reconnection: true,
+    });
 
     socketRef.current.on('connect', () => {
-      console.log('Connected to incident stream server.');
+      console.log(`Connected to incident stream server: ${socketRef.current.id}`);
+      fetchData();
+    });
+
+    socketRef.current.on('connect_error', (err) => {
+      console.error('Socket connection error:', err.message);
+    });
+
+    socketRef.current.on('disconnect', (reason) => {
+      console.warn('Disconnected from incident stream server:', reason);
     });
 
     socketRef.current.on('new_incident', (incident) => {
@@ -233,7 +255,7 @@ export default function Dashboard({ token, user, onLogout }) {
       playAlertSound();
 
       setIncidents((prev) => [incident, ...prev.slice(0, 19)]);
-      
+
       setStats((prev) => ({
         ...prev,
         totalIncidents: prev.totalIncidents + 1,
@@ -346,24 +368,30 @@ export default function Dashboard({ token, user, onLogout }) {
 
   // Freeze frame and open canvas editor
   const startDrawingMode = () => {
-    setIsSettingsOpen(false); // Close settings panel when entering drawing mode
+    setIsSettingsOpen(false);
     const img = imgRef.current;
     if (!img) {
       alert("Stream not loaded yet. Please wait for the video feed to load.");
       return;
     }
-    
-    // Create an offscreen canvas to freeze the current frame
+
+    const w = img.naturalWidth || img.clientWidth || 640;
+    const h = img.naturalHeight || img.clientHeight || 480;
+
+    if (img.naturalWidth === 0 && img.clientWidth === 0) {
+      alert("Stream image has not loaded yet. Please wait a moment and try again.");
+      return;
+    }
+
     const offscreen = document.createElement('canvas');
-    offscreen.width = img.naturalWidth || img.clientWidth || 640;
-    offscreen.height = img.naturalHeight || img.clientHeight || 480;
+    offscreen.width = w;
+    offscreen.height = h;
     const ctx = offscreen.getContext('2d');
-    
+
     try {
-      ctx.drawImage(img, 0, 0, offscreen.width, offscreen.height);
+      ctx.drawImage(img, 0, 0, w, h);
       frozenFrameRef.current = offscreen;
-      
-      // Load existing boundary points
+
       let existingPoints = [];
       if (selectedCamera?.restrictedPolygon) {
         try {
@@ -374,8 +402,13 @@ export default function Dashboard({ token, user, onLogout }) {
           existingPoints = selectedCamera.restrictedPolygon;
         }
       }
-      setDrawingPoints(existingPoints || []);
-      setIsDrawingClosed(existingPoints && existingPoints.length >= 3);
+
+      if (!Array.isArray(existingPoints)) {
+        existingPoints = [];
+      }
+
+      setDrawingPoints(existingPoints);
+      setIsDrawingClosed(Array.isArray(existingPoints) && existingPoints.length >= 3);
       setIsDrawingPerimeter(true);
     } catch (err) {
       console.error("Failed to snapshot stream frame:", err);
@@ -481,10 +514,39 @@ export default function Dashboard({ token, user, onLogout }) {
   };
 
   // Canvas Action controls
-  const clearDrawing = () => {
+  const clearDrawing = async () => {
+    if (!selectedCamera) return;
+
     setDrawingPoints([]);
     setMousePos(null);
     setIsDrawingClosed(false);
+
+    if (selectedCamera.restrictedPolygon) {
+      try {
+        const res = await fetch(`${API.CAMERAS}/${selectedCamera.id}/settings`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify({ restrictedPolygon: null })
+        });
+
+        if (res.status === 401) {
+          onLogout();
+          return;
+        }
+
+        const data = await res.json();
+        if (res.ok) {
+          const updatedCam = data.camera;
+          setSelectedCamera(updatedCam);
+          setCameras(cameras.map(c => c.id === updatedCam.id ? updatedCam : c));
+        }
+      } catch (err) {
+        console.error('Failed to clear perimeter:', err);
+      }
+    }
   };
 
   const cancelDrawing = () => {
@@ -525,16 +587,16 @@ export default function Dashboard({ token, user, onLogout }) {
       
       alert("Virtual perimeter zone updated successfully!");
       
-      const updatedCam = { ...selectedCamera, restrictedPolygon: drawingPoints };
+      const updatedCam = data.camera;
       setSelectedCamera(updatedCam);
-      setCameras(cameras.map(c => c.id === selectedCamera.id ? updatedCam : c));
+      setCameras(cameras.map(c => c.id === updatedCam.id ? updatedCam : c));
       
       setIsDrawingPerimeter(false);
       setDrawingPoints([]);
       setMousePos(null);
       setIsDrawingClosed(false);
       frozenFrameRef.current = null;
-      setStreamTimestamp(Date.now()); // Force reload video stream with dynamic parameter
+      setStreamTimestamp(Date.now());
     } catch (err) {
       alert(err.message);
     }
@@ -803,7 +865,9 @@ export default function Dashboard({ token, user, onLogout }) {
                     style={{ display: isDrawingPerimeter ? 'none' : 'block' }}
                     onError={(e) => {
                       e.target.style.display = 'none';
+                      setStreamError('Stream unavailable. Check if the AI service is running.');
                     }}
+                    onLoad={() => setStreamError('')}
                   />
                 )}
 
@@ -828,11 +892,13 @@ export default function Dashboard({ token, user, onLogout }) {
                 <div className="feed-placeholder" style={{ display: selectedCamera && !isDrawingPerimeter ? 'none' : 'flex' }}>
                   <div className="feed-placeholder-icon">📹</div>
                   <span style={{ fontSize: '15px' }}>
-                    {isDrawingPerimeter
-                      ? 'Place at least 3 points, then click near the green start node to close the perimeter.'
-                      : selectedCamera
-                        ? 'Camera Stream Offline or Connecting...'
-                        : 'Select a camera to start surveillance'}
+                    {streamError
+                      ? streamError
+                      : isDrawingPerimeter
+                        ? 'Place at least 3 points, then click near the green start node to close the perimeter.'
+                        : selectedCamera
+                          ? 'Camera Stream Offline or Connecting...'
+                          : 'Select a camera to start surveillance'}
                   </span>
                 </div>
               </div>
@@ -917,10 +983,17 @@ export default function Dashboard({ token, user, onLogout }) {
                                   step="1"
                                   className="settings-time-input"
                                   value={settingsValues[entry.key] ? settingsValues[entry.key].substring(0, 8) : ''}
-                                  onChange={(e) => setSettingsValues({
-                                    ...settingsValues,
-                                    [entry.key]: e.target.value ? e.target.value : null
-                                  })}
+                                  onChange={(e) => {
+                                    const newVal = e.target.value || null;
+                                    setSettingsValues(prev => {
+                                      const next = { ...prev, [entry.key]: newVal };
+                                      if (newVal === null) {
+                                        next.restrictedStartTime = null;
+                                        next.restrictedEndTime = null;
+                                      }
+                                      return next;
+                                    });
+                                  }}
                                 />
                               ) : (
                                 <input

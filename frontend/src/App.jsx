@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import Login from './Login';
 import Dashboard from './Dashboard';
 import './App.css';
@@ -20,12 +20,12 @@ function App() {
     setUser(authUser);
   };
 
-  const handleLogout = () => {
+  const handleLogout = useCallback(() => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     setToken('');
     setUser(null);
-  };
+  }, []);
 
   if (!token) {
     return <Login onAuthSuccess={handleAuthSuccess} />;

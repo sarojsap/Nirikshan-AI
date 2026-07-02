@@ -24,6 +24,23 @@ export const createIncident = async incidentData => {
   return await incidentRepo.save(newIncident);
 };
 
+export const getIncidentById = async id => {
+  const incidentRepo = AppDataSource.getRepository(Incident);
+
+  return await incidentRepo.findOne({
+    where: { id },
+    relations: { camera: true },
+  });
+};
+
+export const getFirstCamera = async () => {
+  const cameraRepo = AppDataSource.getRepository(Camera);
+
+  return await cameraRepo.findOne({
+    order: { createdAt: 'ASC' },
+  });
+};
+
 export const getAllIncidents = async (page = 1, limit = 10) => {
   const incidentRepo = AppDataSource.getRepository(Incident);
 
