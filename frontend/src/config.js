@@ -14,4 +14,5 @@ export const API = {
 export const STREAM = {
   BASE: STREAM_BASE,
   VIDEO_FEED: `${STREAM_BASE}/video_feed`,
+  SNAPSHOT: `${STREAM_BASE}/snapshot`,
 };

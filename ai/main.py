@@ -1,5 +1,6 @@
 import cv2
 import os
+import threading
 import time
 import base64
 import logging
@@ -22,6 +23,13 @@ logging.basicConfig(
 logger = logging.getLogger('nirikshan-ai')
 
 app = Flask(__name__)
+
+@app.after_request
+def add_cors_headers(response):
+    response.headers['Access-Control-Allow-Origin'] = '*'
+    response.headers['Access-Control-Allow-Headers'] = '*'
+    response.headers['Access-Control-Allow-Methods'] = '*'
+    return response
 
 api = APIClient()
 model = YOLO('yolov8n.pt')
@@ -62,6 +70,12 @@ cooldowns = {}
 COOLDOWN_CLEANUP_INTERVAL = 3600
 _last_cooldown_cleanup = time.time()
 
+# Thread-safe frame cache: stores the latest JPEG bytes for each camera_id
+# so the /snapshot endpoint can return cached frames without opening a new VideoCapture
+_frame_cache = {}
+_last_frame_time = {}
+_frame_cache_lock = threading.Lock()
+
 INCIDENT_SNAPSHOT_DIR = os.path.join(os.path.dirname(__file__), 'snapshots')
 os.makedirs(INCIDENT_SNAPSHOT_DIR, exist_ok=True)
 
@@ -82,12 +96,13 @@ def _cleanup_stale_cooldowns():
 
 def check_cooldown(camera_id, alert_type, cooldown_seconds):
     _cleanup_stale_cooldowns()
-    current_time = time.time()
-    key = (camera_id, alert_type)
+    now = time.time()
+    key = f"{camera_id}:{alert_type}"
     last_alert_time = cooldowns.get(key, 0)
-    if current_time - last_alert_time > cooldown_seconds:
-        cooldowns[key] = current_time
+    if now - last_alert_time > cooldown_seconds:
+        cooldowns[key] = now
         return True
+    logger.info(f"Alert {alert_type} on camera {camera_id} throttled by cooldown (elapsed: {now - last_alert_time:.1f}s, limit: {cooldown_seconds}s)")
     return False
 
 
@@ -95,13 +110,15 @@ def is_within_time_window(start_time_str, end_time_str):
     if not start_time_str or not end_time_str:
         return True
     try:
-        now = datetime.now(timezone.utc).time()
+        now = datetime.now().time()
         start = datetime.strptime(start_time_str, "%H:%M:%S").time()
         end = datetime.strptime(end_time_str, "%H:%M:%S").time()
         if start <= end:
-            return start <= now <= end
+            res = start <= now <= end
         else:
-            return start <= now or now <= end
+            res = start <= now or now <= end
+        logger.info(f"Time window check: start={start}, end={end}, now={now} -> within={res}")
+        return res
     except Exception as e:
         logger.warning(f"Error parsing time window '{start_time_str}-{end_time_str}': {e}")
         return True
@@ -174,113 +191,161 @@ def open_video_source(source):
     return cap
 
 
-def generate_frames(camera_id=None):
-    cid = camera_id if camera_id else CAMERA_ID
+_camera_threads = {}
+_threads_lock = threading.Lock()
+_last_access = {}
+_access_lock = threading.Lock()
 
-    logger.info(f"Starting stream for camera: {cid}")
-    cfg = load_camera_config(cid)
-    last_config_fetch = time.time()
 
-    video_source = cfg['rtsp_url'] if cfg['rtsp_url'] else 0
-    logger.info(f"Opening video source: {video_source}")
+def mark_camera_accessed(camera_id):
+    with _access_lock:
+        _last_access[camera_id] = time.time()
 
-    cap = open_video_source(video_source)
-    if not cap.isOpened():
-        logger.error(f"Failed to open video source: {video_source}")
-        return
 
-    logger.info(f"Video source opened successfully for camera: {cid}")
+def ensure_camera_thread(camera_id):
+    with _threads_lock:
+        thread = _camera_threads.get(camera_id)
+        if not thread or not thread.is_alive():
+            thread = CameraThread(camera_id)
+            _camera_threads[camera_id] = thread
+            thread.start()
+            logger.info(f"Started background thread for camera: {camera_id}")
 
-    frame_count = 0
-    last_snapshot = None
-    try:
-        while True:
-            ret, frame = cap.read()
-            if not ret:
-                logger.warning("Failed to read frame, attempting reconnection...")
-                cap.release()
-                time.sleep(2)
+
+class CameraThread(threading.Thread):
+    def __init__(self, camera_id):
+        super().__init__()
+        self.camera_id = camera_id
+        self.daemon = True
+        self.running = True
+
+    def run(self):
+        logger.info(f"Background thread started for camera: {self.camera_id}")
+        last_snapshot = None
+        cap = None
+        
+        while self.running:
+            try:
+                # 1. Fetch camera configuration
+                cfg = load_camera_config(self.camera_id)
+                video_source = cfg['rtsp_url'] if cfg['rtsp_url'] else 0
+                logger.info(f"Camera {self.camera_id} Thread: Opening video source {video_source}")
+                
                 cap = open_video_source(video_source)
                 if not cap.isOpened():
-                    logger.error("Reconnection failed, ending stream")
-                    break
-                continue
+                    logger.error(f"Camera {self.camera_id} Thread: Failed to open source {video_source}")
+                    time.sleep(5)
+                    continue
 
-            frame_count += 1
-            if frame_count % 300 == 0:
-                logger.info(f"Camera {cid}: processed {frame_count} frames")
+                logger.info(f"Camera {self.camera_id} Thread: Video source opened successfully")
+                frame_count = 0
+                last_config_fetch = time.time()
+                last_frame_time = time.time()
 
-            if time.time() - last_config_fetch > 5.0:
-                try:
-                    cfg = load_camera_config(cid)
-                    last_config_fetch = time.time()
-                except Exception as e:
-                    logger.warning(f"Error reloading config: {e}")
+                while self.running:
+                    # Check inactivity timeout (30 seconds of no requests)
+                    with _access_lock:
+                        last_req_time = _last_access.get(self.camera_id, 0)
+                    if time.time() - last_req_time > 30.0:
+                        logger.info(f"Camera {self.camera_id} Thread: Stopping due to inactivity (>30 seconds)")
+                        self.running = False
+                        break
 
-            results = model(frame, conf=cfg['confidence_threshold'], classes=[0], verbose=False)
-            person_count = 0
-            intrusion_detected = False
-            current_snapshot = None
+                    ret, frame = cap.read()
+                    if not ret:
+                        logger.warning(f"Camera {self.camera_id} Thread: Failed to read frame, reconnecting...")
+                        cap.release()
+                        cap = None
+                        time.sleep(2)
+                        break
 
-            for r in results:
-                for box in r.boxes:
-                    person_count += 1
-                    x1, y1, x2, y2 = map(int, box.xyxy[0])
-                    foot_x = int((x1 + x2) / 2)
-                    foot_y = y2
+                    frame_count += 1
+                    if frame_count % 300 == 0:
+                        logger.info(f"Camera {self.camera_id} Thread: Processed {frame_count} frames")
 
-                    cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
-                    cv2.circle(frame, (foot_x, foot_y), 5, (0, 0, 255), -1)
+                    # Periodically refresh config from database
+                    if time.time() - last_config_fetch > 5.0:
+                        try:
+                            cfg = load_camera_config(self.camera_id)
+                            last_config_fetch = time.time()
+                        except Exception as e:
+                            logger.warning(f"Camera {self.camera_id} Thread: Error reloading config: {e}")
 
-                    if cfg['restricted_zone'] and cfg['restricted_zone'].contains(Point(foot_x, foot_y)):
-                        intrusion_detected = True
-                        cv2.putText(frame, "INTRUDER!", (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 0, 255), 2)
+                    # Run YOLOv8 detection
+                    results = model(frame, conf=cfg['confidence_threshold'], classes=[0], verbose=False)
+                    person_count = 0
+                    intrusion_detected = False
+                    current_snapshot = None
 
-            if cfg['restricted_zone']:
-                try:
-                    pts = [(int(x), int(y)) for x, y in cfg['restricted_zone'].exterior.coords]
-                    for i in range(len(pts) - 1):
-                        cv2.line(frame, pts[i], pts[i + 1], (0, 0, 255) if intrusion_detected else (255, 0, 0), 2)
-                except Exception:
-                    pass
+                    for r in results:
+                        for box in r.boxes:
+                            person_count += 1
+                            x1, y1, x2, y2 = map(int, box.xyxy[0])
+                            foot_x = int((x1 + x2) / 2)
+                            foot_y = y2
 
-            cv2.putText(frame, f"People Count: {person_count}", (20, 40), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 0), 2)
+                            cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
+                            cv2.circle(frame, (foot_x, foot_y), 5, (0, 0, 255), -1)
 
-            if cfg['alerts_enabled'] and is_within_time_window(cfg['start_time_str'], cfg['end_time_str']):
-                if cfg['intrusion_enabled'] and intrusion_detected:
-                    if check_cooldown(cid, "INTRUSION", cfg['cooldown_seconds']):
-                        if current_snapshot is None:
-                            current_snapshot = _encode_frame_as_data_uri(frame)
-                            last_snapshot = current_snapshot
-                        api.send_incident(
-                            "INTRUSION", "Perimeter breached during restricted hours.", "CRITICAL", cid
-                        )
+                            if cfg['restricted_zone'] and cfg['restricted_zone'].contains(Point(foot_x, foot_y)):
+                                intrusion_detected = True
+                                cv2.putText(frame, "INTRUDER!", (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 0, 255), 2)
 
-                if cfg['crowd_enabled'] and person_count >= cfg['crowd_threshold']:
-                    if check_cooldown(cid, "CROWD", cfg['cooldown_seconds']):
-                        if current_snapshot is None:
-                            current_snapshot = _encode_frame_as_data_uri(frame)
-                            last_snapshot = current_snapshot
-                        api.send_incident(
-                            "CROWD",
-                            f"Crowd threshold exceeded. {person_count} people detected.",
-                            "MEDIUM",
-                            cid,
-                        )
+                    if cfg['restricted_zone']:
+                        try:
+                            pts = [(int(x), int(y)) for x, y in cfg['restricted_zone'].exterior.coords]
+                            for i in range(len(pts) - 1):
+                                cv2.line(frame, pts[i], pts[i + 1], (0, 0, 255) if intrusion_detected else (255, 0, 0), 2)
+                        except Exception:
+                            pass
 
-            ret, buffer = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 80])
-            frame_bytes = buffer.tobytes()
+                    cv2.putText(frame, f"People Count: {person_count}", (20, 40), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 0), 2)
 
-            yield (b'--frame\r\n'
-                   b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
+                    # Trigger alert notifications
+                    if cfg['alerts_enabled'] and is_within_time_window(cfg['start_time_str'], cfg['end_time_str']):
+                        if cfg['intrusion_enabled'] and intrusion_detected:
+                            if check_cooldown(self.camera_id, "INTRUSION", cfg['cooldown_seconds']):
+                                if current_snapshot is None:
+                                    current_snapshot = _encode_frame_as_data_uri(frame)
+                                    last_snapshot = current_snapshot
+                                api.send_incident(
+                                    "INTRUSION", "Perimeter breached during restricted hours.", "CRITICAL", self.camera_id
+                                )
 
-    except GeneratorExit:
-        logger.info(f"Client disconnected from camera {cid}")
-    except Exception as e:
-        logger.error(f"Stream error for camera {cid}: {e}")
-    finally:
-        cap.release()
-        logger.info(f"Camera {cid} stream ended")
+                        if cfg['crowd_enabled'] and person_count >= cfg['crowd_threshold']:
+                            if check_cooldown(self.camera_id, "CROWD", cfg['cooldown_seconds']):
+                                if current_snapshot is None:
+                                    current_snapshot = _encode_frame_as_data_uri(frame)
+                                    last_snapshot = current_snapshot
+                                api.send_incident(
+                                    "CROWD",
+                                    f"Crowd threshold exceeded. {person_count} people detected.",
+                                    "MEDIUM",
+                                    self.camera_id,
+                                )
+
+                    # Encode and cache the frame
+                    ret, buffer = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 80])
+                    if ret:
+                        frame_bytes = buffer.tobytes()
+                        with _frame_cache_lock:
+                            _frame_cache[self.camera_id] = frame_bytes
+                            _last_frame_time[self.camera_id] = time.time()
+
+                    # Cap frame rate to ~20 FPS in background to prevent high CPU utilization
+                    elapsed = time.time() - last_frame_time
+                    sleep_time = max(0.01, 0.05 - elapsed)
+                    time.sleep(sleep_time)
+                    last_frame_time = time.time()
+
+            except Exception as e:
+                logger.error(f"Camera {self.camera_id} Thread: Uncaught error: {e}")
+                time.sleep(5)
+            finally:
+                if cap:
+                    cap.release()
+                    cap = None
+        logger.info(f"Background thread ended for camera: {self.camera_id}")
 
 
 @app.route('/')
@@ -309,10 +374,81 @@ def index():
 @app.route('/video_feed')
 def video_feed():
     camera_id = request.args.get('camera_id')
+    cid = camera_id if camera_id else CAMERA_ID
+
+    mark_camera_accessed(cid)
+    ensure_camera_thread(cid)
+
+    # Wait up to 3 seconds for the first frame to populate
+    first_frame_ok = False
+    for _ in range(30):
+        with _frame_cache_lock:
+            last_time = _last_frame_time.get(cid, 0)
+            if time.time() - last_time < 5.0:
+                first_frame_ok = True
+                break
+        time.sleep(0.1)
+
+    if not first_frame_ok:
+        logger.warning(f"Video feed requested for offline/unreachable camera: {cid}")
+        return Response("Camera offline", status=503)
+
+    def stream_cached_frames():
+        last_frame = None
+        consecutive_missing = 0
+        try:
+            while True:
+                mark_camera_accessed(cid)
+                
+                # Check if camera has timed out (no new frame for > 8 seconds)
+                with _frame_cache_lock:
+                    last_time = _last_frame_time.get(cid, 0)
+                    cached = _frame_cache.get(cid)
+                
+                if time.time() - last_time > 8.0:
+                    logger.warning(f"Closing stream connection for camera {cid} due to feed loss")
+                    break
+
+                if cached:
+                    if cached != last_frame:
+                        last_frame = cached
+                        yield (b'--frame\r\n'
+                               b'Content-Type: image/jpeg\r\n\r\n' + cached + b'\r\n')
+                        consecutive_missing = 0
+                else:
+                    consecutive_missing += 1
+                    if consecutive_missing > 100:  # ~5 seconds of no cached frame
+                        break
+                time.sleep(0.05)
+        except GeneratorExit:
+            pass
+
     return Response(
-        generate_frames(camera_id),
+        stream_cached_frames(),
         mimetype='multipart/x-mixed-replace; boundary=frame',
     )
+
+
+@app.route('/snapshot')
+def snapshot():
+    camera_id = request.args.get('camera_id')
+    cid = camera_id if camera_id else CAMERA_ID
+
+    mark_camera_accessed(cid)
+    ensure_camera_thread(cid)
+
+    # Wait up to 1 second for cache to be populated initially
+    for _ in range(10):
+        with _frame_cache_lock:
+            last_time = _last_frame_time.get(cid, 0)
+            cached = _frame_cache.get(cid)
+            is_valid = time.time() - last_time < 8.0
+        if cached and is_valid:
+            return Response(cached, mimetype='image/jpeg',
+                            headers={'Cache-Control': 'no-cache, no-store, must-revalidate'})
+        time.sleep(0.1)
+
+    return Response(status=503)
 
 
 @app.route('/health')
@@ -321,6 +457,7 @@ def health():
         "status": "ok",
         "camera_id": CAMERA_ID,
         "uptime": time.time(),
+        "active_threads": [cid for cid, t in _camera_threads.items() if t.is_alive()]
     })
 
 

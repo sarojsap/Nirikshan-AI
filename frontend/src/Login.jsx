@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
 import { API } from './config';
-import './Login.css';
 
 export default function Login({ onAuthSuccess }) {
   const [isLogin, setIsLogin] = useState(true);
@@ -86,18 +85,18 @@ export default function Login({ onAuthSuccess }) {
   };
 
   return (
-    <div className="auth-container">
+    <div className="min-h-screen w-full flex justify-center items-center bg-[#060b13] relative overflow-hidden font-sans p-4 select-none">
       {/* Background blobs for premium glowing visuals */}
-      <div className="auth-bg-blob blob-purple"></div>
-      <div className="auth-bg-blob blob-cyan"></div>
-      <div className="auth-bg-blob blob-pink"></div>
+      <div className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] rounded-full bg-violet-600/10 blur-[120px] pointer-events-none animate-pulse"></div>
+      <div className="absolute bottom-[-20%] right-[-10%] w-[600px] h-[600px] rounded-full bg-cyan-500/10 blur-[120px] pointer-events-none animate-pulse"></div>
+      <div className="absolute top-[40%] left-[50%] -translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px] rounded-full bg-pink-500/5 blur-[120px] pointer-events-none animate-pulse"></div>
 
-      <div className="auth-card">
+      <div className="w-full max-w-[460px] p-8 md:p-10 bg-[#090f19]/45 backdrop-blur-2xl border border-[#162235] rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.5),inset_0_1px_0_rgba(255,255,255,0.05)] z-10 relative">
         {registerComplete ? (
-          <div className="auth-success-screen">
-            <div className="auth-success-icon-container">
+          <div className="text-center py-6">
+            <div className="w-20 h-20 bg-emerald-500/10 border border-emerald-500/25 rounded-full flex items-center justify-center mx-auto mb-6 shadow-[0_0_30px_rgba(16,185,129,0.2)]">
               <svg
-                className="auth-success-svg"
+                className="w-10 h-10 text-emerald-400"
                 viewBox="0 0 24 24"
                 fill="none"
                 stroke="currentColor"
@@ -108,26 +107,24 @@ export default function Login({ onAuthSuccess }) {
                 <polyline points="20 6 9 17 4 12" />
               </svg>
             </div>
-            <h2 className="auth-title">Success!</h2>
-            <p className="auth-subtitle" style={{ fontSize: '16px', color: '#cbd5e1' }}>
+            <h2 className="text-2xl font-bold text-white mb-2 tracking-tight">Success!</h2>
+            <p className="text-slate-400 text-sm leading-relaxed">
               Your account has been registered. Redirecting you to login...
             </p>
           </div>
         ) : (
           <>
-            <div className="auth-header">
-              <div className="auth-logo-container">
-                <div className="auth-logo-icon">
-                  <svg className="auth-logo-svg" viewBox="0 0 24 24">
-                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 17h-2v-2h2v2zm2.07-7.75l-.9.92C13.45 12.9 13 13.5 13 15h-2v-.5c0-1.1.45-2.1 1.17-2.83l1.24-1.26c.37-.36.59-.86.59-1.41 0-1.1-.9-2-2-2s-2 .9-2 2H7c0-2.76 2.24-5 5-5s5 2.24 5 5c0 1.04-.42 1.99-1.07 2.75z" />
-                  </svg>
+            <div className="text-center mb-8">
+              <div className="flex justify-center items-center gap-3 mb-4">
+                <div className="w-10 h-10 bg-violet-600/10 border border-violet-500/20 rounded-xl flex items-center justify-center shadow-[0_0_15px_rgba(139,92,246,0.15)] text-violet-400">
+                  <span className="material-symbols-outlined text-lg">visibility</span>
                 </div>
-                <span className="auth-logo-text">Nirikshan AI</span>
+                <span className="text-xl font-bold text-white tracking-wider uppercase">Nirikshan AI</span>
               </div>
-              <h2 className="auth-title">
+              <h2 className="text-2xl font-bold text-white tracking-tight mb-2">
                 {isLogin ? 'Welcome Back' : 'Get Started'}
               </h2>
-              <p className="auth-subtitle">
+              <p className="text-slate-400 text-xs">
                 {isLogin
                   ? 'Sign in to access your surveillance dashboard'
                   : 'Register a new account to monitor secure areas'}
@@ -136,7 +133,7 @@ export default function Login({ onAuthSuccess }) {
 
             {/* Error Message */}
             {error && (
-              <div className="auth-alert auth-alert-error">
+              <div className="p-3.5 mb-6 bg-rose-500/10 border border-rose-500/25 text-rose-400 text-xs rounded-xl flex items-center gap-2.5">
                 <svg
                   width="18"
                   height="18"
@@ -146,6 +143,7 @@ export default function Login({ onAuthSuccess }) {
                   strokeWidth="2"
                   strokeLinecap="round"
                   strokeLinejoin="round"
+                  className="shrink-0"
                 >
                   <circle cx="12" cy="12" r="10" />
                   <line x1="12" y1="8" x2="12" y2="12" />
@@ -157,7 +155,7 @@ export default function Login({ onAuthSuccess }) {
 
             {/* Success Message (Redirecting...) */}
             {success && !registerComplete && (
-              <div className="auth-alert auth-alert-success">
+              <div className="p-3.5 mb-6 bg-emerald-500/10 border border-emerald-500/25 text-emerald-400 text-xs rounded-xl flex items-center gap-2.5">
                 <svg
                   width="18"
                   height="18"
@@ -167,6 +165,7 @@ export default function Login({ onAuthSuccess }) {
                   strokeWidth="2"
                   strokeLinecap="round"
                   strokeLinejoin="round"
+                  className="shrink-0"
                 >
                   <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
                   <polyline points="22 4 12 14.01 9 11.01" />
@@ -175,30 +174,19 @@ export default function Login({ onAuthSuccess }) {
               </div>
             )}
 
-            <form onSubmit={handleSubmit} className="auth-form">
+            <form onSubmit={handleSubmit} className="flex flex-col gap-5">
               {/* Full Name Input (Only for Register) */}
               {!isLogin && (
-                <div className="auth-input-group">
-                  <label className="auth-label" htmlFor="name">
+                <div className="flex flex-col gap-1.5 text-left">
+                  <label className="text-xs font-bold uppercase tracking-wider text-slate-400" htmlFor="name">
                     Full Name
                   </label>
-                  <div className="auth-input-wrapper">
-                    <svg
-                      className="auth-input-icon"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2.5"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                      <circle cx="12" cy="7" r="4" />
-                    </svg>
+                  <div className="relative flex items-center">
+                    <span className="material-symbols-outlined absolute left-4 text-[#64748b] pointer-events-none text-base">person</span>
                     <input
                       id="name"
                       type="text"
-                      className="auth-input"
+                      className="w-full pl-11 pr-4 py-3 bg-white/5 border border-white/10 rounded-xl text-xs text-white placeholder-[#64748b] focus:outline-none focus:bg-white/[0.07] focus:border-violet-500 focus:ring-4 focus:ring-violet-500/20 transition-all font-sans"
                       placeholder="Enter your full name"
                       value={name}
                       onChange={(e) => setName(e.target.value)}
@@ -209,27 +197,16 @@ export default function Login({ onAuthSuccess }) {
               )}
 
               {/* Email Input */}
-              <div className="auth-input-group">
-                <label className="auth-label" htmlFor="email">
+              <div className="flex flex-col gap-1.5 text-left">
+                <label className="text-xs font-bold uppercase tracking-wider text-slate-400" htmlFor="email">
                   Email Address
                 </label>
-                <div className="auth-input-wrapper">
-                  <svg
-                    className="auth-input-icon"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
-                    <polyline points="22,6 12,13 2,6" />
-                  </svg>
+                <div className="relative flex items-center">
+                  <span className="material-symbols-outlined absolute left-4 text-[#64748b] pointer-events-none text-base">mail</span>
                   <input
                     id="email"
                     type="email"
-                    className="auth-input"
+                    className="w-full pl-11 pr-4 py-3 bg-white/5 border border-white/10 rounded-xl text-xs text-white placeholder-[#64748b] focus:outline-none focus:bg-white/[0.07] focus:border-violet-500 focus:ring-4 focus:ring-violet-500/20 transition-all font-sans"
                     placeholder="name@example.com"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
@@ -239,27 +216,16 @@ export default function Login({ onAuthSuccess }) {
               </div>
 
               {/* Password Input */}
-              <div className="auth-input-group">
-                <label className="auth-label" htmlFor="password">
+              <div className="flex flex-col gap-1.5 text-left">
+                <label className="text-xs font-bold uppercase tracking-wider text-slate-400" htmlFor="password">
                   Password
                 </label>
-                <div className="auth-input-wrapper">
-                  <svg
-                    className="auth-input-icon"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-                    <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-                  </svg>
+                <div className="relative flex items-center">
+                  <span className="material-symbols-outlined absolute left-4 text-[#64748b] pointer-events-none text-base">lock</span>
                   <input
                     id="password"
                     type="password"
-                    className="auth-input"
+                    className="w-full pl-11 pr-4 py-3 bg-white/5 border border-white/10 rounded-xl text-xs text-white placeholder-[#64748b] focus:outline-none focus:bg-white/[0.07] focus:border-violet-500 focus:ring-4 focus:ring-violet-500/20 transition-all font-sans"
                     placeholder="••••••••"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
@@ -270,33 +236,22 @@ export default function Login({ onAuthSuccess }) {
 
               {/* Role Select (Only for Register) */}
               {!isLogin && (
-                <div className="auth-input-group">
-                  <label className="auth-label" htmlFor="role">
+                <div className="flex flex-col gap-1.5 text-left">
+                  <label className="text-xs font-bold uppercase tracking-wider text-slate-400" htmlFor="role">
                     Role
                   </label>
-                  <div className="auth-input-wrapper">
-                    <svg
-                      className="auth-input-icon"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2.5"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-                      <path d="M12 2v9M8 5h8" />
-                    </svg>
+                  <div className="relative flex items-center">
+                    <span className="material-symbols-outlined absolute left-4 text-[#64748b] pointer-events-none text-base">manage_accounts</span>
                     <select
                       id="role"
-                      className="auth-input"
+                      className="w-full pl-11 pr-10 py-3 bg-white/5 border border-white/10 rounded-xl text-xs text-white focus:outline-none focus:bg-white/[0.07] focus:border-violet-500 focus:ring-4 focus:ring-violet-500/20 transition-all font-sans appearance-none cursor-pointer"
                       value={role}
                       onChange={(e) => setRole(e.target.value)}
                     >
-                      <option value="OPERATOR">Operator</option>
-                      <option value="ADMIN">Administrator</option>
+                      <option className="bg-[#090f19] text-white" value="OPERATOR">Operator</option>
+                      <option className="bg-[#090f19] text-white" value="ADMIN">Administrator</option>
                     </select>
-                    <span className="auth-input-select-arrow">▼</span>
+                    <span className="absolute right-4 text-[#64748b] pointer-events-none text-xs">▼</span>
                   </div>
                 </div>
               )}
@@ -304,22 +259,28 @@ export default function Login({ onAuthSuccess }) {
               {/* Submit Button */}
               <button
                 type="submit"
-                className="auth-submit-btn"
+                className="w-full py-3.5 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 active:from-violet-600 active:to-indigo-600 disabled:opacity-60 text-white font-semibold text-xs uppercase tracking-wider rounded-xl transition-all shadow-lg shadow-violet-500/20 hover:shadow-violet-500/30 flex justify-center items-center cursor-pointer"
                 disabled={loading}
               >
-                {loading ? <div className="auth-spinner"></div> : isLogin ? 'Sign In' : 'Create Account'}
+                {loading ? (
+                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                ) : isLogin ? (
+                  'Sign In'
+                ) : (
+                  'Create Account'
+                )}
               </button>
             </form>
 
-            <div className="auth-footer">
-              <span className="auth-switch-text">
+            <div className="text-center mt-6">
+              <span className="text-xs text-slate-400">
                 {isLogin
                   ? "Don't have an account yet?"
                   : 'Already have an account?'}
               </span>
               <button
                 onClick={handleToggle}
-                className="auth-switch-btn"
+                className="text-xs font-semibold text-violet-400 hover:text-violet-300 transition-colors ml-1.5 cursor-pointer"
                 type="button"
               >
                 {isLogin ? 'Sign Up' : 'Sign In'}
