@@ -1,5 +1,6 @@
 import * as incidentService from '../services/incident.service.js';
 import { getIO } from '../config/socket.js';
+import { sendPushNotification } from '../services/notification.service.js';
 
 const VALID_TYPES = ['PERSON_DETECTED', 'INTRUSION', 'CROWD', 'RESTRICTED_AREA'];
 const VALID_SEVERITIES = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'];
@@ -53,6 +54,13 @@ export const logIncident = async (req, res) => {
     console.log(`Incident saved: ${incident.id}`);
     const completeIncident = await broadcastIncident(incident.id);
 
+    // Send FCM push notification to all registered mobile devices
+    if (completeIncident) {
+      sendPushNotification(completeIncident).catch(err =>
+        console.error('FCM push failed:', err.message)
+      );
+    }
+
     res.status(201).json({ message: 'Incident logged successfully', incident: completeIncident || incident });
   } catch (error) {
     const status = error.message === 'Camera not found!' ? 400 : 500;
@@ -77,6 +85,13 @@ export const createTestIncident = async (req, res) => {
 
     console.log(`Test incident saved: ${incident.id}`);
     const completeIncident = await broadcastIncident(incident.id);
+
+    // Send FCM push notification for test incidents too
+    if (completeIncident) {
+      sendPushNotification(completeIncident).catch(err =>
+        console.error('FCM push failed:', err.message)
+      );
+    }
 
     res.status(201).json({ message: 'Test incident created successfully', incident: completeIncident || incident });
   } catch (error) {
