@@ -3,10 +3,6 @@ import { io } from 'socket.io-client';
 import { API, STREAM } from './config';
 
 
-/**
- * LiveFeedCard — renders a single camera tile in the Live Feeds grid.
- * Uses persistent video stream, displaying cameras simultaneously.
- */
 function LiveFeedCard({ cam, onClick, onDelete }) {
   const [isOffline, setIsOffline] = useState(false);
   const [retryKey, setRetryKey] = useState(0);
@@ -133,6 +129,16 @@ export default function Dashboard({ token, user, onLogout }) {
   const [settingsError, setSettingsError] = useState('');
   const [settingsSuccess, setSettingsSuccess] = useState('');
   const [selectedSnapshot, setSelectedSnapshot] = useState(null);
+
+  // Historical Alerts Log States
+  const [isAlertsHistoryOpen, setIsAlertsHistoryOpen] = useState(false);
+  const [historyIncidents, setHistoryIncidents] = useState([]);
+  const [historyPage, setHistoryPage] = useState(1);
+  const [historyTotalPages, setHistoryTotalPages] = useState(1);
+  const [historyTotalRecords, setHistoryTotalRecords] = useState(0);
+  const [historyLimit] = useState(10);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyError, setHistoryError] = useState('');
 
   // Settings Page States
   const [settingsPageCameraId, setSettingsPageCameraId] = useState('');
@@ -502,6 +508,36 @@ export default function Dashboard({ token, user, onLogout }) {
       console.error('Error fetching operators:', err);
     }
   }, [token, user, onLogout]);
+
+  // Fetch all historical incidents from DB with pagination
+  const fetchAlertsHistory = useCallback(async (page = 1) => {
+    setHistoryLoading(true);
+    setHistoryError('');
+    try {
+      const res = await fetch(`${API.INCIDENTS}?page=${page}&limit=${historyLimit}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.status === 401) {
+        onLogout();
+        return;
+      }
+      if (res.ok) {
+        const result = await res.json();
+        setHistoryIncidents(result.data || []);
+        setHistoryPage(result.pagination.currentPage);
+        setHistoryTotalPages(result.pagination.totalPages);
+        setHistoryTotalRecords(result.pagination.totalRecords);
+      } else {
+        const data = await res.json();
+        setHistoryError(data.error || 'Failed to load historical alerts.');
+      }
+    } catch (err) {
+      setHistoryError('Connection error. Failed to load alerts.');
+      console.error(err);
+    } finally {
+      setHistoryLoading(false);
+    }
+  }, [token, onLogout, historyLimit]);
 
   useEffect(() => {
     if (activeTab === 'operators') {
@@ -1387,9 +1423,6 @@ export default function Dashboard({ token, user, onLogout }) {
                         <span className="material-symbols-outlined text-sm">videocam</span>
                         <span>Webcam</span>
                       </div>
-                      <div className="flex items-center gap-1.5 text-[9px] font-bold text-slate-400 bg-white/5 px-2 py-0.5 rounded border border-white/10 uppercase tracking-wider font-mono">
-                        HD 1080p
-                      </div>
                     </div>
                     <div className="flex items-center gap-3 text-slate-400">
                       <button onClick={handleFullscreen} className="hover:text-white transition-colors flex items-center justify-center" title="Toggle Fullscreen">
@@ -1433,7 +1466,13 @@ export default function Dashboard({ token, user, onLogout }) {
                     <h2 className="text-xs font-bold text-white uppercase tracking-wider">Security Alerts</h2>
                     <p className="text-[10px] text-slate-500">Real-time feed</p>
                   </div>
-                  <button className="text-slate-400 hover:text-white border border-[#162235] bg-[#0c1524] px-3 py-1 rounded-xl text-[10px] font-semibold transition-colors">
+                  <button 
+                    onClick={() => {
+                      setIsAlertsHistoryOpen(true);
+                      fetchAlertsHistory(1);
+                    }}
+                    className="text-slate-400 hover:text-white border border-[#162235] bg-[#0c1524] px-3 py-1 rounded-xl text-[10px] font-semibold transition-colors"
+                  >
                     View All
                   </button>
                 </div>
@@ -1462,7 +1501,8 @@ export default function Dashboard({ token, user, onLogout }) {
                       return (
                         <div
                           key={incident.id}
-                          className={`bg-[#0d1624] border border-[#162235] p-3 rounded-xl border-l-4 relative overflow-hidden group flex-shrink-0 h-auto ${borderClass}`}
+                          onClick={() => setSelectedSnapshot(incident)}
+                          className={`bg-[#0d1624] border border-[#162235] p-3 rounded-xl border-l-4 relative overflow-hidden group flex-shrink-0 h-auto cursor-pointer hover:border-slate-600 transition-all ${borderClass}`}
                         >
                           {bgOverlayClass && <div className={`absolute inset-0 transition-colors pointer-events-none ${bgOverlayClass}`} />}
                           <div className="relative z-10 flex flex-col gap-1">
@@ -1477,6 +1517,18 @@ export default function Dashboard({ token, user, onLogout }) {
                               <span className="material-symbols-outlined text-[10px]">location_on</span>
                               <span>{incident.camera ? incident.camera.location : incident.location || 'Surveillance Area'}</span>
                             </div>
+                            {incident.imageUrl && (
+                              <div className="mt-2 relative rounded-lg overflow-hidden border border-white/5 aspect-video bg-black/50 group/thumb">
+                                <img 
+                                  src={incident.imageUrl} 
+                                  alt="Incident snapshot thumbnail" 
+                                  className="w-full h-full object-cover transition-transform duration-300 group-hover/thumb:scale-105"
+                                />
+                                <div className="absolute inset-0 bg-black/35 opacity-0 group-hover/thumb:opacity-100 transition-opacity flex items-center justify-center">
+                                  <span className="material-symbols-outlined text-white text-base">zoom_in</span>
+                                </div>
+                              </div>
+                            )}
                           </div>
                         </div>
                       );
@@ -1485,7 +1537,13 @@ export default function Dashboard({ token, user, onLogout }) {
                 </div>
 
                 <div className="p-3 border-t border-[#162235] bg-[#0c1524] shrink-0">
-                  <button className="w-full bg-[#121c2e] hover:bg-[#1a2942] text-slate-300 hover:text-white border border-[#1f2f4c] rounded-xl py-2 text-xs font-semibold flex items-center justify-center gap-2 transition-all">
+                  <button 
+                    onClick={() => {
+                      setIsAlertsHistoryOpen(true);
+                      fetchAlertsHistory(1);
+                    }}
+                    className="w-full bg-[#121c2e] hover:bg-[#1a2942] text-slate-300 hover:text-white border border-[#1f2f4c] rounded-xl py-2 text-xs font-semibold flex items-center justify-center gap-2 transition-all"
+                  >
                     <span>View All Alerts</span>
                     <span className="material-symbols-outlined text-xs">arrow_forward</span>
                   </button>
@@ -2106,6 +2164,227 @@ export default function Dashboard({ token, user, onLogout }) {
             <span className="material-symbols-outlined text-sm">delete</span>
             <span>Delete Camera</span>
           </button>
+        </div>
+      )}
+      {/* Incident Snapshot Viewer Modal Overlay */}
+      {selectedSnapshot && (
+        <div className="fixed inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center z-[250] p-4 font-sans">
+          <div className="bg-[#090f19] border border-[#162235] w-full max-w-4xl rounded-2xl flex flex-col md:flex-row shadow-2xl relative overflow-hidden h-[85vh] max-h-[600px] animate-[scaleIn_0.3s_cubic-bezier(0.16,1,0.3,1)_forwards]">
+            
+            {/* Close Button */}
+            <button 
+              className="absolute top-4 right-4 bg-black/40 hover:bg-black/60 text-white w-8 h-8 rounded-full flex items-center justify-center z-50 text-xl font-bold transition-colors border border-white/10" 
+              onClick={() => setSelectedSnapshot(null)}
+            >
+              ×
+            </button>
+
+            {/* Left Column: Image Snapshot Area */}
+            <div className="flex-1 bg-black flex items-center justify-center relative overflow-hidden h-1/2 md:h-full group">
+              {selectedSnapshot.imageUrl ? (
+                <img 
+                  src={selectedSnapshot.imageUrl} 
+                  alt="Incident Snapshot" 
+                  className="w-full h-full object-contain"
+                />
+              ) : (
+                <div className="text-center p-8">
+                  <span className="material-symbols-outlined text-slate-600 text-5xl mb-2">image_not_supported</span>
+                  <p className="text-slate-400 text-xs">No snapshot image available for this alert.</p>
+                </div>
+              )}
+              {/* Telemetry overlay labels inside image */}
+              <div className="absolute top-4 left-4 bg-[#090f19]/80 backdrop-blur-md px-3 py-1.5 border border-white/10 rounded-lg text-[9px] font-bold text-slate-300 font-mono flex items-center gap-1.5 shadow-md">
+                <span className="w-1.5 h-1.5 bg-rose-500 rounded-full animate-ping"></span>
+                <span>TELEMETRY OVERLAY FRAME</span>
+              </div>
+            </div>
+
+            {/* Right Column: Telemetry details sidebar */}
+            <div className="w-full md:w-80 border-t md:border-t-0 md:border-l border-[#162235] bg-[#0c1524] p-6 flex flex-col justify-between shrink-0 h-1/2 md:h-full overflow-y-auto">
+              <div className="flex flex-col gap-5">
+                <div>
+                  <span className="bg-rose-500/10 text-rose-400 border border-rose-500/20 text-[9px] font-bold px-2 py-0.5 rounded uppercase tracking-wider font-mono">
+                    {selectedSnapshot.severity || 'CRITICAL'}
+                  </span>
+                  <h3 className="text-sm font-bold text-white uppercase tracking-wider mt-2.5">{selectedSnapshot.type}</h3>
+                  <p className="text-[10px] text-slate-500 font-mono mt-0.5">ID: {selectedSnapshot.id}</p>
+                </div>
+
+                <div className="flex flex-col gap-3">
+                  {/* Location Info */}
+                  <div className="flex flex-col gap-1 bg-white/5 border border-white/10 rounded-xl p-3">
+                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Detection Location</span>
+                    <div className="flex items-center gap-1.5 text-xs text-white mt-0.5">
+                      <span className="material-symbols-outlined text-sm text-slate-400">location_on</span>
+                      <span>{selectedSnapshot.camera ? selectedSnapshot.camera.location : selectedSnapshot.location || 'Surveillance Zone'}</span>
+                    </div>
+                    {selectedSnapshot.camera && (
+                      <span className="text-[10px] text-slate-400 font-medium font-sans mt-0.5">
+                        Camera: {selectedSnapshot.camera.name}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Description Info */}
+                  <div className="flex flex-col gap-1 bg-white/5 border border-white/10 rounded-xl p-3">
+                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Alert Details</span>
+                    <p className="text-xs text-slate-300 leading-normal mt-0.5">{selectedSnapshot.description}</p>
+                  </div>
+
+                  {/* Timestamp Info */}
+                  <div className="flex flex-col gap-1 bg-white/5 border border-white/10 rounded-xl p-3">
+                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Incident Timestamp</span>
+                    <div className="flex items-center gap-1.5 text-xs text-white mt-0.5 font-mono">
+                      <span className="material-symbols-outlined text-sm text-slate-400 font-sans">schedule</span>
+                      <span>{new Date(selectedSnapshot.timestamp || selectedSnapshot.createdAt).toLocaleString()}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Actions Footer */}
+              <div className="mt-6 flex flex-col gap-2 pt-4 border-t border-[#162235]">
+                {selectedSnapshot.imageUrl && (
+                  <a 
+                    href={selectedSnapshot.imageUrl}
+                    download={`incident-${selectedSnapshot.id}.jpg`}
+                    className="w-full bg-violet-600 hover:bg-violet-500 text-white text-center py-2.5 rounded-xl font-semibold text-xs transition-colors flex items-center justify-center gap-1.5 shadow-md shadow-violet-600/15"
+                  >
+                    <span className="material-symbols-outlined text-sm">download</span>
+                    <span>Download Snapshot</span>
+                  </a>
+                )}
+                <button 
+                  onClick={() => setSelectedSnapshot(null)}
+                  className="w-full bg-[#121c2e] hover:bg-[#1a2942] text-slate-300 hover:text-white border border-[#1f2f4c] py-2.5 rounded-xl text-xs font-semibold transition-colors"
+                >
+                  Close Viewer
+                </button>
+              </div>
+
+            </div>
+
+          </div>
+        </div>
+      )}
+      {/* Historical Alerts Log Modal Overlay */}
+      {isAlertsHistoryOpen && (
+        <div className="fixed inset-0 bg-black/85 backdrop-blur-md flex items-center justify-center z-[220] p-4 font-sans animate-[fadeIn_0.2s_ease-out_forwards]">
+          <div className="bg-[#090f19] border border-[#162235] w-full max-w-5xl rounded-2xl flex flex-col shadow-2xl relative overflow-hidden h-[80vh] max-h-[700px] animate-[scaleIn_0.3s_cubic-bezier(0.16,1,0.3,1)_forwards]">
+            
+            {/* Header */}
+            <div className="p-5 border-b border-[#162235] bg-[#0c1524] flex justify-between items-center shrink-0">
+              <div>
+                <h3 className="text-sm font-bold text-white uppercase tracking-wider">Historical Alerts Log</h3>
+                <p className="text-[10px] text-slate-400 mt-0.5">Review all recorded perimeter intrusions and crowd limit notifications</p>
+              </div>
+              <button 
+                className="text-slate-400 hover:text-white text-xl font-bold bg-white/5 hover:bg-white/10 w-8 h-8 rounded-full flex items-center justify-center border border-white/5 transition-all"
+                onClick={() => setIsAlertsHistoryOpen(false)}
+              >
+                ×
+              </button>
+            </div>
+
+            {/* Table Area / Body */}
+            <div className="flex-1 overflow-y-auto p-6 min-h-0">
+              {historyError && (
+                <div className="p-3 bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs rounded-xl mb-4">
+                  {historyError}
+                </div>
+              )}
+
+              {historyLoading ? (
+                <div className="flex flex-col items-center justify-center h-full gap-3 py-12">
+                  <div className="w-8 h-8 border-2 border-violet-500 border-t-transparent rounded-full animate-spin"></div>
+                  <p className="text-slate-400 text-xs font-semibold">Loading historical alerts...</p>
+                </div>
+              ) : historyIncidents.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-full gap-3 py-12 text-slate-500">
+                  <span className="material-symbols-outlined text-4xl">notifications_off</span>
+                  <p className="text-xs">No historical alerts found in database logs.</p>
+                </div>
+              ) : (
+                <div className="w-full flex flex-col min-w-[700px]">
+                  {/* Table Header */}
+                  <div className="grid grid-cols-12 text-[10px] text-slate-400 font-bold uppercase tracking-wider pb-2.5 border-b border-[#162235] px-4 shrink-0">
+                    <span className="col-span-2">Event</span>
+                    <span className="col-span-2">Severity</span>
+                    <span className="col-span-2">Camera</span>
+                    <span className="col-span-4">Details / Description</span>
+                    <span className="col-span-2">Timestamp</span>
+                  </div>
+
+                  {/* Table Rows */}
+                  <div className="flex flex-col gap-1.5 mt-2">
+                    {historyIncidents.map((incident) => {
+                      const isCritical = incident.severity === 'CRITICAL';
+                      const isWarning = incident.severity === 'WARNING' || incident.severity === 'HIGH' || incident.type.includes('CROWD');
+                      let sevBadgeColor = 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20';
+                      
+                      if (isCritical) {
+                        sevBadgeColor = 'bg-rose-500/10 text-rose-400 border-rose-500/20';
+                      } else if (isWarning) {
+                        sevBadgeColor = 'bg-amber-500/10 text-amber-400 border-amber-500/20';
+                      }
+
+                      return (
+                        <div 
+                          key={incident.id} 
+                          onClick={() => {
+                            setSelectedSnapshot(incident);
+                          }}
+                          className="grid grid-cols-12 items-center py-3 border-b border-[#162235]/40 hover:bg-white/5 transition-all rounded-xl px-4 text-xs text-slate-300 cursor-pointer"
+                        >
+                          <span className="col-span-2 font-bold text-white tracking-wide truncate">{incident.type}</span>
+                          <span className="col-span-2">
+                            <span className={`border px-2 py-0.5 rounded-full text-[9px] font-bold ${sevBadgeColor}`}>
+                              {incident.severity}
+                            </span>
+                          </span>
+                          <span className="col-span-2 font-semibold text-slate-400 truncate">
+                            {incident.camera ? incident.camera.name : incident.location || 'Surveillance'}
+                          </span>
+                          <span className="col-span-4 text-slate-300 leading-relaxed pr-4 truncate">{incident.description}</span>
+                          <span className="col-span-2 font-mono text-[10px] text-slate-500">
+                            {new Date(incident.timestamp || incident.createdAt).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Pagination / Footer */}
+            <div className="p-4 border-t border-[#162235] bg-[#0c1524] flex justify-between items-center shrink-0 text-xs">
+              <span className="text-slate-500 font-semibold">
+                Total Logs: <span className="text-slate-300 font-bold">{historyTotalRecords}</span>
+              </span>
+              <div className="flex items-center gap-3">
+                <button
+                  disabled={historyPage <= 1 || historyLoading}
+                  onClick={() => fetchAlertsHistory(historyPage - 1)}
+                  className="px-3 py-1.5 bg-[#121c2e] hover:bg-[#1a2942] disabled:opacity-40 text-slate-300 hover:text-white border border-[#1f2f4c] rounded-lg font-semibold transition-all disabled:cursor-not-allowed"
+                >
+                  Previous
+                </button>
+                <span className="text-slate-400 font-mono font-semibold">
+                  Page {historyPage} of {historyTotalPages}
+                </span>
+                <button
+                  disabled={historyPage >= historyTotalPages || historyLoading}
+                  onClick={() => fetchAlertsHistory(historyPage + 1)}
+                  className="px-3 py-1.5 bg-[#121c2e] hover:bg-[#1a2942] disabled:opacity-40 text-slate-300 hover:text-white border border-[#1f2f4c] rounded-lg font-semibold transition-all disabled:cursor-not-allowed"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+
+          </div>
         </div>
       )}
     </div>
