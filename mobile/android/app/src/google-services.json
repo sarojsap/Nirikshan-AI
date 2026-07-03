@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "56221041601",
+    "project_id": "nirikshanai",
+    "storage_bucket": "nirikshanai.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:56221041601:android:95bfae384829d27c65a540",
+        "android_client_info": {
+          "package_name": "com.nirikshanai.com"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC-1CO-UJgjzzVd-7sdxTNlLgppviHp1bs"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
