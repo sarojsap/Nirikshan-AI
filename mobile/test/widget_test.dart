@@ -21,13 +21,14 @@ void main() {
         child: BlocProvider<AuthBloc>(
           create: (context) =>
               AuthBloc(authService: context.read<AuthService>()),
-          child: const MaterialApp(home: HomeScreen(user: user)),
+          child: const MaterialApp(
+            home: HomeScreen(user: user, initializeNotifications: false),
+          ),
         ),
       ),
     );
 
     expect(find.text('ADMIN'), findsOneWidget);
-    expect(find.text('Welcome, Super Admin'), findsOneWidget);
-    expect(find.text('Dashboard coming soon'), findsOneWidget);
+    expect(find.text('Event Snapshots'), findsOneWidget);
   });
 }

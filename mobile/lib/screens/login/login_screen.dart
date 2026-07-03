@@ -175,7 +175,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   children: [
                     // Form title
                     Text(
-                      'Access Portal',
+                      'Login to Your Account',
                       style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                             fontWeight: FontWeight.w600,
                             color: AppTheme.onSurface,
@@ -183,7 +183,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'Enter your operational credentials to proceed.',
+                      'Enter your email and password to login.',
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                             color: AppTheme.onSurfaceVariant,
                           ),
@@ -192,8 +192,8 @@ class _LoginScreenState extends State<LoginScreen> {
                     // Email field
                     _buildTextField(
                       controller: _emailController,
-                      label: 'Operational Identity (Email)',
-                      icon: Icons.badge,
+                      label: 'Email',
+                      icon: Icons.email,
                       keyboardType: TextInputType.emailAddress,
                     ),
                     const SizedBox(height: 24),
@@ -213,19 +213,15 @@ class _LoginScreenState extends State<LoginScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        _buildLink(
-                          label: 'Forgot Password?',
-                          icon: Icons.help_outline,
-                          onTap: () {
-                            // TODO: Navigate to forgot password
-                          },
-                        ),
-                        _buildLink(
-                          label: 'Request Access',
-                          icon: Icons.arrow_forward,
-                          onTap: () {
-                            // TODO: Navigate to signup
-                          },
+                        Container(
+                          alignment: Alignment.center,
+                          child: _buildLink(
+                            label: 'Forgot Password?',
+                            icon: Icons.help_outline,
+                            onTap: () {
+                              // TODO: Navigate to forgot password
+                            },
+                          ),
                         ),
                       ],
                     ),
@@ -289,7 +285,7 @@ class _LoginScreenState extends State<LoginScreen> {
         fontFamily: 'monospace',
       ),
       decoration: InputDecoration(
-        labelText: 'Access Protocol (Password)',
+        labelText: 'Password',
         prefixIcon: Icon(
           Icons.key,
           color: AppTheme.outline,
@@ -358,7 +354,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   const Icon(Icons.verified_user, size: 20),
                   const SizedBox(width: 12),
                   Text(
-                    'AUTHENTICATE',
+                    'LOGIN',
                     style: Theme.of(context).textTheme.labelLarge?.copyWith(
                           color: Colors.white,
                           fontWeight: FontWeight.w600,
