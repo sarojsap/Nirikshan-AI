@@ -1,0 +1,10 @@
+
+> backend@1.0.0 start
+> node src/server.js
+
+◇ injected env (12) from .env // tip: ⌘ enable debugging { debug: true }
+◇ injected env (0) from .env // tip: ⌘ enable debugging { debug: true }
+Connected to PostgreSQL database successfully!
+Connected to Firebase project: nirikshanai
+Database already has users. Skipping seeder.
+Server is running on PORT: 5000

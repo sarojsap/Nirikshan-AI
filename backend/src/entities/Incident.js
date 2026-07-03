@@ -24,7 +24,7 @@ export const Incident = new EntitySchema({
       default: 'MEDIUM',
     },
     imageUrl: {
-      type: 'varchar',
+      type: 'text',
       nullable: true, // URL to the snapshot of the incident
     },
     timestamp: {

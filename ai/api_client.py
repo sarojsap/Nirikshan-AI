@@ -71,7 +71,7 @@ class APIClient:
                     logger.error(f"Request failed after 3 attempts: {e}")
                     return None
 
-    def send_incident(self, incident_type, description, severity, camera_id):
+    def send_incident(self, incident_type, description, severity, camera_id, image_url=None):
         if not self._ensure_authenticated():
             logger.error("Cannot send incident: not authenticated")
             return
@@ -82,6 +82,8 @@ class APIClient:
             "severity": severity,
             "cameraId": camera_id,
         }
+        if image_url:
+            payload["imageUrl"] = image_url
 
         result = self._request("POST", "/incidents", json=payload)
         if result:

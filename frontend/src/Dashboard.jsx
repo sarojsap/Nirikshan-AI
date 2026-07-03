@@ -132,6 +132,7 @@ export default function Dashboard({ token, user, onLogout }) {
   const [settingsLoading, setSettingsLoading] = useState(false);
   const [settingsError, setSettingsError] = useState('');
   const [settingsSuccess, setSettingsSuccess] = useState('');
+  const [selectedSnapshot, setSelectedSnapshot] = useState(null);
 
   // Settings Page States
   const [settingsPageCameraId, setSettingsPageCameraId] = useState('');

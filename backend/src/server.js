@@ -5,6 +5,7 @@ dotenv.config();
 import http from 'http';
 import app from './app.js';
 import { AppDataSource } from './config/database.js';
+import { firebaseApp } from './config/firebase.js';
 import { initSocket } from './config/socket.js';
 import { seedAdminUser } from './config/seeder.js';
 
@@ -20,6 +21,7 @@ initSocket(server);
 AppDataSource.initialize()
   .then(async () => {
     console.log('Connected to PostgreSQL database successfully!');
+    console.log(`Connected to Firebase project: ${firebaseApp.options.projectId}`);
 
     // Seed default admin user if tables are empty
     await seedAdminUser();

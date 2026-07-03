@@ -309,7 +309,11 @@ class CameraThread(threading.Thread):
                                     current_snapshot = _encode_frame_as_data_uri(frame)
                                     last_snapshot = current_snapshot
                                 api.send_incident(
-                                    "INTRUSION", "Perimeter breached during restricted hours.", "CRITICAL", self.camera_id
+                                    "INTRUSION",
+                                    "Perimeter breached during restricted hours.",
+                                    "CRITICAL",
+                                    self.camera_id,
+                                    image_url=current_snapshot
                                 )
 
                         if cfg['crowd_enabled'] and person_count >= cfg['crowd_threshold']:
@@ -322,6 +326,7 @@ class CameraThread(threading.Thread):
                                     f"Crowd threshold exceeded. {person_count} people detected.",
                                     "MEDIUM",
                                     self.camera_id,
+                                    image_url=current_snapshot
                                 )
 
                     # Encode and cache the frame
