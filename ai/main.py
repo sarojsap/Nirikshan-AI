@@ -3,17 +3,26 @@ import os
 import threading
 import time
 import base64
+import json
 import logging
+import asyncio
 from datetime import datetime, timezone, timedelta
+from urllib.parse import urlparse, parse_qs
 from flask import Flask, request, Response, jsonify
 from ultralytics import YOLO
 from shapely.geometry import Point, Polygon
 from dotenv import load_dotenv
+import websockets
 from api_client import APIClient
 
 load_dotenv()
 CAMERA_ID = os.getenv('CAMERA_ID')
 STREAM_PORT = int(os.getenv('STREAM_PORT', 8000))
+WEBSOCKET_PORT = int(os.getenv('WEBSOCKET_PORT', 8001))
+
+# Global FPS target — inference runs at this rate regardless of camera source FPS
+TARGET_FPS = 24
+FRAME_INTERVAL = 1.0 / TARGET_FPS  # ~0.0417s per frame
 
 logging.basicConfig(
     level=logging.INFO,
@@ -160,7 +169,6 @@ def load_camera_config(cid):
         if restricted_polygon_data:
             try:
                 if isinstance(restricted_polygon_data, str):
-                    import json
                     restricted_polygon_data = json.loads(restricted_polygon_data)
                 if isinstance(restricted_polygon_data, list) and len(restricted_polygon_data) >= 3:
                     polygon_points = [(pt['x'], pt['y']) for pt in restricted_polygon_data]
@@ -223,14 +231,17 @@ class CameraThread(threading.Thread):
         logger.info(f"Background thread started for camera: {self.camera_id}")
         last_snapshot = None
         cap = None
-        
+
+        # Fixed-interval frame scheduling for consistent 24 FPS
+        next_frame_time = time.time()
+
         while self.running:
             try:
                 # 1. Fetch camera configuration
                 cfg = load_camera_config(self.camera_id)
                 video_source = cfg['rtsp_url'] if cfg['rtsp_url'] else 0
                 logger.info(f"Camera {self.camera_id} Thread: Opening video source {video_source}")
-                
+
                 cap = open_video_source(video_source)
                 if not cap.isOpened():
                     logger.error(f"Camera {self.camera_id} Thread: Failed to open source {video_source}")
@@ -240,7 +251,6 @@ class CameraThread(threading.Thread):
                 logger.info(f"Camera {self.camera_id} Thread: Video source opened successfully")
                 frame_count = 0
                 last_config_fetch = time.time()
-                last_frame_time = time.time()
 
                 while self.running:
                     # Check inactivity timeout (30 seconds of no requests)
@@ -259,19 +269,34 @@ class CameraThread(threading.Thread):
                         time.sleep(2)
                         break
 
+                    now = time.time()
+
+                    # ── Frame skipping: only process at TARGET_FPS ──
+                    # If we're ahead of schedule, skip inference for this frame
+                    # to maintain exactly TARGET_FPS (24) and reduce CPU load.
+                    if now < next_frame_time:
+                        continue
+
+                    next_frame_time = now + FRAME_INTERVAL
+                    # Catch-up protection: if we fell behind by more than one interval,
+                    # don't accumulate debt — just continue from current time
+                    if next_frame_time < now:
+                        next_frame_time = now + FRAME_INTERVAL
+                    # ──────────────────────────────────────────────────
+
                     frame_count += 1
                     if frame_count % 300 == 0:
-                        logger.info(f"Camera {self.camera_id} Thread: Processed {frame_count} frames")
+                        logger.info(f"Camera {self.camera_id} Thread: Processed {frame_count} frames at {TARGET_FPS} FPS")
 
                     # Periodically refresh config from database
-                    if time.time() - last_config_fetch > 5.0:
+                    if now - last_config_fetch > 5.0:
                         try:
                             cfg = load_camera_config(self.camera_id)
-                            last_config_fetch = time.time()
+                            last_config_fetch = now
                         except Exception as e:
                             logger.warning(f"Camera {self.camera_id} Thread: Error reloading config: {e}")
 
-                    # Run YOLOv8 detection
+                    # Run YOLO detection
                     results = model(frame, conf=cfg['confidence_threshold'], classes=[0], verbose=False)
                     person_count = 0
                     intrusion_detected = False
@@ -335,13 +360,7 @@ class CameraThread(threading.Thread):
                         frame_bytes = buffer.tobytes()
                         with _frame_cache_lock:
                             _frame_cache[self.camera_id] = frame_bytes
-                            _last_frame_time[self.camera_id] = time.time()
-
-                    # Cap frame rate to ~20 FPS in background to prevent high CPU utilization
-                    elapsed = time.time() - last_frame_time
-                    sleep_time = max(0.01, 0.05 - elapsed)
-                    time.sleep(sleep_time)
-                    last_frame_time = time.time()
+                            _last_frame_time[self.camera_id] = now
 
             except Exception as e:
                 logger.error(f"Camera {self.camera_id} Thread: Uncaught error: {e}")
@@ -351,6 +370,110 @@ class CameraThread(threading.Thread):
                     cap.release()
                     cap = None
         logger.info(f"Background thread ended for camera: {self.camera_id}")
+
+
+# ── WebSocket Video Streaming Server ──────────────────────────────
+# Runs on a separate port from Flask, streams cached frames as binary
+# JPEG messages to connected browser clients.
+
+async def ws_video_feed(websocket):
+    try:
+        # In websockets v16, the path + query is on request.path
+        request_path = websocket.request.path
+        query = parse_qs(urlparse(request_path).query)
+        camera_id = query.get('camera_id', [None])[0]
+        if not camera_id:
+            camera_id = CAMERA_ID
+        if not camera_id:
+            await websocket.close(1008, "camera_id required")
+            return
+
+        mark_camera_accessed(camera_id)
+        ensure_camera_thread(camera_id)
+
+        # Wait up to 8 seconds for the first frame to appear in the cache.
+        # The camera thread starts asynchronously, so the cache is initially empty.
+        first_frame_ok = False
+        for _ in range(80):
+            with _frame_cache_lock:
+                if _frame_cache.get(camera_id) is not None:
+                    first_frame_ok = True
+                    break
+            await asyncio.sleep(0.1)
+
+        if not first_frame_ok:
+            logger.warning(f"WS: No frames for {camera_id}, closing")
+            await websocket.close(1011, "Camera feed unavailable")
+            return
+
+        last_send_time = 0
+        stale_cycles = 0
+
+        while True:
+            mark_camera_accessed(camera_id)
+
+            with _frame_cache_lock:
+                cached = _frame_cache.get(camera_id)
+                last_time = _last_frame_time.get(camera_id, 0)
+
+            fresh = time.time() - last_time <= 8.0
+            if not fresh:
+                stale_cycles += 1
+                if stale_cycles > 20:
+                    logger.warning(f"WS: Closing stream for {camera_id} due to feed loss")
+                    break
+                await asyncio.sleep(FRAME_INTERVAL)
+                continue
+
+            stale_cycles = 0
+
+            # Only send if we have a new frame (compare timestamps, not bytes)
+            if cached is not None and last_time != last_send_time:
+                try:
+                    await websocket.send(cached)
+                    last_send_time = last_time
+                except websockets.ConnectionClosed:
+                    break
+
+            await asyncio.sleep(FRAME_INTERVAL)
+
+    except asyncio.CancelledError:
+        pass
+    except websockets.ConnectionClosed:
+        pass
+    except Exception as e:
+        logger.error(f"WS stream error: {e}", exc_info=True)
+
+
+async def ws_handler(websocket):
+    await ws_video_feed(websocket)
+
+
+def start_websocket_server():
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+
+    async def serve():
+        async with websockets.serve(
+            ws_handler,
+            "0.0.0.0",
+            WEBSOCKET_PORT,
+            ping_interval=20,
+            ping_timeout=10,
+            origins=None,
+        ):
+            logger.info(f"WebSocket streaming server listening on ws://0.0.0.0:{WEBSOCKET_PORT}")
+            await asyncio.Future()
+
+    try:
+        loop.run_until_complete(serve())
+    except Exception as e:
+        logger.error(f"WebSocket server failed: {e}")
+
+
+# Start WebSocket server in a daemon thread
+ws_thread = threading.Thread(target=start_websocket_server, daemon=True, name="ws-server")
+ws_thread.start()
 
 
 @app.route('/')

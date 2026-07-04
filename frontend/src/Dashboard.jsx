@@ -4,16 +4,62 @@ import { API, STREAM } from './config';
 
 
 function LiveFeedCard({ cam, onClick, onDelete }) {
-  const [isOffline, setIsOffline] = useState(false);
+  const [isOffline, setIsOffline] = useState(true);
   const [retryKey, setRetryKey] = useState(0);
-  const streamUrl = `${STREAM.VIDEO_FEED}?camera_id=${cam.id}&retry=${retryKey}`;
+  const canvasRef = useRef(null);
+  const cardWsRef = useRef(null);
 
   useEffect(() => {
+    const cameraId = cam.id;
+    const url = `${STREAM.WS}/video_feed?camera_id=${cameraId}`;
+
+    let ws = new WebSocket(url);
+    ws.binaryType = 'blob';
+
+    ws.onopen = () => setIsOffline(false);
+
+    ws.onmessage = (event) => {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+
+      const blob = event.data;
+      const img = new Image();
+      img.onload = () => {
+        if (canvas.width !== img.width || canvas.height !== img.height) {
+          canvas.width = img.width;
+          canvas.height = img.height;
+        }
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        URL.revokeObjectURL(img.src);
+      };
+      img.onerror = () => URL.revokeObjectURL(img.src);
+      img.src = URL.createObjectURL(blob);
+    };
+
+    ws.onerror = () => setIsOffline(true);
+    ws.onclose = () => {
+      if (ws === cardWsRef.current) {
+        setIsOffline(true);
+      }
+    };
+
+    cardWsRef.current = ws;
+
+    return () => {
+      if (cardWsRef.current === ws) {
+        ws.close();
+        cardWsRef.current = null;
+      }
+    };
+  }, [cam.id, retryKey]);
+
+  // Auto-retry every 15 seconds when offline
+  useEffect(() => {
     if (!isOffline) return;
-    // Auto-retry checking the feed every 15 seconds
     const interval = setInterval(() => {
       setRetryKey((prev) => prev + 1);
-      setIsOffline(false);
     }, 15000);
     return () => clearInterval(interval);
   }, [isOffline]);
@@ -21,7 +67,6 @@ function LiveFeedCard({ cam, onClick, onDelete }) {
   const handleRetry = (e) => {
     e.stopPropagation();
     setRetryKey((prev) => prev + 1);
-    setIsOffline(false);
   };
 
   return (
@@ -31,13 +76,9 @@ function LiveFeedCard({ cam, onClick, onDelete }) {
     >
       {/* Feed Player Screen */}
       <div className="relative aspect-video bg-black flex items-center justify-center overflow-hidden">
-        <img
-          src={streamUrl}
-          crossOrigin="anonymous"
-          alt={cam.name}
+        <canvas
+          ref={canvasRef}
           className={`w-full h-full object-cover ${isOffline ? 'hidden' : ''}`}
-          onError={() => setIsOffline(true)}
-          onLoad={() => setIsOffline(false)}
         />
         
         {isOffline && (
@@ -148,7 +189,8 @@ export default function Dashboard({ token, user, onLogout }) {
   const [settingsPageError, setSettingsPageError] = useState('');
   const [settingsPageSuccess, setSettingsPageSuccess] = useState('');
   
-  const imgRef = useRef(null);
+  const streamCanvasRef = useRef(null);
+  const wsRef = useRef(null);
   const canvasRef = useRef(null);
   const frozenFrameRef = useRef(null);
   const settingsSuccessTimeoutRef = useRef(null);
@@ -490,6 +532,56 @@ export default function Dashboard({ token, user, onLogout }) {
     };
   }, [token, fetchData]);
 
+  // WebSocket video stream for the main player
+  useEffect(() => {
+    if (!selectedCamera || isDrawingPerimeter) return;
+
+    const cameraId = selectedCamera.id;
+    const url = `${STREAM.WS}/video_feed?camera_id=${cameraId}`;
+
+    let ws = new WebSocket(url);
+    ws.binaryType = 'blob';
+
+    ws.onopen = () => setStreamError('');
+
+    ws.onmessage = (event) => {
+      const canvas = streamCanvasRef.current;
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+
+      const blob = event.data;
+      const img = new Image();
+      img.onload = () => {
+        if (canvas.width !== img.width || canvas.height !== img.height) {
+          canvas.width = img.width;
+          canvas.height = img.height;
+        }
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        URL.revokeObjectURL(img.src);
+      };
+      img.onerror = () => URL.revokeObjectURL(img.src);
+      img.src = URL.createObjectURL(blob);
+    };
+
+    ws.onerror = () => setStreamError('Stream unavailable. Check if the AI service is running.');
+
+    ws.onclose = () => {
+      if (ws === wsRef.current) {
+        setStreamError('Stream disconnected. Attempting reconnect...');
+      }
+    };
+
+    wsRef.current = ws;
+
+    return () => {
+      if (wsRef.current === ws) {
+        ws.close();
+        wsRef.current = null;
+      }
+    };
+  }, [selectedCamera?.id, isDrawingPerimeter]);
+
   const fetchOperators = useCallback(async () => {
     if (user?.role !== 'ADMIN') return;
     try {
@@ -617,16 +709,16 @@ export default function Dashboard({ token, user, onLogout }) {
   // Freeze frame and open canvas editor
   const startDrawingMode = () => {
     setIsSettingsOpen(false);
-    const img = imgRef.current;
-    if (!img) {
+    const canvas = streamCanvasRef.current;
+    if (!canvas) {
       alert("Stream not loaded yet. Please wait for the video feed to load.");
       return;
     }
 
-    const w = img.naturalWidth || img.clientWidth || 640;
-    const h = img.naturalHeight || img.clientHeight || 480;
+    const w = canvas.width || canvas.clientWidth || 640;
+    const h = canvas.height || canvas.clientHeight || 480;
 
-    if (img.naturalWidth === 0 && img.clientWidth === 0) {
+    if (canvas.width === 0 && canvas.clientWidth === 0) {
       alert("Stream image has not loaded yet. Please wait a moment and try again.");
       return;
     }
@@ -637,7 +729,7 @@ export default function Dashboard({ token, user, onLogout }) {
     const ctx = offscreen.getContext('2d');
 
     try {
-      ctx.drawImage(img, 0, 0, w, h);
+      ctx.drawImage(canvas, 0, 0, w, h);
       frozenFrameRef.current = offscreen;
 
       let existingPoints = [];
@@ -1373,17 +1465,9 @@ export default function Dashboard({ token, user, onLogout }) {
                       </div>
                     </div>
                   ) : selectedCamera ? (
-                    <img
-                      ref={imgRef}
-                      crossOrigin="anonymous"
-                      src={`${STREAM.VIDEO_FEED}?camera_id=${selectedCamera.id}&t=${streamTimestamp}`}
-                      alt="Surveillance Feed"
+                    <canvas
+                      ref={streamCanvasRef}
                       className="w-full h-full object-cover"
-                      onError={(e) => {
-                        e.target.style.display = 'none';
-                        setStreamError('Stream unavailable. Check if the AI service is running.');
-                      }}
-                      onLoad={() => setStreamError('')}
                     />
                   ) : null}
 

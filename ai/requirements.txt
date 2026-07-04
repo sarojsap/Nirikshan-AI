@@ -4,3 +4,4 @@ shapely==2.1.2
 python-dotenv==1.2.2
 requests==2.34.2
 flask==3.0.3
+websockets>=12.0,<17.0
