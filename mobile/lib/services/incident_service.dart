@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
+import '../config/api_config.dart';
 import '../config/constants.dart';
 import '../models/incident.dart';
 import 'auth_service.dart';
@@ -18,7 +19,7 @@ class IncidentService {
       throw Exception('You are not signed in.');
     }
 
-    final uri = Uri.parse(incidentsEndpoint).replace(
+    final uri = Uri.parse(ApiConfig.incidentsEndpoint).replace(
       queryParameters: {'page': page.toString(), 'limit': limit.toString()},
     );
 

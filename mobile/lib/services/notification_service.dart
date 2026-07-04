@@ -5,6 +5,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../config/api_config.dart';
 import '../config/constants.dart';
 
 /// Top-level handler for background/terminated FCM messages.
@@ -136,7 +137,7 @@ class NotificationService {
 
       final response = await http
           .post(
-            Uri.parse(registerNotificationEndpoint),
+            Uri.parse(ApiConfig.registerNotificationEndpoint),
             headers: {
               'Content-Type': 'application/json',
               'Authorization': 'Bearer $authToken',
@@ -167,7 +168,7 @@ class NotificationService {
 
       await http
           .post(
-            Uri.parse(unregisterNotificationEndpoint),
+            Uri.parse(ApiConfig.unregisterNotificationEndpoint),
             headers: {
               'Content-Type': 'application/json',
               'Authorization': 'Bearer $authToken',

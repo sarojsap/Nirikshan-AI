@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../config/api_config.dart';
 import '../config/constants.dart';
 import '../models/user.dart';
 
@@ -14,7 +15,7 @@ class AuthService {
     try {
       final response = await http
           .post(
-            Uri.parse(loginEndpoint),
+            Uri.parse(ApiConfig.loginEndpoint),
             headers: {'Content-Type': 'application/json'},
             body: jsonEncode({'email': email, 'password': password}),
           )

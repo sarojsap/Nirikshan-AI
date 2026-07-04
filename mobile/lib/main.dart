@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'bloc/auth/bloc.dart';
+import 'config/api_config.dart';
 import 'config/theme.dart';
 import 'screens/app_navigator.dart';
 import 'services/auth_service.dart';
@@ -11,6 +12,9 @@ import 'services/notification_service.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
+
+  // Load backend API configuration from SharedPreferences
+  await ApiConfig.load();
 
   // Register the background message handler (must be top-level)
   FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
