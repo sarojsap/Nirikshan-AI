@@ -19,6 +19,7 @@ test_videos/
 scripts/
 logs/
 snapshots/
+media/
 
 # ====================================================================
 # OpenCV & Media Outputs

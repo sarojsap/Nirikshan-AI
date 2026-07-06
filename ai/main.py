@@ -5,6 +5,7 @@ import time
 import json
 import logging
 import asyncio
+import collections
 from datetime import datetime, timezone, timedelta
 from urllib.parse import urlparse, parse_qs
 from flask import Flask, request, Response, jsonify, send_from_directory
@@ -18,11 +19,14 @@ load_dotenv()
 CAMERA_ID = os.getenv('CAMERA_ID')
 STREAM_PORT = int(os.getenv('STREAM_PORT', 8000))
 WEBSOCKET_PORT = int(os.getenv('WEBSOCKET_PORT', 8001))
+MEDIA_DIR = os.getenv('MEDIA_DIR', os.path.join(os.path.dirname(__file__), 'media'))
 
-# Global FPS target — inference runs at this rate regardless of camera source FPS
-# Reduced from 24 to 5: security analytics doesn't need high FPS, saves ~80% CPU/GPU
 TARGET_FPS = 5
-FRAME_INTERVAL = 1.0 / TARGET_FPS  # ~0.2s per frame
+FRAME_INTERVAL = 1.0 / TARGET_FPS
+
+# 30-second clip buffer: stores the last 30 seconds of processed frames
+CLIP_DURATION_SECONDS = 30
+CLIP_BUFFER_SIZE = TARGET_FPS * CLIP_DURATION_SECONDS  # 150 frames @ 5fps
 
 logging.basicConfig(
     level=logging.INFO,
@@ -44,7 +48,7 @@ api = APIClient()
 model = YOLO('yolov8n.pt')
 try:
     model.to('cuda')
-    logger.info("YOLO model loaded on GPU (CUDA) — 5-10x faster inference")
+    logger.info("YOLO model loaded on GPU (CUDA)")
 except Exception:
     logger.warning("CUDA not available, running YOLO on CPU")
 
@@ -84,14 +88,13 @@ cooldowns = {}
 COOLDOWN_CLEANUP_INTERVAL = 3600
 _last_cooldown_cleanup = time.time()
 
-# Thread-safe frame cache: stores the latest JPEG bytes for each camera_id
-# so the /snapshot endpoint can return cached frames without opening a new VideoCapture
 _frame_cache = {}
 _last_frame_time = {}
 _frame_cache_lock = threading.Lock()
 
 INCIDENT_SNAPSHOT_DIR = os.path.join(os.path.dirname(__file__), 'snapshots')
 os.makedirs(INCIDENT_SNAPSHOT_DIR, exist_ok=True)
+os.makedirs(MEDIA_DIR, exist_ok=True)
 
 
 def _cleanup_stale_cooldowns():
@@ -146,7 +149,27 @@ def _save_snapshot(frame, camera_id, alert_type):
     filepath = os.path.join(INCIDENT_SNAPSHOT_DIR, filename)
     with open(filepath, 'wb') as f:
         f.write(buffer.tobytes())
-    return f"/snapshots/{filename}"
+    return filepath
+
+
+def _save_clip(frames, camera_id, alert_type):
+    if not frames or len(frames) < 5:
+        logger.warning(f"Not enough frames for clip ({len(frames)}), skipping")
+        return None
+    filename = f"{camera_id}_{alert_type}_{int(time.time())}.mp4"
+    filepath = os.path.join(MEDIA_DIR, filename)
+    try:
+        height, width = frames[0].shape[:2]
+        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+        out = cv2.VideoWriter(filepath, fourcc, TARGET_FPS, (width, height))
+        for f in frames:
+            out.write(f)
+        out.release()
+        logger.info(f"Saved 30s clip: {filepath} ({len(frames)} frames)")
+        return filepath
+    except Exception as e:
+        logger.error(f"Failed to save clip: {e}")
+        return None
 
 
 def load_camera_config(cid):
@@ -241,12 +264,13 @@ class CameraThread(threading.Thread):
         last_snapshot = None
         cap = None
 
-        # Fixed-interval frame scheduling for consistent 24 FPS
+        # 30-second rolling buffer of processed frames (for video clip capture)
+        clip_buffer = collections.deque(maxlen=CLIP_BUFFER_SIZE)
+
         next_frame_time = time.time()
 
         while self.running:
             try:
-                # 1. Fetch camera configuration
                 cfg = load_camera_config(self.camera_id)
                 video_source = cfg['rtsp_url'] if cfg['rtsp_url'] else 0
                 logger.info(f"Camera {self.camera_id} Thread: Opening video source {video_source}")
@@ -262,7 +286,6 @@ class CameraThread(threading.Thread):
                 last_config_fetch = time.time()
 
                 while self.running:
-                    # Check inactivity timeout (30 seconds of no requests)
                     with _access_lock:
                         last_req_time = _last_access.get(self.camera_id, 0)
                     if time.time() - last_req_time > 30.0:
@@ -280,24 +303,17 @@ class CameraThread(threading.Thread):
 
                     now = time.time()
 
-                    # ── Frame skipping: only process at TARGET_FPS ──
-                    # If we're ahead of schedule, skip inference for this frame
-                    # to maintain exactly TARGET_FPS and reduce CPU load.
                     if now < next_frame_time:
                         continue
 
                     next_frame_time = now + FRAME_INTERVAL
-                    # Catch-up protection: if we fell behind by more than one interval,
-                    # don't accumulate debt — just continue from current time
                     if next_frame_time < now:
                         next_frame_time = now + FRAME_INTERVAL
-                    # ──────────────────────────────────────────────────
 
                     frame_count += 1
                     if frame_count % 300 == 0:
                         logger.info(f"Camera {self.camera_id} Thread: Processed {frame_count} frames at {TARGET_FPS} FPS")
 
-                    # Periodically refresh config from database
                     if now - last_config_fetch > 5.0:
                         try:
                             cfg = load_camera_config(self.camera_id)
@@ -305,7 +321,6 @@ class CameraThread(threading.Thread):
                         except Exception as e:
                             logger.warning(f"Camera {self.camera_id} Thread: Error reloading config: {e}")
 
-                    # Run YOLO detection
                     results = model(frame, conf=cfg['confidence_threshold'], classes=[0], verbose=False)
                     person_count = 0
                     intrusion_detected = False
@@ -335,35 +350,39 @@ class CameraThread(threading.Thread):
 
                     cv2.putText(frame, f"People Count: {person_count}", (20, 40), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 0), 2)
 
-                    # Trigger alert notifications
+                    # ── Add processed frame to clip buffer ──
+                    # Store a copy at inference resolution for the 30s clip
+                    clip_buffer.append(frame.copy())
+
                     if cfg['alerts_enabled'] and is_within_time_window(cfg['start_time_str'], cfg['end_time_str']):
                         if cfg['intrusion_enabled'] and intrusion_detected:
                             if check_cooldown(self.camera_id, "INTRUSION", cfg['cooldown_seconds']):
-                                if current_snapshot is None:
-                                    current_snapshot = _save_snapshot(frame, self.camera_id, "INTRUSION")
-                                    last_snapshot = current_snapshot
+                                snapshot_path = _save_snapshot(frame, self.camera_id, "INTRUSION")
+                                clip_path = _save_clip(list(clip_buffer), self.camera_id, "INTRUSION")
                                 api.send_incident(
                                     "INTRUSION",
                                     "Perimeter breached during restricted hours.",
                                     "CRITICAL",
                                     self.camera_id,
-                                    image_url=current_snapshot
+                                    image_url=snapshot_path,
+                                    local_snapshot_path=snapshot_path,
+                                    local_clip_path=clip_path,
                                 )
 
                         if cfg['crowd_enabled'] and person_count >= cfg['crowd_threshold']:
                             if check_cooldown(self.camera_id, "CROWD", cfg['cooldown_seconds']):
-                                if current_snapshot is None:
-                                    current_snapshot = _save_snapshot(frame, self.camera_id, "CROWD")
-                                    last_snapshot = current_snapshot
+                                snapshot_path = _save_snapshot(frame, self.camera_id, "CROWD")
+                                clip_path = _save_clip(list(clip_buffer), self.camera_id, "CROWD")
                                 api.send_incident(
                                     "CROWD",
                                     f"Crowd threshold exceeded. {person_count} people detected.",
                                     "MEDIUM",
                                     self.camera_id,
-                                    image_url=current_snapshot
+                                    image_url=snapshot_path,
+                                    local_snapshot_path=snapshot_path,
+                                    local_clip_path=clip_path,
                                 )
 
-                    # Encode and cache the frame (quality 60 saves ~55% bandwidth vs 80)
                     ret, buffer = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 60])
                     if ret:
                         frame_bytes = buffer.tobytes()
@@ -381,13 +400,10 @@ class CameraThread(threading.Thread):
         logger.info(f"Background thread ended for camera: {self.camera_id}")
 
 
-# ── WebSocket Video Streaming Server ──────────────────────────────
-# Runs on a separate port from Flask, streams cached frames as binary
-# JPEG messages to connected browser clients.
+# ── WebSocket Video Streaming Server ──
 
 async def ws_video_feed(websocket):
     try:
-        # In websockets v16, the path + query is on request.path
         request_path = websocket.request.path
         query = parse_qs(urlparse(request_path).query)
         camera_id = query.get('camera_id', [None])[0]
@@ -400,8 +416,6 @@ async def ws_video_feed(websocket):
         mark_camera_accessed(camera_id)
         ensure_camera_thread(camera_id)
 
-        # Wait up to 8 seconds for the first frame to appear in the cache.
-        # The camera thread starts asynchronously, so the cache is initially empty.
         first_frame_ok = False
         for _ in range(80):
             with _frame_cache_lock:
@@ -436,7 +450,6 @@ async def ws_video_feed(websocket):
 
             stale_cycles = 0
 
-            # Only send if we have a new frame (compare timestamps, not bytes)
             if cached is not None and last_time != last_send_time:
                 try:
                     await websocket.send(cached)
@@ -480,7 +493,6 @@ def start_websocket_server():
         logger.error(f"WebSocket server failed: {e}")
 
 
-# Start WebSocket server in a daemon thread
 ws_thread = threading.Thread(target=start_websocket_server, daemon=True, name="ws-server")
 ws_thread.start()
 
@@ -516,7 +528,6 @@ def video_feed():
     mark_camera_accessed(cid)
     ensure_camera_thread(cid)
 
-    # Wait up to 3 seconds for the first frame to populate
     first_frame_ok = False
     for _ in range(30):
         with _frame_cache_lock:
@@ -536,12 +547,11 @@ def video_feed():
         try:
             while True:
                 mark_camera_accessed(cid)
-                
-                # Check if camera has timed out (no new frame for > 8 seconds)
+
                 with _frame_cache_lock:
                     last_time = _last_frame_time.get(cid, 0)
                     cached = _frame_cache.get(cid)
-                
+
                 if time.time() - last_time > 8.0:
                     logger.warning(f"Closing stream connection for camera {cid} due to feed loss")
                     break
@@ -554,7 +564,7 @@ def video_feed():
                         consecutive_missing = 0
                 else:
                     consecutive_missing += 1
-                    if consecutive_missing > 100:  # ~5 seconds of no cached frame
+                    if consecutive_missing > 100:
                         break
                 time.sleep(0.05)
         except GeneratorExit:
@@ -574,7 +584,6 @@ def snapshot():
     mark_camera_accessed(cid)
     ensure_camera_thread(cid)
 
-    # Wait up to 1 second for cache to be populated initially
     for _ in range(10):
         with _frame_cache_lock:
             last_time = _last_frame_time.get(cid, 0)
@@ -593,16 +602,23 @@ def serve_snapshot(filename):
     return send_from_directory(INCIDENT_SNAPSHOT_DIR, filename)
 
 
+@app.route('/media/<filename>')
+def serve_media(filename):
+    return send_from_directory(MEDIA_DIR, filename)
+
+
 @app.route('/health')
 def health():
     return jsonify({
         "status": "ok",
         "camera_id": CAMERA_ID,
         "uptime": time.time(),
-        "active_threads": [cid for cid, t in _camera_threads.items() if t.is_alive()]
+        "active_threads": [cid for cid, t in _camera_threads.items() if t.is_alive()],
     })
 
 
 if __name__ == '__main__':
     logger.info(f"Starting Nirikshan AI server on port {STREAM_PORT}")
+    logger.info(f"Media directory: {MEDIA_DIR}")
+    logger.info(f"30-second clip buffer: {CLIP_BUFFER_SIZE} frames")
     app.run(host='0.0.0.0', port=STREAM_PORT, threaded=True)

@@ -16,6 +16,15 @@ logger = logging.getLogger(__name__)
 QUEUE_FILE = os.path.join(os.path.dirname(__file__), 'failed_incidents.json')
 
 
+def find_free_port(start=9000, end=9999):
+    import socket
+    for port in range(start, end):
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            if s.connect_ex(('localhost', port)) != 0:
+                return port
+    return start
+
+
 class APIClient:
     def __init__(self):
         self.token = None
@@ -44,7 +53,7 @@ class APIClient:
             data = resp.json()
             self.token = data.get('data', {}).get('token')
             self._session.headers.update({"Authorization": f"Bearer {self.token}"})
-            logger.info('Successfully logged into Node.js Backend')
+            logger.info('Successfully logged into Edge Backend')
             self._login_retry_delay = 5
             self._retry_failed()
             return True
@@ -114,7 +123,8 @@ class APIClient:
             os.remove(QUEUE_FILE)
             logger.info(f"All {len(failed)} queued incidents sent successfully")
 
-    def send_incident(self, incident_type, description, severity, camera_id, image_url=None):
+    def send_incident(self, incident_type, description, severity, camera_id,
+                      image_url=None, local_snapshot_path=None, local_clip_path=None):
         self._retry_failed()
 
         if not self._ensure_authenticated():
@@ -129,10 +139,14 @@ class APIClient:
         }
         if image_url:
             payload["imageUrl"] = image_url
+        if local_snapshot_path:
+            payload["localSnapshotPath"] = local_snapshot_path
+        if local_clip_path:
+            payload["localClipPath"] = local_clip_path
 
         result = self._request("POST", "/incidents", json=payload)
         if result:
-            logger.info(f"Alert Sent: {incident_type} - {description}")
+            logger.info(f"Alert Sent: {incident_type} - {description} (sync: {result.get('syncStatus', 'unknown')})")
         else:
             logger.error(f"Failed to send incident: {incident_type}")
             self._queue_failed(payload)
