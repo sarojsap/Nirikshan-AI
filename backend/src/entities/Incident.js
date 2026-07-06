@@ -10,34 +10,74 @@ export const Incident = new EntitySchema({
       generated: 'uuid',
     },
     type: {
-      type: 'enum',
-      // Based on your MVP features
-      enum: ['PERSON_DETECTED', 'INTRUSION', 'CROWD', 'RESTRICTED_AREA'],
+      type: 'varchar',
+      default: 'PERSON_DETECTED',
     },
     description: {
       type: 'text',
       nullable: true,
     },
     severity: {
-      type: 'enum',
-      enum: ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'],
+      type: 'varchar',
       default: 'MEDIUM',
     },
     imageUrl: {
       type: 'text',
-      nullable: true, // URL to the snapshot of the incident
+      nullable: true,
     },
     timestamp: {
-      type: 'timestamp',
+      type: 'datetime',
       createDate: true,
+    },
+    syncStatus: {
+      type: 'varchar',
+      default: 'PENDING',
+    },
+    localSnapshotPath: {
+      type: 'text',
+      nullable: true,
+    },
+    localClipPath: {
+      type: 'text',
+      nullable: true,
+    },
+    snapshotKey: {
+      type: 'varchar',
+      length: 500,
+      nullable: true,
+    },
+    clipKey: {
+      type: 'varchar',
+      length: 500,
+      nullable: true,
+    },
+    retryCount: {
+      type: 'int',
+      default: 0,
+    },
+    nextRetryAt: {
+      type: 'datetime',
+      nullable: true,
+    },
+    lastSyncError: {
+      type: 'text',
+      nullable: true,
+    },
+    syncedAt: {
+      type: 'datetime',
+      nullable: true,
     },
   },
   relations: {
     camera: {
       target: 'Camera',
       type: 'many-to-one',
-      joinColumn: { name: 'cameraId' }, // Creates a 'cameraId' column in the database
-      onDelete: 'CASCADE', // If a camera is deleted, delete all its incidents automatically
+      joinColumn: { name: 'cameraId' },
+      onDelete: 'CASCADE',
     },
   },
+  indices: [
+    { columns: ['syncStatus'] },
+    { columns: ['nextRetryAt'] },
+  ],
 });
