@@ -1,13 +1,19 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { io } from 'socket.io-client';
-import { API, STREAM } from './config';
+import { API, STREAM, CLOUD_API, detectMode } from './config';
 import LiveFeedCard from './components/LiveFeedCard';
 import AddCameraModal from './components/AddCameraModal';
 import SnapshotViewer from './components/SnapshotViewer';
 import ContextMenu from './components/ContextMenu';
 import AlertsHistoryModal from './components/AlertsHistoryModal';
+import SyncStatusBadge from './components/SyncStatusBadge';
+import DeviceSettingsPanel from './components/DeviceSettingsPanel';
+import CloudDashboard from './components/CloudDashboard';
+import CloudIncidents from './components/CloudIncidents';
+import CloudDevices from './components/CloudDevices';
 
-export default function Dashboard({ token, user, onLogout }) {
+export default function Dashboard({ token, user, onLogout, mode: initialMode, onModeSwitch }) {
+  const [mode, setMode] = useState(initialMode || detectMode());
   const [cameras, setCameras] = useState([]);
   const [selectedCamera, setSelectedCamera] = useState(null);
   const [incidents, setIncidents] = useState([]);
@@ -16,7 +22,10 @@ export default function Dashboard({ token, user, onLogout }) {
     activeCameras: 0,
     totalIncidents: 0,
   });
-  const [activeTab, setActiveTab] = useState('surveillance');
+  const [activeTab, setActiveTab] = useState(() => {
+    const m = initialMode || detectMode();
+    return m === 'cloud' ? 'dashboard' : 'surveillance';
+  });
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isCameraDropdownOpen, setIsCameraDropdownOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -42,6 +51,8 @@ export default function Dashboard({ token, user, onLogout }) {
   const [opError, setOpError] = useState('');
   const [opSuccess, setOpSuccess] = useState('');
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [cloudIncidents, setCloudIncidents] = useState([]);
+  const [cloudDevices, setCloudDevices] = useState([]);
   const [settingsPageCameraId, setSettingsPageCameraId] = useState('');
   const [settingsPageSchema, setSettingsPageSchema] = useState([]);
   const [settingsPageValues, setSettingsPageValues] = useState({});
@@ -56,6 +67,12 @@ export default function Dashboard({ token, user, onLogout }) {
   const settingsSuccessTimeoutRef = useRef(null);
   const playerRef = useRef(null);
   const socketRef = useRef(null);
+
+  useEffect(() => {
+    setActiveTab(mode === 'cloud' ? 'dashboard' : 'surveillance');
+    setIsSettingsOpen(false);
+    setSelectedSnapshot(null);
+  }, [mode]);
 
   useEffect(() => {
     const handleCloseMenu = () => {
@@ -220,7 +237,7 @@ export default function Dashboard({ token, user, onLogout }) {
   }, [cameras, settingsPageCameraId]);
 
   useEffect(() => {
-    if (activeTab === 'settings' && settingsPageCameraId) {
+    if (mode === 'edge' && activeTab === 'settings' && settingsPageCameraId) {
       const fetchSettingsConfig = async () => {
         setSettingsPageLoading(true);
         setSettingsPageError('');
@@ -284,25 +301,45 @@ export default function Dashboard({ token, user, onLogout }) {
     }
   };
 
-  useEffect(() => {
-    fetchData();
-    socketRef.current = io(API.SOCKET, { transports: ['websocket', 'polling'], reconnection: true });
-    socketRef.current.on('connect', () => { fetchData(); });
-    socketRef.current.on('connect_error', (err) => console.error('Socket connection error:', err.message));
-    socketRef.current.on('disconnect', (reason) => console.warn('Disconnected from incident stream server:', reason));
-    socketRef.current.on('new_incident', (incident) => {
-      playAlertSound();
-      setIncidents((prev) => [incident, ...prev.slice(0, 19)]);
-      setStats((prev) => ({ ...prev, totalIncidents: prev.totalIncidents + 1 }));
-    });
-    return () => {
-      if (socketRef.current) socketRef.current.disconnect();
-      if (settingsSuccessTimeoutRef.current) clearTimeout(settingsSuccessTimeoutRef.current);
-    };
-  }, [token, fetchData]);
+  const fetchCloudDevices = useCallback(async () => {
+    if (mode !== 'cloud') return;
+    try {
+      const res = await fetch(CLOUD_API.DEVICES, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.status === 401) { onLogout?.(); return; }
+      if (res.ok) {
+        const body = await res.json();
+        setCloudDevices(body.data ?? body);
+      }
+    } catch { /* ignore */ }
+  }, [token, onLogout, mode]);
 
   useEffect(() => {
-    if (!selectedCamera || isDrawingPerimeter) return;
+    if (mode === 'edge') {
+      fetchData();
+      socketRef.current = io(API.SOCKET, { transports: ['websocket', 'polling'], reconnection: true });
+      socketRef.current.on('connect', () => { fetchData(); });
+      socketRef.current.on('connect_error', (err) => console.error('Socket connection error:', err.message));
+      socketRef.current.on('disconnect', (reason) => console.warn('Disconnected from incident stream server:', reason));
+      socketRef.current.on('new_incident', (incident) => {
+        playAlertSound();
+        setIncidents((prev) => [incident, ...prev.slice(0, 19)]);
+        setStats((prev) => ({ ...prev, totalIncidents: prev.totalIncidents + 1 }));
+      });
+    } else {
+      fetchCloudDevices();
+      const interval = setInterval(fetchCloudDevices, 30000);
+      return () => clearInterval(interval);
+    }
+    return () => {
+      if (socketRef.current) { socketRef.current.disconnect(); socketRef.current = null; }
+      if (settingsSuccessTimeoutRef.current) clearTimeout(settingsSuccessTimeoutRef.current);
+    };
+  }, [token, fetchData, fetchCloudDevices, mode]);
+
+  useEffect(() => {
+    if (!selectedCamera || isDrawingPerimeter || mode !== 'edge') return;
     const cameraId = selectedCamera.id;
     const url = `${STREAM.WS}/video_feed?camera_id=${cameraId}`;
     let ws = new WebSocket(url);
@@ -548,95 +585,172 @@ export default function Dashboard({ token, user, onLogout }) {
         </div>
 
         <div className="flex flex-col gap-6 overflow-y-auto flex-1 pr-1">
-          <div className="flex flex-col gap-1">
-            <button onClick={() => setActiveTab('surveillance')} className={`flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all text-left ${activeTab === 'surveillance' ? 'bg-violet-600/15 border border-violet-500/20 text-white shadow-sm' : 'hover:bg-white/5 text-slate-400'}`}>
-              <span className="material-symbols-outlined text-lg">dashboard</span><span>Dashboard</span>
-            </button>
-          </div>
+          {mode === 'edge' ? (
+            <>
+              <div className="flex flex-col gap-1">
+                <button onClick={() => setActiveTab('surveillance')} className={`flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all text-left ${activeTab === 'surveillance' ? 'bg-violet-600/15 border border-violet-500/20 text-white shadow-sm' : 'hover:bg-white/5 text-slate-400'}`}>
+                  <span className="material-symbols-outlined text-lg">dashboard</span><span>Dashboard</span>
+                </button>
+              </div>
 
-          <div className="flex flex-col gap-1">
-            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider px-4 mb-1">Monitoring</span>
-            <button onClick={() => setActiveTab('surveillance')} className={`flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all text-left ${activeTab === 'surveillance' ? 'bg-violet-600/15 border border-violet-500/20 text-white shadow-sm' : 'hover:bg-white/5 text-slate-400'}`}>
-              <span className="material-symbols-outlined text-lg">videocam</span><span>Camera Registry</span>
-            </button>
-            <button onClick={() => setActiveTab('live_feeds')} className={`flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all text-left ${activeTab === 'live_feeds' ? 'bg-violet-600/15 border border-violet-500/20 text-white shadow-sm' : 'hover:bg-white/5 text-slate-400'}`}>
-              <span className="material-symbols-outlined text-lg">live_tv</span><span>Live Feeds</span>
-            </button>
-            <button className="flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-600 cursor-not-allowed text-left">
-              <span className="material-symbols-outlined text-lg">video_library</span><span>Recordings</span>
-            </button>
-            <button className="flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-600 cursor-not-allowed text-left">
-              <span className="material-symbols-outlined text-lg">analytics</span><span>Analytics</span>
-            </button>
-          </div>
+              <div className="flex flex-col gap-1">
+                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider px-4 mb-1">Monitoring</span>
+                <button onClick={() => setActiveTab('surveillance')} className={`flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all text-left ${activeTab === 'surveillance' ? 'bg-violet-600/15 border border-violet-500/20 text-white shadow-sm' : 'hover:bg-white/5 text-slate-400'}`}>
+                  <span className="material-symbols-outlined text-lg">videocam</span><span>Camera Registry</span>
+                </button>
+                <button onClick={() => setActiveTab('live_feeds')} className={`flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all text-left ${activeTab === 'live_feeds' ? 'bg-violet-600/15 border border-violet-500/20 text-white shadow-sm' : 'hover:bg-white/5 text-slate-400'}`}>
+                  <span className="material-symbols-outlined text-lg">live_tv</span><span>Live Feeds</span>
+                </button>
+                <button className="flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-600 cursor-not-allowed text-left">
+                  <span className="material-symbols-outlined text-lg">video_library</span><span>Recordings</span>
+                </button>
+                <button className="flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-600 cursor-not-allowed text-left">
+                  <span className="material-symbols-outlined text-lg">analytics</span><span>Analytics</span>
+                </button>
+              </div>
 
-          <div className="flex flex-col gap-1">
-            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider px-4 mb-1">Alerts & Events</span>
-            <button onClick={() => setActiveTab('surveillance')} className="flex items-center justify-between px-4 py-2.5 rounded-xl text-xs font-semibold hover:bg-white/5 text-slate-400 text-left w-full">
-              <div className="flex items-center gap-3"><span className="material-symbols-outlined text-lg">shield</span><span>Security Alerts</span></div>
-              <span className="bg-rose-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">{incidents.filter(i => i.severity === 'CRITICAL').length || 8}</span>
-            </button>
-            <button onClick={() => setActiveTab('surveillance')} className="flex items-center justify-between px-4 py-2.5 rounded-xl text-xs font-semibold hover:bg-white/5 text-slate-400 text-left w-full">
-              <div className="flex items-center gap-3"><span className="material-symbols-outlined text-lg">groups</span><span>Crowd Alerts</span></div>
-              <span className="bg-amber-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">{incidents.filter(i => i.type.includes('CROWD') || i.severity === 'WARNING').length || 12}</span>
-            </button>
-            <button className="flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-600 cursor-not-allowed text-left">
-              <span className="material-symbols-outlined text-lg">description</span><span>System Logs</span>
-            </button>
-          </div>
+              <div className="flex flex-col gap-1">
+                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider px-4 mb-1">Alerts & Events</span>
+                <button onClick={() => setActiveTab('surveillance')} className="flex items-center justify-between px-4 py-2.5 rounded-xl text-xs font-semibold hover:bg-white/5 text-slate-400 text-left w-full">
+                  <div className="flex items-center gap-3"><span className="material-symbols-outlined text-lg">shield</span><span>Security Alerts</span></div>
+                  <span className="bg-rose-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">{incidents.filter(i => i.severity === 'CRITICAL').length || 8}</span>
+                </button>
+                <button onClick={() => setActiveTab('surveillance')} className="flex items-center justify-between px-4 py-2.5 rounded-xl text-xs font-semibold hover:bg-white/5 text-slate-400 text-left w-full">
+                  <div className="flex items-center gap-3"><span className="material-symbols-outlined text-lg">groups</span><span>Crowd Alerts</span></div>
+                  <span className="bg-amber-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">{incidents.filter(i => i.type.includes('CROWD') || i.severity === 'WARNING').length || 12}</span>
+                </button>
+                <button className="flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-600 cursor-not-allowed text-left">
+                  <span className="material-symbols-outlined text-lg">description</span><span>System Logs</span>
+                </button>
+              </div>
 
-          <div className="flex flex-col gap-1">
-            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider px-4 mb-1">System</span>
-            {user?.role === 'ADMIN' && (
-              <button onClick={() => setActiveTab('operators')} className={`flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all text-left ${activeTab === 'operators' ? 'bg-violet-600/15 border border-violet-500/20 text-white shadow-sm' : 'hover:bg-white/5 text-slate-400'}`}>
-                <span className="material-symbols-outlined text-lg">manage_accounts</span><span>Operators</span>
-              </button>
-            )}
-            {user?.role === 'ADMIN' && (
-              <button onClick={() => setActiveTab('settings')} className={`flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all text-left ${activeTab === 'settings' ? 'bg-violet-600/15 border border-violet-500/20 text-white shadow-sm' : 'hover:bg-white/5 text-slate-400'}`}>
-                <span className="material-symbols-outlined text-lg">settings</span><span>Settings</span>
-              </button>
-            )}
-            <button className="flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-600 cursor-not-allowed text-left">
-              <span className="material-symbols-outlined text-lg">receipt_long</span><span>Audit Logs</span>
-            </button>
-          </div>
-
-          <div className="flex flex-col gap-1 mt-2 min-h-0 overflow-hidden border-t border-white/5 pt-4">
-            <div className="flex justify-between items-center px-4 mb-2 shrink-0">
-              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Cameras</span>
-              <span className="bg-emerald-500/10 text-emerald-400 text-[8px] font-mono px-1.5 py-0.5 rounded border border-emerald-500/20 font-bold shrink-0">
-                {cameras.filter(c => c.status === 'ACTIVE').length} / {cameras.length}
-              </span>
-            </div>
-            <div className="flex flex-col gap-1 overflow-y-auto pr-1 max-h-[220px]">
-              {cameras.length === 0 ? (
-                <span className="text-slate-500 text-[10px] px-4 py-2">No cameras registered.</span>
-              ) : (
-                cameras.map((cam) => (
-                  <button key={cam.id} onClick={() => { setActiveTab('surveillance'); setSelectedCamera(cam); }} onContextMenu={(e) => handleContextMenu(e, cam)} className={`flex items-center justify-between px-3 py-2 rounded-xl text-xs transition-all text-left w-full border ${selectedCamera?.id === cam.id ? 'bg-violet-600/15 border-violet-500/35 text-white font-semibold shadow-[0_0_10px_rgba(139,92,246,0.1)]' : 'hover:bg-white/5 bg-transparent border-transparent text-slate-400'}`}>
-                    <div className="flex items-center gap-2 truncate flex-1 mr-2">
-                      <span className="material-symbols-outlined text-base shrink-0">{cam.rtspUrl.length === 1 ? 'videocam' : 'sensors'}</span>
-                      <span className="truncate text-[11px] font-sans">{cam.name}</span>
-                    </div>
-                    <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${cam.status === 'ACTIVE' ? 'bg-emerald-400 shadow-[0_0_6px_#34d399]' : 'bg-rose-500'}`} />
+              <div className="flex flex-col gap-1">
+                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider px-4 mb-1">System</span>
+                {user?.role === 'ADMIN' && (
+                  <button onClick={() => setActiveTab('operators')} className={`flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all text-left ${activeTab === 'operators' ? 'bg-violet-600/15 border border-violet-500/20 text-white shadow-sm' : 'hover:bg-white/5 text-slate-400'}`}>
+                    <span className="material-symbols-outlined text-lg">manage_accounts</span><span>Operators</span>
                   </button>
-                ))
-              )}
-            </div>
-          </div>
+                )}
+                {user?.role === 'ADMIN' && (
+                  <button onClick={() => setActiveTab('settings')} className={`flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all text-left ${activeTab === 'settings' ? 'bg-violet-600/15 border border-violet-500/20 text-white shadow-sm' : 'hover:bg-white/5 text-slate-400'}`}>
+                    <span className="material-symbols-outlined text-lg">settings</span><span>Settings</span>
+                  </button>
+                )}
+                <button className="flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-600 cursor-not-allowed text-left">
+                  <span className="material-symbols-outlined text-lg">receipt_long</span><span>Audit Logs</span>
+                </button>
+              </div>
+
+              <SyncStatusBadge token={token} onLogout={onLogout} />
+
+              <div className="flex flex-col gap-1 mt-2 min-h-0 overflow-hidden border-t border-white/5 pt-4">
+                <div className="flex justify-between items-center px-4 mb-2 shrink-0">
+                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Cameras</span>
+                  <span className="bg-emerald-500/10 text-emerald-400 text-[8px] font-mono px-1.5 py-0.5 rounded border border-emerald-500/20 font-bold shrink-0">
+                    {cameras.filter(c => c.status === 'ACTIVE').length} / {cameras.length}
+                  </span>
+                </div>
+                <div className="flex flex-col gap-1 overflow-y-auto pr-1 max-h-[220px]">
+                  {cameras.length === 0 ? (
+                    <span className="text-slate-500 text-[10px] px-4 py-2">No cameras registered.</span>
+                  ) : (
+                    cameras.map((cam) => (
+                      <button key={cam.id} onClick={() => { setActiveTab('surveillance'); setSelectedCamera(cam); }} onContextMenu={(e) => handleContextMenu(e, cam)} className={`flex items-center justify-between px-3 py-2 rounded-xl text-xs transition-all text-left w-full border ${selectedCamera?.id === cam.id ? 'bg-violet-600/15 border-violet-500/35 text-white font-semibold shadow-[0_0_10px_rgba(139,92,246,0.1)]' : 'hover:bg-white/5 bg-transparent border-transparent text-slate-400'}`}>
+                        <div className="flex items-center gap-2 truncate flex-1 mr-2">
+                          <span className="material-symbols-outlined text-base shrink-0">{cam.rtspUrl.length === 1 ? 'videocam' : 'sensors'}</span>
+                          <span className="truncate text-[11px] font-sans">{cam.name}</span>
+                        </div>
+                        <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${cam.status === 'ACTIVE' ? 'bg-emerald-400 shadow-[0_0_6px_#34d399]' : 'bg-rose-500'}`} />
+                      </button>
+                    ))
+                  )}
+                </div>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="flex flex-col gap-1">
+                <button onClick={() => setActiveTab('dashboard')} className={`flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all text-left ${activeTab === 'dashboard' ? 'bg-violet-600/15 border border-violet-500/20 text-white shadow-sm' : 'hover:bg-white/5 text-slate-400'}`}>
+                  <span className="material-symbols-outlined text-lg">dashboard</span><span>Dashboard</span>
+                </button>
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider px-4 mb-1">Data</span>
+                <button onClick={() => setActiveTab('incidents')} className={`flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all text-left ${activeTab === 'incidents' ? 'bg-violet-600/15 border border-violet-500/20 text-white shadow-sm' : 'hover:bg-white/5 text-slate-400'}`}>
+                  <span className="material-symbols-outlined text-lg">warning</span><span>Incidents</span>
+                </button>
+                <button onClick={() => setActiveTab('devices')} className={`flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all text-left ${activeTab === 'devices' ? 'bg-violet-600/15 border border-violet-500/20 text-white shadow-sm' : 'hover:bg-white/5 text-slate-400'}`}>
+                  <span className="material-symbols-outlined text-lg">devices</span><span>Devices</span>
+                </button>
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider px-4 mb-1">System</span>
+                <button onClick={() => setActiveTab('settings')} className={`flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all text-left ${activeTab === 'settings' ? 'bg-violet-600/15 border border-violet-500/20 text-white shadow-sm' : 'hover:bg-white/5 text-slate-400'}`}>
+                  <span className="material-symbols-outlined text-lg">settings</span><span>Settings</span>
+                </button>
+              </div>
+
+              <div className="flex flex-col gap-1 mt-2 min-h-0 overflow-hidden border-t border-white/5 pt-4">
+                <div className="flex justify-between items-center px-4 mb-2 shrink-0">
+                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Devices</span>
+                  <span className="bg-violet-500/10 text-violet-400 text-[8px] font-mono px-1.5 py-0.5 rounded border border-violet-500/20 font-bold shrink-0">
+                    {cloudDevices.length}
+                  </span>
+                </div>
+                <div className="flex flex-col gap-1 overflow-y-auto pr-1 max-h-[220px]">
+                  {cloudDevices.length === 0 ? (
+                    <span className="text-slate-500 text-[10px] px-4 py-2">No devices registered.</span>
+                  ) : (
+                    cloudDevices.map((d) => (
+                      <button key={d.id} onClick={() => setActiveTab('devices')} className="flex items-center justify-between px-3 py-2 rounded-xl text-xs transition-all text-left w-full border hover:bg-white/5 bg-transparent border-transparent text-slate-400">
+                        <div className="flex items-center gap-2 truncate flex-1 mr-2">
+                          <span className="material-symbols-outlined text-base shrink-0">devices</span>
+                          <span className="truncate text-[11px] font-sans">{d.name}</span>
+                        </div>
+                        <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${d.isActive !== false ? 'bg-emerald-400 shadow-[0_0_6px_#34d399]' : 'bg-rose-500'}`} />
+                      </button>
+                    ))
+                  )}
+                </div>
+              </div>
+            </>
+          )}
         </div>
       </aside>
 
       <div className="flex-1 flex flex-col h-full overflow-hidden min-w-0">
         <nav className="bg-[#090f19] border-b border-[#162235] h-20 px-8 flex justify-between items-center z-10 shrink-0">
           <div className="flex items-center gap-6 ml-4">
-            <button className={`pb-1 text-sm font-semibold transition-all border-b-2 ${activeTab === 'surveillance' ? 'text-white border-violet-500' : 'text-slate-400 border-transparent hover:text-white'}`} onClick={() => setActiveTab('surveillance')}>Surveillance</button>
-            {user?.role === 'ADMIN' && (
-              <button className={`pb-1 text-sm font-semibold transition-all border-b-2 ${activeTab === 'operators' ? 'text-white border-violet-500' : 'text-slate-400 border-transparent hover:text-white'}`} onClick={() => setActiveTab('operators')}>Operators</button>
+            {mode === 'edge' ? (
+              <>
+                <button className={`pb-1 text-sm font-semibold transition-all border-b-2 ${activeTab === 'surveillance' ? 'text-white border-violet-500' : 'text-slate-400 border-transparent hover:text-white'}`} onClick={() => setActiveTab('surveillance')}>Surveillance</button>
+                {user?.role === 'ADMIN' && (
+                  <button className={`pb-1 text-sm font-semibold transition-all border-b-2 ${activeTab === 'operators' ? 'text-white border-violet-500' : 'text-slate-400 border-transparent hover:text-white'}`} onClick={() => setActiveTab('operators')}>Operators</button>
+                )}
+              </>
+            ) : (
+              <>
+                <button className={`pb-1 text-sm font-semibold transition-all border-b-2 ${activeTab === 'dashboard' ? 'text-white border-violet-500' : 'text-slate-400 border-transparent hover:text-white'}`} onClick={() => setActiveTab('dashboard')}>Dashboard</button>
+                <button className={`pb-1 text-sm font-semibold transition-all border-b-2 ${activeTab === 'incidents' ? 'text-white border-violet-500' : 'text-slate-400 border-transparent hover:text-white'}`} onClick={() => setActiveTab('incidents')}>Incidents</button>
+                <button className={`pb-1 text-sm font-semibold transition-all border-b-2 ${activeTab === 'devices' ? 'text-white border-violet-500' : 'text-slate-400 border-transparent hover:text-white'}`} onClick={() => setActiveTab('devices')}>Devices</button>
+                <button className={`pb-1 text-sm font-semibold transition-all border-b-2 ${activeTab === 'settings' ? 'text-white border-violet-500' : 'text-slate-400 border-transparent hover:text-white'}`} onClick={() => setActiveTab('settings')}>Settings</button>
+              </>
             )}
           </div>
-          <div className="flex items-center gap-6">
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => onModeSwitch?.(mode === 'cloud' ? 'edge' : 'cloud')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-bold transition-all ${
+                mode === 'cloud'
+                  ? 'bg-violet-600/10 border border-violet-500/20 text-violet-400 hover:bg-violet-600/20'
+                  : 'bg-emerald-600/10 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-600/20'
+              }`}
+            >
+              <span className="material-symbols-outlined text-sm">{mode === 'cloud' ? 'cloud' : 'lan'}</span>
+              <span>{mode === 'cloud' ? 'Cloud' : 'Edge'}</span>
+            </button>
             <div className="flex items-center gap-3">
               <div className="text-right">
                 <p className="text-xs font-bold text-white leading-tight">{user?.name || 'Super Admin'}</p>
@@ -651,7 +765,39 @@ export default function Dashboard({ token, user, onLogout }) {
           </div>
         </nav>
 
-        {activeTab === 'surveillance' || activeTab === 'live_feeds' || user?.role !== 'ADMIN' ? (
+        {mode === 'cloud' ? (
+          <div className="flex-1 flex overflow-hidden p-6 gap-6 min-h-0 w-full">
+            {activeTab === 'dashboard' && (
+              <CloudDashboard
+                token={token}
+                onLogout={onLogout}
+                onSelectIncident={(inc) => setSelectedSnapshot(inc)}
+              />
+            )}
+            {activeTab === 'incidents' && (
+              <CloudIncidents
+                token={token}
+                onLogout={onLogout}
+                onSelectIncident={(inc) => setSelectedSnapshot(inc)}
+              />
+            )}
+            {activeTab === 'devices' && (
+              <CloudDevices
+                token={token}
+                onLogout={onLogout}
+              />
+            )}
+            {activeTab === 'settings' && (
+              <div className="flex-1 flex flex-col gap-6 overflow-y-auto pr-1">
+                <div>
+                  <h2 className="text-xl font-bold text-white tracking-tight">Cloud Settings</h2>
+                  <p className="text-xs text-slate-400 mt-0.5">Remote device configuration</p>
+                </div>
+                <DeviceSettingsPanel token={token} onLogout={onLogout} />
+              </div>
+            )}
+          </div>
+        ) : activeTab === 'surveillance' || activeTab === 'live_feeds' || user?.role !== 'ADMIN' ? (
           <div className="flex-1 flex overflow-hidden p-6 gap-6 min-h-0 w-full">
             {activeTab === 'live_feeds' ? (
               <div className="flex-1 h-full min-h-0 flex flex-col gap-6 overflow-y-auto pr-1">
@@ -997,7 +1143,7 @@ export default function Dashboard({ token, user, onLogout }) {
           </div>
         )}
 
-        {isSettingsOpen && selectedCamera && (
+        {mode === 'edge' && isSettingsOpen && selectedCamera && (
           <aside className="fixed top-24 right-6 bottom-6 w-80 bg-[#090f19]/95 backdrop-blur-md border border-[#162235] rounded-2xl flex flex-col z-[150] shadow-2xl overflow-hidden">
             <div className="p-4 border-b border-[#162235] flex justify-between items-center shrink-0">
               <div className="flex items-center gap-2">
@@ -1054,20 +1200,24 @@ export default function Dashboard({ token, user, onLogout }) {
         )}
       </div>
 
-      <AddCameraModal
-        isOpen={isAddModalOpen}
-        onClose={() => setIsAddModalOpen(false)}
-        token={token}
-        onLogout={onLogout}
-        onSuccess={fetchData}
-      />
+      {mode === 'edge' && (
+        <AddCameraModal
+          isOpen={isAddModalOpen}
+          onClose={() => setIsAddModalOpen(false)}
+          token={token}
+          onLogout={onLogout}
+          onSuccess={fetchData}
+        />
+      )}
 
-      <ContextMenu
-        contextMenu={contextMenu}
-        onDrawPerimeter={handleContextDrawPerimeter}
-        onDeleteCamera={handleDeleteCamera}
-        onClose={() => setContextMenu(null)}
-      />
+      {mode === 'edge' && (
+        <ContextMenu
+          contextMenu={contextMenu}
+          onDrawPerimeter={handleContextDrawPerimeter}
+          onDeleteCamera={handleDeleteCamera}
+          onClose={() => setContextMenu(null)}
+        />
+      )}
 
       <SnapshotViewer
         incident={selectedSnapshot}

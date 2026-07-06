@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
-import { API } from './config';
+import { API, CLOUD_API } from './config';
 
-export default function Login({ onAuthSuccess }) {
+export default function Login({ onAuthSuccess, onModeSelect, currentMode = 'edge', onRegisterDevice }) {
   const [isLogin, setIsLogin] = useState(true);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -27,8 +27,9 @@ export default function Login({ onAuthSuccess }) {
     setSuccess('');
     setLoading(true);
 
+    const authApi = isLogin && currentMode === 'cloud' ? CLOUD_API : API;
     const url = isLogin
-      ? `${API.AUTH}/login`
+      ? `${authApi.AUTH}/login`
       : `${API.AUTH}/register`;
 
     const payload = isLogin
@@ -129,6 +130,24 @@ export default function Login({ onAuthSuccess }) {
                   ? 'Sign in to access your surveillance dashboard'
                   : 'Register a new account to monitor secure areas'}
               </p>
+              <div className="flex items-center justify-center gap-2 mt-3">
+                <button
+                  onClick={onModeSelect}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-[#0c1524] hover:bg-violet-600/10 border border-[#162235] hover:border-violet-500/30 rounded-xl text-[10px] font-semibold text-slate-400 hover:text-white transition-all"
+                >
+                  <span className="material-symbols-outlined text-sm">{currentMode === 'cloud' ? 'cloud' : 'lan'}</span>
+                  <span className="uppercase">{currentMode === 'cloud' ? 'Cloud Mode' : 'Edge Mode'}</span>
+                  <span className="material-symbols-outlined text-xs">swap_horiz</span>
+                </button>
+                {currentMode === 'cloud' && onRegisterDevice && (
+                  <button
+                    onClick={onRegisterDevice}
+                    className="px-3 py-1.5 bg-violet-600/10 hover:bg-violet-600/20 border border-violet-500/20 text-violet-400 rounded-xl text-[10px] font-semibold transition-all"
+                  >
+                    Link Edge Device
+                  </button>
+                )}
+              </div>
             </div>
 
             {/* Error Message */}
