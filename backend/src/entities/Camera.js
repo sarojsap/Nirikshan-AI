@@ -19,8 +19,7 @@ export const Camera = new EntitySchema({
       type: 'varchar', // The URL used to fetch the live video feed
     },
     status: {
-      type: 'enum',
-      enum: ['ACTIVE', 'INACTIVE', 'MAINTENANCE'],
+      type: 'varchar',
       default: 'ACTIVE',
     },
     crowdThreshold: {
@@ -28,7 +27,7 @@ export const Camera = new EntitySchema({
       default: 3,
     },
     restrictedPolygon: {
-      type: 'json',
+      type: 'simple-json',
       nullable: true,
     },
     restrictedStartTime: {
@@ -60,11 +59,11 @@ export const Camera = new EntitySchema({
       default: true,
     },
     createdAt: {
-      type: 'timestamp',
+      type: 'datetime',
       createDate: true,
     },
     updatedAt: {
-      type: 'timestamp',
+      type: 'datetime',
       updateDate: true,
     },
   },

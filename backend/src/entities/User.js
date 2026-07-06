@@ -22,8 +22,7 @@ export const User = new EntitySchema({
       nullable: false,
     },
     role: {
-      type: 'enum',
-      enum: ['ADMIN', 'OPERATOR'],
+      type: 'varchar',
       default: 'OPERATOR',
     },
     resetToken: {
@@ -31,15 +30,15 @@ export const User = new EntitySchema({
       nullable: true,
     },
     resetTokenExpiry: {
-      type: 'timestamp',
+      type: 'datetime',
       nullable: true,
     },
     createdAt: {
-      type: 'timestamp',
+      type: 'datetime',
       createDate: true,
     },
     updatedAt: {
-      type: 'timestamp',
+      type: 'datetime',
       updateDate: true,
     },
   },
