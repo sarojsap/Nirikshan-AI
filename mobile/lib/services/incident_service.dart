@@ -9,9 +9,16 @@ import 'auth_service.dart';
 
 class IncidentService {
   final AuthService _authService;
+  final String? _organizationId;
+  final String? _deviceId;
 
-  IncidentService({AuthService? authService})
-    : _authService = authService ?? AuthService();
+  IncidentService({
+    AuthService? authService,
+    String? organizationId,
+    String? deviceId,
+  })  : _authService = authService ?? AuthService(),
+        _organizationId = organizationId,
+        _deviceId = deviceId;
 
   Future<List<Incident>> getIncidents({int page = 1, int limit = 30}) async {
     final token = await _authService.getToken();
@@ -19,8 +26,22 @@ class IncidentService {
       throw Exception('You are not signed in.');
     }
 
+    final queryParams = <String, String>{
+      'page': page.toString(),
+      'limit': limit.toString(),
+    };
+
+    if (ApiConfig.isCloudMode) {
+      if (_deviceId != null) {
+        queryParams['deviceId'] = _deviceId!;
+      }
+      if (_organizationId != null) {
+        queryParams['organizationId'] = _organizationId!;
+      }
+    }
+
     final uri = Uri.parse(ApiConfig.incidentsEndpoint).replace(
-      queryParameters: {'page': page.toString(), 'limit': limit.toString()},
+      queryParameters: queryParams,
     );
 
     final response = await http

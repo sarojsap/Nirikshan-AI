@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../bloc/auth/bloc.dart';
+import '../../config/api_config.dart';
 import '../../config/theme.dart';
 import '../../models/incident.dart';
 import '../../models/user.dart';
@@ -26,7 +27,9 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  final IncidentService _incidentService = IncidentService();
+  late final IncidentService _incidentService;
+  String? _organizationId;
+  String? _deviceId;
 
   List<Incident> _incidents = const [];
   bool _isLoading = true;
@@ -38,6 +41,10 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    _incidentService = IncidentService(
+      organizationId: _organizationId,
+      deviceId: _deviceId,
+    );
     if (widget.initializeNotifications) {
       NotificationService().initialize();
     }
@@ -51,6 +58,18 @@ class _HomeScreenState extends State<HomeScreen> {
   void dispose() {
     _refreshTimer?.cancel();
     super.dispose();
+  }
+
+  void _setDeviceFilter({String? organizationId, String? deviceId}) {
+    setState(() {
+      _organizationId = organizationId;
+      _deviceId = deviceId;
+    });
+    _incidentService = IncidentService(
+      organizationId: organizationId ?? _organizationId,
+      deviceId: deviceId ?? _deviceId,
+    );
+    _loadIncidents();
   }
 
   Future<void> _loadIncidents({bool silent = false}) async {
@@ -85,6 +104,164 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  void _showDeviceSelector() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppTheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(8)),
+      ),
+      builder: (context) {
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 44, height: 4,
+                decoration: BoxDecoration(
+                  color: AppTheme.outlineVariant,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              ),
+              const SizedBox(height: 18),
+              Text(
+                'Device Filter',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  color: AppTheme.onSurface,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Filter events by organization and device.',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: AppTheme.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () {
+                    _setDeviceFilter(organizationId: null, deviceId: null);
+                    Navigator.pop(context);
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.primaryContainer,
+                    foregroundColor: AppTheme.onSurface,
+                  ),
+                  child: const Text('Show All Devices'),
+                ),
+              ),
+              const SizedBox(height: 8),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton(
+                  onPressed: () => Navigator.pop(context),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppTheme.onSurfaceVariant,
+                    side: BorderSide(color: AppTheme.outlineVariant),
+                  ),
+                  child: const Text('Cancel'),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _showModeSwitchDialog() async {
+    final switchToCloud = !ApiConfig.isCloudMode;
+    final newMode = switchToCloud ? 'cloud' : 'edge';
+
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppTheme.surface,
+        title: Text(
+          'Switch to ${newMode.toUpperCase()} mode?',
+          style: const TextStyle(color: AppTheme.onSurface),
+        ),
+        content: Text(
+          switchToCloud
+              ? 'Connect to the cloud dashboard to view incidents across all sites.'
+              : 'Connect directly to a local edge device for real-time monitoring.',
+          style: const TextStyle(color: AppTheme.onSurfaceVariant),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Switch'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true && mounted) {
+      if (switchToCloud) {
+        await ApiConfig.switchToCloud();
+      } else {
+        // Show dialog to enter edge URL
+        final edgeUrl = await _promptEdgeUrl();
+        if (edgeUrl != null && mounted) {
+          await ApiConfig.switchToEdge(edgeUrl);
+        } else {
+          return;
+        }
+      }
+      setState(() {});
+      _loadIncidents();
+    }
+  }
+
+  Future<String?> _promptEdgeUrl() async {
+    final controller = TextEditingController(text: ApiConfig.baseUrl);
+    final url = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppTheme.surface,
+        title: const Text(
+          'Edge Device URL',
+          style: TextStyle(color: AppTheme.onSurface),
+        ),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          style: const TextStyle(color: AppTheme.onSurface),
+          decoration: const InputDecoration(
+            hintText: 'http://10.0.2.2:5000/api',
+            hintStyle: TextStyle(color: AppTheme.onSurfaceVariant),
+            enabledBorder: UnderlineInputBorder(
+              borderSide: BorderSide(color: AppTheme.outlineVariant),
+            ),
+            focusedBorder: UnderlineInputBorder(
+              borderSide: BorderSide(color: AppTheme.primary),
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, controller.text),
+            child: const Text('Connect'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    return url;
+  }
+
   Future<void> _handleLogout() async {
     await NotificationService().unregister();
     if (!mounted) return;
@@ -98,8 +275,42 @@ class _HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       backgroundColor: AppTheme.background,
       appBar: AppBar(
-        title: const Text('NIRIKSHAN AI'),
+        title: Row(
+          children: [
+            const Text('NIRIKSHAN AI'),
+            const SizedBox(width: 10),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: ApiConfig.isCloudMode
+                    ? Colors.purple.withValues(alpha: 0.18)
+                    : Colors.green.withValues(alpha: 0.18),
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(
+                  color: ApiConfig.isCloudMode
+                      ? Colors.purple.withValues(alpha: 0.36)
+                      : Colors.green.withValues(alpha: 0.36),
+                ),
+              ),
+              child: Text(
+                ApiConfig.isCloudMode ? 'CLOUD' : 'EDGE',
+                style: TextStyle(
+                  fontSize: 9,
+                  fontWeight: FontWeight.w800,
+                  color: ApiConfig.isCloudMode ? Colors.purple[200] : Colors.green[200],
+                  letterSpacing: 1.2,
+                ),
+              ),
+            ),
+          ],
+        ),
         actions: [
+          if (ApiConfig.isCloudMode)
+            IconButton(
+              tooltip: 'Select device',
+              icon: const Icon(Icons.devices),
+              onPressed: () => _showDeviceSelector(),
+            ),
           IconButton(
             tooltip: 'Refresh events',
             icon: _isRefreshing
@@ -111,10 +322,41 @@ class _HomeScreenState extends State<HomeScreen> {
                 : const Icon(Icons.refresh),
             onPressed: _isRefreshing ? null : () => _loadIncidents(),
           ),
-          IconButton(
-            tooltip: 'Logout',
-            icon: const Icon(Icons.logout),
-            onPressed: _handleLogout,
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.more_vert),
+            onSelected: (value) {
+              if (value == 'switch_mode') {
+                _showModeSwitchDialog();
+              } else if (value == 'logout') {
+                _handleLogout();
+              }
+            },
+            itemBuilder: (context) => [
+              PopupMenuItem(
+                value: 'switch_mode',
+                child: Row(
+                  children: [
+                    Icon(
+                      ApiConfig.isCloudMode ? Icons.lan : Icons.cloud,
+                      size: 18,
+                    ),
+                    const SizedBox(width: 10),
+                    Text(ApiConfig.isCloudMode ? 'Switch to Edge' : 'Switch to Cloud'),
+                  ],
+                ),
+              ),
+              const PopupMenuDivider(),
+              const PopupMenuItem(
+                value: 'logout',
+                child: Row(
+                  children: [
+                    Icon(Icons.logout, size: 18),
+                    SizedBox(width: 10),
+                    Text('Logout'),
+                  ],
+                ),
+              ),
+            ],
           ),
         ],
       ),
