@@ -2,13 +2,12 @@ import cv2
 import os
 import threading
 import time
-import base64
 import json
 import logging
 import asyncio
 from datetime import datetime, timezone, timedelta
 from urllib.parse import urlparse, parse_qs
-from flask import Flask, request, Response, jsonify
+from flask import Flask, request, Response, jsonify, send_from_directory
 from ultralytics import YOLO
 from shapely.geometry import Point, Polygon
 from dotenv import load_dotenv
@@ -21,8 +20,9 @@ STREAM_PORT = int(os.getenv('STREAM_PORT', 8000))
 WEBSOCKET_PORT = int(os.getenv('WEBSOCKET_PORT', 8001))
 
 # Global FPS target — inference runs at this rate regardless of camera source FPS
-TARGET_FPS = 24
-FRAME_INTERVAL = 1.0 / TARGET_FPS  # ~0.0417s per frame
+# Reduced from 24 to 5: security analytics doesn't need high FPS, saves ~80% CPU/GPU
+TARGET_FPS = 5
+FRAME_INTERVAL = 1.0 / TARGET_FPS  # ~0.2s per frame
 
 logging.basicConfig(
     level=logging.INFO,
@@ -42,6 +42,11 @@ def add_cors_headers(response):
 
 api = APIClient()
 model = YOLO('yolov8n.pt')
+try:
+    model.to('cuda')
+    logger.info("YOLO model loaded on GPU (CUDA) — 5-10x faster inference")
+except Exception:
+    logger.warning("CUDA not available, running YOLO on CPU")
 
 camera_exists = False
 if CAMERA_ID and CAMERA_ID != 'your-camera-uuid-here' and CAMERA_ID.strip() != '':
@@ -133,11 +138,15 @@ def is_within_time_window(start_time_str, end_time_str):
         return True
 
 
-def _encode_frame_as_data_uri(frame):
+def _save_snapshot(frame, camera_id, alert_type):
     ret, buffer = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 75])
     if not ret:
         return None
-    return "data:image/jpeg;base64," + base64.b64encode(buffer).decode('utf-8')
+    filename = f"{camera_id}_{alert_type}_{int(time.time())}.jpg"
+    filepath = os.path.join(INCIDENT_SNAPSHOT_DIR, filename)
+    with open(filepath, 'wb') as f:
+        f.write(buffer.tobytes())
+    return f"/snapshots/{filename}"
 
 
 def load_camera_config(cid):
@@ -273,7 +282,7 @@ class CameraThread(threading.Thread):
 
                     # ── Frame skipping: only process at TARGET_FPS ──
                     # If we're ahead of schedule, skip inference for this frame
-                    # to maintain exactly TARGET_FPS (24) and reduce CPU load.
+                    # to maintain exactly TARGET_FPS and reduce CPU load.
                     if now < next_frame_time:
                         continue
 
@@ -331,7 +340,7 @@ class CameraThread(threading.Thread):
                         if cfg['intrusion_enabled'] and intrusion_detected:
                             if check_cooldown(self.camera_id, "INTRUSION", cfg['cooldown_seconds']):
                                 if current_snapshot is None:
-                                    current_snapshot = _encode_frame_as_data_uri(frame)
+                                    current_snapshot = _save_snapshot(frame, self.camera_id, "INTRUSION")
                                     last_snapshot = current_snapshot
                                 api.send_incident(
                                     "INTRUSION",
@@ -344,7 +353,7 @@ class CameraThread(threading.Thread):
                         if cfg['crowd_enabled'] and person_count >= cfg['crowd_threshold']:
                             if check_cooldown(self.camera_id, "CROWD", cfg['cooldown_seconds']):
                                 if current_snapshot is None:
-                                    current_snapshot = _encode_frame_as_data_uri(frame)
+                                    current_snapshot = _save_snapshot(frame, self.camera_id, "CROWD")
                                     last_snapshot = current_snapshot
                                 api.send_incident(
                                     "CROWD",
@@ -354,8 +363,8 @@ class CameraThread(threading.Thread):
                                     image_url=current_snapshot
                                 )
 
-                    # Encode and cache the frame
-                    ret, buffer = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 80])
+                    # Encode and cache the frame (quality 60 saves ~55% bandwidth vs 80)
+                    ret, buffer = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 60])
                     if ret:
                         frame_bytes = buffer.tobytes()
                         with _frame_cache_lock:
@@ -577,6 +586,11 @@ def snapshot():
         time.sleep(0.1)
 
     return Response(status=503)
+
+
+@app.route('/snapshots/<filename>')
+def serve_snapshot(filename):
+    return send_from_directory(INCIDENT_SNAPSHOT_DIR, filename)
 
 
 @app.route('/health')

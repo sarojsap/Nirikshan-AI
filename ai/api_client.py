@@ -1,4 +1,5 @@
 import os
+import json
 import time
 import logging
 import requests
@@ -11,6 +12,8 @@ USERNAME = os.getenv('AI_USERNAME')
 PASSWORD = os.getenv('AI_PASSWORD')
 
 logger = logging.getLogger(__name__)
+
+QUEUE_FILE = os.path.join(os.path.dirname(__file__), 'failed_incidents.json')
 
 
 class APIClient:
@@ -43,6 +46,7 @@ class APIClient:
             self._session.headers.update({"Authorization": f"Bearer {self.token}"})
             logger.info('Successfully logged into Node.js Backend')
             self._login_retry_delay = 5
+            self._retry_failed()
             return True
         except Exception as e:
             logger.error(f"Failed to login to API: {e}")
@@ -71,7 +75,48 @@ class APIClient:
                     logger.error(f"Request failed after 3 attempts: {e}")
                     return None
 
+    def _queue_failed(self, payload):
+        failed = []
+        if os.path.exists(QUEUE_FILE):
+            try:
+                with open(QUEUE_FILE, 'r') as f:
+                    failed = json.load(f)
+            except Exception:
+                failed = []
+        failed.append(payload)
+        failed = failed[-1000:]
+        with open(QUEUE_FILE, 'w') as f:
+            json.dump(failed, f)
+        logger.warning(f"Incident queued to disk ({len(failed)} pending)")
+
+    def _retry_failed(self):
+        if not os.path.exists(QUEUE_FILE):
+            return
+        try:
+            with open(QUEUE_FILE, 'r') as f:
+                failed = json.load(f)
+        except Exception:
+            return
+        if not failed:
+            os.remove(QUEUE_FILE)
+            return
+        successful = []
+        for incident in failed:
+            result = self._request("POST", "/incidents", json=incident)
+            if result:
+                successful.append(incident)
+        remaining = [i for i in failed if i not in successful]
+        if remaining:
+            with open(QUEUE_FILE, 'w') as f:
+                json.dump(remaining, f)
+            logger.info(f"Retried {len(failed)} incidents, {len(remaining)} still pending")
+        else:
+            os.remove(QUEUE_FILE)
+            logger.info(f"All {len(failed)} queued incidents sent successfully")
+
     def send_incident(self, incident_type, description, severity, camera_id, image_url=None):
+        self._retry_failed()
+
         if not self._ensure_authenticated():
             logger.error("Cannot send incident: not authenticated")
             return
@@ -90,6 +135,7 @@ class APIClient:
             logger.info(f"Alert Sent: {incident_type} - {description}")
         else:
             logger.error(f"Failed to send incident: {incident_type}")
+            self._queue_failed(payload)
 
     def get_camera_config(self, camera_id):
         if not self._ensure_authenticated():

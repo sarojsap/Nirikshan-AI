@@ -18,6 +18,7 @@ predict/
 test_videos/
 scripts/
 logs/
+snapshots/
 
 # ====================================================================
 # OpenCV & Media Outputs
