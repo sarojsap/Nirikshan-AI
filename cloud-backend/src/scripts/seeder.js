@@ -1,7 +1,9 @@
 import 'dotenv/config';
+import bcrypt from 'bcrypt';
 import { AppDataSource } from '../config/database.js';
 import { Organization } from '../entities/Organization.js';
 import { User } from '../entities/User.js';
+import { EdgeDevice } from '../entities/EdgeDevice.js';
 import * as authService from '../services/auth.service.js';
 
 async function seed() {
@@ -38,6 +40,28 @@ async function seed() {
     console.log(`Created super admin: ${adminEmail}`);
   } else {
     console.log(`Super admin already exists: ${adminEmail}`);
+  }
+
+  const deviceRepo = AppDataSource.getRepository(EdgeDevice);
+  const defaultDeviceId = process.env.DEFAULT_EDGE_DEVICE_ID;
+  if (defaultDeviceId) {
+    let device = await deviceRepo.findOne({ where: { id: defaultDeviceId } });
+    if (!device) {
+      const apiKey = process.env.DEFAULT_EDGE_API_KEY;
+      const apiKeyHash = await bcrypt.hash(apiKey, 10);
+      device = deviceRepo.create({
+        id: defaultDeviceId,
+        organizationId: org.id,
+        name: 'Default Edge Device',
+        apiKeyHash,
+        status: 'OFFLINE',
+        isActive: true,
+      });
+      await deviceRepo.save(device);
+      console.log(`Created default edge device: ${device.name} (${device.id})`);
+    } else {
+      console.log(`Edge device already exists: ${device.id}`);
+    }
   }
 
   console.log('Seed complete');

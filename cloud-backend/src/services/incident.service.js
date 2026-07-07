@@ -2,7 +2,6 @@ import { AppDataSource } from '../config/database.js';
 import { Incident } from '../entities/Incident.js';
 import { getIO } from '../config/socket.js';
 import { sendPushNotification } from './notification.service.js';
-import { generateDownloadUrl } from '../config/s3.js';
 
 export async function createIncident(data) {
   const repo = AppDataSource.getRepository(Incident);
@@ -43,13 +42,6 @@ export async function getIncidentById(id, organizationId) {
     relations: { edgeDevice: true },
   });
   if (!incident) return null;
-
-  if (incident.snapshotKey) {
-    incident.snapshotUrl = await generateDownloadUrl(incident.snapshotKey).catch(() => null);
-  }
-  if (incident.clipKey) {
-    incident.clipUrl = await generateDownloadUrl(incident.clipKey).catch(() => null);
-  }
   return incident;
 }
 
@@ -73,15 +65,6 @@ export async function listIncidents(
   query.skip((page - 1) * limit).take(limit);
 
   const [data, total] = await query.getManyAndCount();
-
-  for (const incident of data) {
-    if (incident.snapshotKey) {
-      incident.snapshotUrl = await generateDownloadUrl(incident.snapshotKey).catch(() => null);
-    }
-    if (incident.clipKey) {
-      incident.clipUrl = await generateDownloadUrl(incident.clipKey).catch(() => null);
-    }
-  }
 
   return {
     data,

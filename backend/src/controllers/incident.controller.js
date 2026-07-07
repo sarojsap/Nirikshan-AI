@@ -27,7 +27,7 @@ const broadcastIncident = async (incidentId) => {
 
 export const logIncident = async (req, res) => {
   try {
-    const { type, description, severity, imageUrl, cameraId, localSnapshotPath, localClipPath } = req.body;
+    const { type, description, severity, imageUrl, clipUrl, cameraId, localSnapshotPath, localClipPath } = req.body;
 
     if (!type || !cameraId) {
       return res.status(400).json({ error: 'Incident type and cameraId are required.' });
@@ -46,6 +46,7 @@ export const logIncident = async (req, res) => {
       description,
       severity,
       imageUrl,
+      clipUrl,
       cameraId,
       localSnapshotPath,
       localClipPath,

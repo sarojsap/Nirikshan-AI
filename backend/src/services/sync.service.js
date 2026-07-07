@@ -1,4 +1,5 @@
 import fs from 'fs';
+import path from 'path';
 import http from 'http';
 import https from 'https';
 import { AppDataSource } from '../config/database.js';
@@ -69,20 +70,39 @@ function performSyncRequest(method, url, body = null) {
   }
 }
 
-async function uploadFileToPresignedUrl(uploadUrl, filePath, contentType) {
+function uploadFileToCloudinary(uploadUrl, filePath, fields) {
   const fileBuffer = fs.readFileSync(filePath);
+  const boundary = '----FormBoundary' + Math.random().toString(36).substring(2);
+  const filename = path.basename(filePath);
+
+  let bodyParts = [];
+  for (const [key, value] of Object.entries(fields)) {
+    bodyParts.push(Buffer.from(
+      `--${boundary}\r\nContent-Disposition: form-data; name="${key}"\r\n\r\n${value}\r\n`,
+      'utf-8',
+    ));
+  }
+  bodyParts.push(Buffer.from(
+    `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="${filename}"\r\nContent-Type: application/octet-stream\r\n\r\n`,
+    'utf-8',
+  ));
+  bodyParts.push(fileBuffer);
+  bodyParts.push(Buffer.from(`\r\n--${boundary}--\r\n`, 'utf-8'));
+
+  const fullBody = Buffer.concat(bodyParts);
+
   const parsed = new URL(uploadUrl);
   const mod = parsed.protocol === 'https:' ? https : http;
 
   return new Promise((resolve, reject) => {
     const options = {
-      method: 'PUT',
+      method: 'POST',
       hostname: parsed.hostname,
       port: parsed.port || (parsed.protocol === 'https:' ? 443 : 80),
       path: parsed.pathname + parsed.search,
       headers: {
-        'Content-Type': contentType,
-        'Content-Length': fileBuffer.length,
+        'Content-Type': `multipart/form-data; boundary=${boundary}`,
+        'Content-Length': fullBody.length,
       },
       timeout: 120000,
     };
@@ -92,15 +112,19 @@ async function uploadFileToPresignedUrl(uploadUrl, filePath, contentType) {
       res.on('data', chunk => data += chunk);
       res.on('end', () => {
         if (res.statusCode >= 200 && res.statusCode < 300) {
-          resolve(true);
+          try {
+            resolve(JSON.parse(data));
+          } catch {
+            reject(new Error('Invalid Cloudinary response'));
+          }
         } else {
-          reject(new Error(`Upload failed: HTTP ${res.statusCode}`));
+          reject(new Error(`Cloudinary upload failed: HTTP ${res.statusCode} - ${data}`));
         }
       });
     });
     req.on('error', reject);
     req.on('timeout', () => { req.destroy(); reject(new Error('timeout')); });
-    req.write(fileBuffer);
+    req.write(fullBody);
     req.end();
   });
 }
@@ -157,8 +181,8 @@ export async function syncPendingIncidents() {
         },
       };
 
-      let snapshotKey = null;
-      let clipKey = null;
+      let snapshotUrl = null;
+      let clipUrl = null;
 
       if (incident.localSnapshotPath && fs.existsSync(incident.localSnapshotPath)) {
         try {
@@ -168,12 +192,27 @@ export async function syncPendingIncidents() {
             { type: 'snapshot', contentType: 'image/jpeg' },
           );
           if (uploadRes?.body?.uploadUrl) {
-            await uploadFileToPresignedUrl(uploadRes.body.uploadUrl, incident.localSnapshotPath, 'image/jpeg');
-            snapshotKey = uploadRes.body.key;
+            console.log(`[Sync] Uploading snapshot for ${incident.id} to Cloudinary...`);
+            const cloudinaryRes = await uploadFileToCloudinary(
+              uploadRes.body.uploadUrl,
+              incident.localSnapshotPath,
+              {
+                public_id: uploadRes.body.publicId,
+                timestamp: uploadRes.body.timestamp,
+                signature: uploadRes.body.signature,
+                api_key: uploadRes.body.apiKey,
+              },
+            );
+            snapshotUrl = cloudinaryRes.secure_url;
+            console.log(`[Sync] Snapshot uploaded: ${snapshotUrl}`);
+          } else {
+            console.error(`[Sync] Upload URL response invalid for ${incident.id}:`, JSON.stringify(uploadRes));
           }
         } catch (err) {
           console.error(`[Sync] Snapshot upload failed for ${incident.id}:`, err.message);
         }
+      } else {
+        console.log(`[Sync] No snapshot file for ${incident.id}: path=${incident.localSnapshotPath}`);
       }
 
       if (incident.localClipPath && fs.existsSync(incident.localClipPath)) {
@@ -184,16 +223,29 @@ export async function syncPendingIncidents() {
             { type: 'clip', contentType: 'video/mp4' },
           );
           if (uploadRes?.body?.uploadUrl) {
-            await uploadFileToPresignedUrl(uploadRes.body.uploadUrl, incident.localClipPath, 'video/mp4');
-            clipKey = uploadRes.body.key;
+            console.log(`[Sync] Uploading clip for ${incident.id} to Cloudinary...`);
+            const cloudinaryRes = await uploadFileToCloudinary(
+              uploadRes.body.uploadUrl,
+              incident.localClipPath,
+              {
+                public_id: uploadRes.body.publicId,
+                timestamp: uploadRes.body.timestamp,
+                signature: uploadRes.body.signature,
+                api_key: uploadRes.body.apiKey,
+              },
+            );
+            clipUrl = cloudinaryRes.secure_url;
+            console.log(`[Sync] Clip uploaded: ${clipUrl}`);
+          } else {
+            console.error(`[Sync] Upload URL response invalid for ${incident.id}:`, JSON.stringify(uploadRes));
           }
         } catch (err) {
           console.error(`[Sync] Clip upload failed for ${incident.id}:`, err.message);
         }
       }
 
-      payload.snapshotKey = snapshotKey;
-      payload.clipKey = clipKey;
+      payload.snapshotUrl = snapshotUrl;
+      payload.clipUrl = clipUrl;
 
       const result = await performSyncRequest(
         'POST',

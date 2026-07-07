@@ -124,7 +124,8 @@ class APIClient:
             logger.info(f"All {len(failed)} queued incidents sent successfully")
 
     def send_incident(self, incident_type, description, severity, camera_id,
-                      image_url=None, local_snapshot_path=None, local_clip_path=None):
+                      image_url=None, clip_url=None,
+                      local_snapshot_path=None, local_clip_path=None):
         self._retry_failed()
 
         if not self._ensure_authenticated():
@@ -139,6 +140,8 @@ class APIClient:
         }
         if image_url:
             payload["imageUrl"] = image_url
+        if clip_url:
+            payload["clipUrl"] = clip_url
         if local_snapshot_path:
             payload["localSnapshotPath"] = local_snapshot_path
         if local_clip_path:

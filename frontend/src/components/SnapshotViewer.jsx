@@ -1,9 +1,23 @@
+import { useState } from 'react';
+
 export default function SnapshotViewer({ incident, onClose }) {
   if (!incident) return null;
 
+  const [imageError, setImageError] = useState(false);
+  const [videoError, setVideoError] = useState(false);
+
+  function isValidUrl(str) {
+    if (!str) return false;
+    return str.startsWith('http://') || str.startsWith('https://') || str.startsWith('blob:') || str.startsWith('data:');
+  }
+
+  const rawImageSrc = incident.imageUrl || incident.snapshotUrl;
+  const imageSrc = !imageError && isValidUrl(rawImageSrc) ? rawImageSrc : null;
+  const clipSrc = !videoError && isValidUrl(incident.clipUrl) ? incident.clipUrl : null;
+
   return (
     <div className="fixed inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center z-[250] p-4 font-sans">
-      <div className="bg-[#090f19] border border-[#162235] w-full max-w-4xl rounded-2xl flex flex-col md:flex-row shadow-2xl relative overflow-hidden h-[85vh] max-h-[600px]">
+      <div className="bg-[#090f19] border border-[#162235] w-full max-w-4xl rounded-2xl flex flex-col md:flex-row shadow-2xl relative overflow-hidden h-[85vh] max-h-[700px]">
         
         <button 
           className="absolute top-4 right-4 bg-black/40 hover:bg-black/60 text-white w-8 h-8 rounded-full flex items-center justify-center z-50 text-xl font-bold transition-colors border border-white/10" 
@@ -12,17 +26,37 @@ export default function SnapshotViewer({ incident, onClose }) {
           ×
         </button>
 
-        <div className="flex-1 bg-black flex items-center justify-center relative overflow-hidden h-1/2 md:h-full group">
-          {incident.imageUrl ? (
+        <div className="flex-1 bg-black flex flex-col items-center justify-center relative overflow-hidden h-1/2 md:h-full">
+          {imageSrc ? (
             <img 
-              src={incident.imageUrl} 
+              src={imageSrc} 
               alt="Incident Snapshot" 
-              className="w-full h-full object-contain"
+              className="w-full h-1/2 object-contain shrink-0"
+              onError={() => setImageError(true)}
             />
           ) : (
             <div className="text-center p-8">
               <span className="material-symbols-outlined text-slate-600 text-5xl mb-2">image_not_supported</span>
               <p className="text-slate-400 text-xs">No snapshot image available for this alert.</p>
+            </div>
+          )}
+          {clipSrc && (
+            <div className="w-full h-1/2 border-t border-[#162235] flex flex-col">
+              <div className="text-[9px] font-bold text-slate-500 uppercase tracking-wider px-3 py-1 shrink-0">Incident Clip</div>
+              <video 
+                src={clipSrc} 
+                controls
+                className="w-full flex-1 object-contain bg-black"
+                onError={() => setVideoError(true)}
+              >
+                Your browser does not support the video tag.
+              </video>
+            </div>
+          )}
+          {!imageSrc && !clipSrc && (
+            <div className="text-center p-8">
+              <span className="material-symbols-outlined text-slate-600 text-5xl mb-2">videocam_off</span>
+              <p className="text-slate-400 text-xs">No media available for this alert.</p>
             </div>
           )}
           <div className="absolute top-4 left-4 bg-[#090f19]/80 backdrop-blur-md px-3 py-1.5 border border-white/10 rounded-lg text-[9px] font-bold text-slate-300 font-mono flex items-center gap-1.5 shadow-md">
@@ -71,14 +105,24 @@ export default function SnapshotViewer({ incident, onClose }) {
           </div>
 
           <div className="mt-6 flex flex-col gap-2 pt-4 border-t border-[#162235]">
-            {incident.imageUrl && (
+            {imageSrc && (
               <a 
-                href={incident.imageUrl}
+                href={imageSrc}
                 download={`incident-${incident.id}.jpg`}
                 className="w-full bg-violet-600 hover:bg-violet-500 text-white text-center py-2.5 rounded-xl font-semibold text-xs transition-colors flex items-center justify-center gap-1.5 shadow-md shadow-violet-600/15"
               >
                 <span className="material-symbols-outlined text-sm">download</span>
                 <span>Download Snapshot</span>
+              </a>
+            )}
+            {clipSrc && (
+              <a 
+                href={clipSrc}
+                download={`incident-${incident.id}.mp4`}
+                className="w-full bg-emerald-600 hover:bg-emerald-500 text-white text-center py-2.5 rounded-xl font-semibold text-xs transition-colors flex items-center justify-center gap-1.5 shadow-md shadow-emerald-600/15"
+              >
+                <span className="material-symbols-outlined text-sm">download</span>
+                <span>Download Clip</span>
               </a>
             )}
             <button 

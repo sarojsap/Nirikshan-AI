@@ -1,11 +1,13 @@
 import cv2
 import os
+import mimetypes
 import threading
 import time
 import json
 import logging
 import asyncio
 import collections
+import subprocess
 from datetime import datetime, timezone, timedelta
 from urllib.parse import urlparse, parse_qs
 from flask import Flask, request, Response, jsonify, send_from_directory
@@ -20,6 +22,12 @@ CAMERA_ID = os.getenv('CAMERA_ID')
 STREAM_PORT = int(os.getenv('STREAM_PORT', 8000))
 WEBSOCKET_PORT = int(os.getenv('WEBSOCKET_PORT', 8001))
 MEDIA_DIR = os.getenv('MEDIA_DIR', os.path.join(os.path.dirname(__file__), 'media'))
+if not os.path.isabs(MEDIA_DIR):
+    MEDIA_DIR = os.path.join(os.path.dirname(__file__), MEDIA_DIR)
+
+# Derive edge backend base URL from API_URL (strip /api suffix)
+_api_url = os.getenv('API_URL', 'http://localhost:5000/api').rstrip('/')
+BACKEND_BASE = _api_url[:-4] if _api_url.endswith('/api') else _api_url
 
 TARGET_FPS = 5
 FRAME_INTERVAL = 1.0 / TARGET_FPS
@@ -160,12 +168,65 @@ def _save_clip(frames, camera_id, alert_type):
     filepath = os.path.join(MEDIA_DIR, filename)
     try:
         height, width = frames[0].shape[:2]
-        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-        out = cv2.VideoWriter(filepath, fourcc, TARGET_FPS, (width, height))
+        file_size = 0
+
+        # Try FFmpeg first for proper H.264 encoding (browser-compatible)
+        cmd = [
+            'ffmpeg', '-y',
+            '-f', 'rawvideo',
+            '-vcodec', 'rawvideo',
+            '-s', f'{width}x{height}',
+            '-pix_fmt', 'bgr24',
+            '-r', str(TARGET_FPS),
+            '-i', '-',
+            '-c:v', 'libx264',
+            '-pix_fmt', 'yuv420p',
+            '-preset', 'fast',
+            '-crf', '23',
+            '-movflags', '+faststart',
+            filepath,
+        ]
+        try:
+            proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stderr=subprocess.DEVNULL)
+            for f in frames:
+                proc.stdin.write(f.tobytes())
+            proc.stdin.close()
+            proc.wait()
+            if proc.returncode == 0:
+                file_size = os.path.getsize(filepath)
+                if file_size >= 1000:
+                    logger.info(f"Saved 30s clip: {filepath} ({len(frames)} frames, {file_size} bytes, codec: H.264)")
+                    return filepath
+        except FileNotFoundError:
+            logger.warning("FFmpeg not found, falling back to OpenCV VideoWriter")
+
+        # Fallback: OpenCV VideoWriter (may produce browser-incompatible codecs)
+        logger.warning("Falling back to OpenCV VideoWriter for clip encoding")
+        fourcc_options = ['avc1', 'X264', 'H264', 'mp4v']
+        out = None
+        used_fourcc = None
+        for codec in fourcc_options:
+            try:
+                fcc = cv2.VideoWriter_fourcc(*codec)
+                test_out = cv2.VideoWriter(filepath, fcc, TARGET_FPS, (width, height))
+                if test_out.isOpened():
+                    out = test_out
+                    used_fourcc = codec
+                    break
+                test_out.release()
+            except Exception:
+                continue
+        if out is None:
+            logger.error(f"Failed to create VideoWriter with any codec for {filepath}")
+            return None
         for f in frames:
             out.write(f)
         out.release()
-        logger.info(f"Saved 30s clip: {filepath} ({len(frames)} frames)")
+        file_size = os.path.getsize(filepath)
+        if file_size < 1000:
+            logger.error(f"Saved clip too small ({file_size} bytes), likely corrupted: {filepath}")
+            return None
+        logger.warning(f"Saved 30s clip: {filepath} ({len(frames)} frames, {file_size} bytes, codec: {used_fourcc})")
         return filepath
     except Exception as e:
         logger.error(f"Failed to save clip: {e}")
@@ -359,12 +420,15 @@ class CameraThread(threading.Thread):
                             if check_cooldown(self.camera_id, "INTRUSION", cfg['cooldown_seconds']):
                                 snapshot_path = _save_snapshot(frame, self.camera_id, "INTRUSION")
                                 clip_path = _save_clip(list(clip_buffer), self.camera_id, "INTRUSION")
+                                snapshot_url = f"{BACKEND_BASE}/snapshots/{os.path.basename(snapshot_path)}" if snapshot_path else None
+                                clip_url = f"{BACKEND_BASE}/media/{os.path.basename(clip_path)}" if clip_path else None
                                 api.send_incident(
                                     "INTRUSION",
                                     "Perimeter breached during restricted hours.",
                                     "CRITICAL",
                                     self.camera_id,
-                                    image_url=snapshot_path,
+                                    image_url=snapshot_url,
+                                    clip_url=clip_url,
                                     local_snapshot_path=snapshot_path,
                                     local_clip_path=clip_path,
                                 )
@@ -373,12 +437,15 @@ class CameraThread(threading.Thread):
                             if check_cooldown(self.camera_id, "CROWD", cfg['cooldown_seconds']):
                                 snapshot_path = _save_snapshot(frame, self.camera_id, "CROWD")
                                 clip_path = _save_clip(list(clip_buffer), self.camera_id, "CROWD")
+                                snapshot_url = f"{BACKEND_BASE}/snapshots/{os.path.basename(snapshot_path)}" if snapshot_path else None
+                                clip_url = f"{BACKEND_BASE}/media/{os.path.basename(clip_path)}" if clip_path else None
                                 api.send_incident(
                                     "CROWD",
                                     f"Crowd threshold exceeded. {person_count} people detected.",
                                     "MEDIUM",
                                     self.camera_id,
-                                    image_url=snapshot_path,
+                                    image_url=snapshot_url,
+                                    clip_url=clip_url,
                                     local_snapshot_path=snapshot_path,
                                     local_clip_path=clip_path,
                                 )
@@ -604,7 +671,11 @@ def serve_snapshot(filename):
 
 @app.route('/media/<filename>')
 def serve_media(filename):
-    return send_from_directory(MEDIA_DIR, filename)
+    filepath = os.path.join(MEDIA_DIR, filename)
+    if not os.path.exists(filepath):
+        return jsonify({"error": "File not found"}), 404
+    mimetype, _ = mimetypes.guess_type(filename)
+    return send_from_directory(MEDIA_DIR, filename, mimetype=mimetype or 'video/mp4', conditional=True)
 
 
 @app.route('/health')

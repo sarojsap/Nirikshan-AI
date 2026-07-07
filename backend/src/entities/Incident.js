@@ -51,6 +51,14 @@ export const Incident = new EntitySchema({
       length: 500,
       nullable: true,
     },
+    snapshotUrl: {
+      type: 'text',
+      nullable: true,
+    },
+    clipUrl: {
+      type: 'text',
+      nullable: true,
+    },
     retryCount: {
       type: 'int',
       default: 0,

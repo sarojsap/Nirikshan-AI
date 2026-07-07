@@ -16,6 +16,7 @@ export const createIncident = async (incidentData) => {
     description: incidentData.description,
     severity: incidentData.severity,
     imageUrl: incidentData.imageUrl,
+    clipUrl: incidentData.clipUrl,
     localSnapshotPath: incidentData.localSnapshotPath,
     localClipPath: incidentData.localClipPath,
     syncStatus: incidentData.syncStatus || 'PENDING',

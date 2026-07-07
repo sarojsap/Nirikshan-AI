@@ -32,9 +32,22 @@ app.use('/api/debug', debugRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/sync', syncRoutes);
 
-// Serve locally stored media files (snapshots, clips)
+// Serve locally stored media files — backend/media/, then fall back to ai/media/
 const mediaDir = path.resolve(__dirname, '..', process.env.MEDIA_DIR || './media');
-app.use('/media', express.static(mediaDir));
+const aiMediaDir = path.resolve(__dirname, '..', '..', 'ai', 'media');
+const serveBackendMedia = express.static(mediaDir);
+const serveAiMedia = express.static(aiMediaDir);
+app.use('/media', (req, res, next) => {
+  serveBackendMedia(req, res, (err) => {
+    if (err) return next(err);
+    serveAiMedia(req, res, next);
+  });
+});
+
+// Serve AI snapshot directory (ai/snapshots/) so snapshots are available
+// when the Python/Flask server is not running
+const aiSnapshotsDir = path.resolve(__dirname, '..', '..', 'ai', 'snapshots');
+app.use('/snapshots', express.static(aiSnapshotsDir));
 
 app.use(notFoundHandler);
 app.use(errorHandler);

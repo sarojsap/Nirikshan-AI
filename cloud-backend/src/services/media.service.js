@@ -1,12 +1,21 @@
-import { generateUploadUrl } from '../config/s3.js';
-
-export function generateMediaKey(organizationId, deviceId, incidentId, type) {
-  const ext = type === 'snapshot' ? 'jpg' : 'mp4';
-  return `organizations/${organizationId}/devices/${deviceId}/incidents/${incidentId}/${type}_${Date.now()}.${ext}`;
-}
+import {
+  generateUploadSignature,
+  getUploadUrl,
+  generatePublicId,
+} from '../config/cloudinary.js';
 
 export async function requestUploadUrl(organizationId, deviceId, incidentId, type, contentType) {
-  const key = generateMediaKey(organizationId, deviceId, incidentId, type);
-  const uploadUrl = await generateUploadUrl(key, contentType);
-  return { uploadUrl, key };
+  const resourceType = type === 'snapshot' ? 'image' : 'video';
+  const publicId = generatePublicId(organizationId, deviceId, incidentId, type);
+  const { signature, timestamp } = generateUploadSignature(publicId);
+  const uploadUrl = getUploadUrl(resourceType);
+
+  return {
+    uploadUrl,
+    publicId,
+    signature,
+    timestamp,
+    apiKey: process.env.CLOUDINARY_API_KEY,
+    cloudName: process.env.CLOUDINARY_CLOUD_NAME,
+  };
 }

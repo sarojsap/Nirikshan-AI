@@ -8,9 +8,12 @@ export async function receiveFromEdge(req, res) {
       organizationId: req.organizationId,
       edgeDeviceId: req.device.id,
     };
+    console.log(`[Incident] Receiving from edge: snapshotUrl=${data.snapshotUrl ? 'present' : 'MISSING'}, clipUrl=${data.clipUrl ? 'present' : 'MISSING'}`);
     const incident = await incidentService.createIncident(data);
+    console.log(`[Incident] Saved: ${incident.id} snapshotUrl=${incident.snapshotUrl ? 'present' : 'MISSING'}`);
     res.status(201).json(incident);
   } catch (err) {
+    console.error(`[Incident] Receive failed:`, err.message);
     res.status(400).json({ error: err.message });
   }
 }
@@ -48,19 +51,22 @@ export async function summary(req, res) {
 
 export async function requestMediaUploadUrl(req, res) {
   try {
-    const { type, contentType } = req.body;
+    const { type } = req.body;
     if (!['snapshot', 'clip'].includes(type)) {
       return res.status(400).json({ error: 'type must be snapshot or clip' });
     }
+    console.log(`[Upload] Generating Cloudinary upload URL for device=${req.device.id} type=${type}`);
     const result = await mediaService.requestUploadUrl(
       req.organizationId,
       req.device.id,
       req.params.incidentId,
       type,
-      contentType || (type === 'snapshot' ? 'image/jpeg' : 'video/mp4'),
+      type === 'snapshot' ? 'image/jpeg' : 'video/mp4',
     );
+    console.log(`[Upload] Cloudinary params ready: uploadUrl=${result.uploadUrl}, publicId=${result.publicId}`);
     res.json(result);
   } catch (err) {
+    console.error(`[Upload] Failed to generate upload URL:`, err.message);
     res.status(400).json({ error: err.message });
   }
 }
