@@ -1,7 +1,6 @@
 import * as incidentService from '../services/incident.service.js';
 import { getIO } from '../config/socket.js';
 import { sendPushNotification } from '../services/notification.service.js';
-import { saveMediaFile, generateMediaFilename } from '../services/media.service.js';
 import { AppDataSource } from '../config/database.js';
 import { Incident } from '../entities/Incident.js';
 
@@ -70,28 +69,6 @@ export const logIncident = async (req, res) => {
   } catch (error) {
     const status = error.message === 'Camera not found!' ? 400 : 500;
     res.status(status).json({ error: error.message });
-  }
-};
-
-export const uploadMedia = async (req, res) => {
-  try {
-    const { cameraId, type, incidentType } = req.body;
-    if (!req.file && !req.files?.file) {
-      return res.status(400).json({ error: 'No media file provided' });
-    }
-
-    const file = req.file || req.files.file;
-    const timestamp = Math.floor(Date.now() / 1000);
-    const filename = generateMediaFilename(cameraId || 'unknown', incidentType || 'INCIDENT', timestamp, type || 'snapshot');
-    const filepath = saveMediaFile(file.buffer || file.data, filename);
-
-    res.status(201).json({
-      message: 'Media saved',
-      localPath: filepath,
-      filename,
-    });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
   }
 };
 

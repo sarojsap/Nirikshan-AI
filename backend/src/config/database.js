@@ -6,7 +6,6 @@ import { fileURLToPath } from 'url';
 import { User } from '../entities/User.js';
 import { Camera } from '../entities/Camera.js';
 import { Incident } from '../entities/Incident.js';
-import { SyncQueue } from '../entities/SyncQueue.js';
 
 dotenv.config();
 
@@ -26,7 +25,7 @@ if (useSQLite) {
     database: dbPath,
     synchronize: true,
     logging: false,
-    entities: [User, Camera, Incident, SyncQueue],
+    entities: [User, Camera, Incident],
     enableWAL: true,
   };
 } else {
@@ -39,7 +38,7 @@ if (useSQLite) {
     database: process.env.DB_NAME,
     synchronize: true,
     logging: false,
-    entities: [User, Camera, Incident, SyncQueue],
+    entities: [User, Camera, Incident],
   };
 }
 

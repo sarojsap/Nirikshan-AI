@@ -1,39 +1,38 @@
+import { AppDataSource } from '../config/database.js';
+import { User } from '../entities/User.js';
 import { firebaseMessaging } from '../config/firebase.js';
 
-// In-memory set of registered FCM device tokens
-const registeredTokens = new Set();
-
-/**
- * Register a device's FCM token for push notifications.
- */
-export const registerToken = (token) => {
+export const registerToken = async (userId, token) => {
   if (!token || typeof token !== 'string') {
     throw new Error('A valid FCM token string is required.');
   }
-  registeredTokens.add(token);
-  console.log(`FCM token registered. Total devices: ${registeredTokens.size}`);
+  const userRepo = AppDataSource.getRepository(User);
+  const user = await userRepo.findOne({ where: { id: userId } });
+  if (!user) throw new Error('User not found');
+
+  const tokens = user.fcmTokens || [];
+  if (!tokens.includes(token)) {
+    tokens.push(token);
+    await userRepo.update(userId, { fcmTokens: tokens });
+    console.log(`FCM token registered for user ${userId}. Total tokens: ${tokens.length}`);
+  }
 };
 
-/**
- * Unregister a device's FCM token (e.g. on logout).
- */
-export const unregisterToken = (token) => {
-  registeredTokens.delete(token);
-  console.log(`FCM token unregistered. Total devices: ${registeredTokens.size}`);
+export const unregisterToken = async (userId, token) => {
+  const userRepo = AppDataSource.getRepository(User);
+  const user = await userRepo.findOne({ where: { id: userId } });
+  if (!user) return;
+
+  const tokens = (user.fcmTokens || []).filter(t => t !== token);
+  await userRepo.update(userId, { fcmTokens: tokens });
+  console.log(`FCM token unregistered for user ${userId}.`);
 };
 
-/**
- * Get the current count of registered tokens.
- */
-export const getTokenCount = () => registeredTokens.size;
-
-/**
- * Send a push notification to all registered devices when an incident occurs.
- * Uses Firebase Admin SDK's sendEachForMulticast for reliable delivery.
- */
 export const sendPushNotification = async (incident) => {
-  const tokens = [...registeredTokens];
+  const userRepo = AppDataSource.getRepository(User);
+  const users = await userRepo.find({ where: { isActive: true }, select: ['fcmTokens', 'id'] });
 
+  const tokens = users.flatMap(u => u.fcmTokens || []).filter(Boolean);
   if (tokens.length === 0) {
     console.log('FCM: No registered device tokens. Skipping push notification.');
     return;
@@ -76,23 +75,30 @@ export const sendPushNotification = async (incident) => {
       `Success: ${response.successCount}, Failure: ${response.failureCount}`
     );
 
-    // Clean up stale/invalid tokens
     if (response.failureCount > 0) {
+      const invalidTokens = [];
       response.responses.forEach((resp, idx) => {
         if (!resp.success) {
           const errorCode = resp.error?.code;
-          // Remove tokens that are no longer valid
           if (
             errorCode === 'messaging/invalid-registration-token' ||
             errorCode === 'messaging/registration-token-not-registered'
           ) {
-            console.log(`FCM: Removing stale token: ${tokens[idx].substring(0, 20)}...`);
-            registeredTokens.delete(tokens[idx]);
+            invalidTokens.push(tokens[idx]);
           } else {
             console.error(`FCM: Error sending to token ${idx}: ${resp.error?.message}`);
           }
         }
       });
+
+      if (invalidTokens.length > 0) {
+        for (const user of users) {
+          const remaining = (user.fcmTokens || []).filter(t => !invalidTokens.includes(t));
+          if (remaining.length !== (user.fcmTokens || []).length) {
+            await userRepo.update(user.id, { fcmTokens: remaining });
+          }
+        }
+      }
     }
   } catch (error) {
     console.error('FCM: Failed to send multicast notification:', error.message);

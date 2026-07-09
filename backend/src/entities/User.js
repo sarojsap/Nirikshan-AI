@@ -33,6 +33,10 @@ export const User = new EntitySchema({
       type: 'datetime',
       nullable: true,
     },
+    fcmTokens: {
+      type: 'simple-json',
+      default: [],
+    },
     createdAt: {
       type: 'datetime',
       createDate: true,

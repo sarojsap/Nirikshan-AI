@@ -12,7 +12,7 @@ async function start() {
     console.log('Connected to PostgreSQL — nirikshan_cloud');
 
     const server = http.createServer(app);
-    initSocket(server);
+    initSocket(server, app);
 
     server.listen(PORT, () => {
       console.log(`Nirikshan Cloud API running on port ${PORT}`);

@@ -1,7 +1,6 @@
 import fs from 'fs';
 import path from 'path';
 import { cert, getApps, initializeApp } from 'firebase-admin/app';
-import { getAuth } from 'firebase-admin/auth';
 import { getMessaging } from 'firebase-admin/messaging';
 
 const resolveServiceAccountPath = () => {
@@ -38,5 +37,4 @@ export const initializeFirebase = () => {
 };
 
 export const firebaseApp = initializeFirebase();
-export const firebaseAuth = getAuth(firebaseApp);
 export const firebaseMessaging = getMessaging(firebaseApp);

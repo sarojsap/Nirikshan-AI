@@ -41,16 +41,6 @@ export const Incident = new EntitySchema({
       type: 'text',
       nullable: true,
     },
-    snapshotKey: {
-      type: 'varchar',
-      length: 500,
-      nullable: true,
-    },
-    clipKey: {
-      type: 'varchar',
-      length: 500,
-      nullable: true,
-    },
     snapshotUrl: {
       type: 'text',
       nullable: true,

@@ -2,27 +2,6 @@ import { AppDataSource } from '../config/database.js';
 import { User } from '../entities/User.js';
 import { messaging } from '../config/firebase.js';
 
-export async function registerFcmToken(userId, token) {
-  const repo = AppDataSource.getRepository(User);
-  const user = await repo.findOne({ where: { id: userId } });
-  if (!user) throw new Error('User not found');
-
-  const tokens = user.fcmTokens || [];
-  if (!tokens.includes(token)) {
-    tokens.push(token);
-    await repo.update(userId, { fcmTokens: tokens });
-  }
-}
-
-export async function unregisterFcmToken(userId, token) {
-  const repo = AppDataSource.getRepository(User);
-  const user = await repo.findOne({ where: { id: userId } });
-  if (!user) return;
-
-  const tokens = (user.fcmTokens || []).filter(t => t !== token);
-  await repo.update(userId, { fcmTokens: tokens });
-}
-
 export async function sendPushNotification(organizationId, { title, body, data = {} }) {
   if (!messaging) {
     console.warn('FCM not configured, skipping push');

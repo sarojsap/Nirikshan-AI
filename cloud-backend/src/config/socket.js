@@ -3,7 +3,7 @@ import jwt from 'jsonwebtoken';
 
 let io;
 
-export function initSocket(httpServer) {
+export function initSocket(httpServer, app) {
   io = new Server(httpServer, {
     cors: {
       origin: process.env.CORS_ORIGINS?.split(',') || '*',
@@ -23,6 +23,8 @@ export function initSocket(httpServer) {
       next(new Error('Invalid token'));
     }
   });
+
+  app.set('io', io);
 
   io.on('connection', (socket) => {
     console.log(`Socket connected: ${socket.id} (org:${socket.user?.organizationId})`);

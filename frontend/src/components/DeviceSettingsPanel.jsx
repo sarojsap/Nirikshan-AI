@@ -74,6 +74,9 @@ export default function DeviceSettingsPanel({ token, onLogout }) {
         <div>
           <h3 className="text-xs font-bold text-white uppercase tracking-wider">Edge Devices</h3>
           <p className="text-[10px] text-slate-500">Configure remote edge devices from the cloud</p>
+          <p className="text-[9px] text-amber-400 mt-1.5 bg-amber-500/10 border border-amber-500/20 rounded-xl px-3 py-2">
+            These are device-level default values. Per-camera settings configured in the edge backend will override these values.
+          </p>
         </div>
         <button
           onClick={fetchDevices}

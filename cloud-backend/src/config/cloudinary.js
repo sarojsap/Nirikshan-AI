@@ -24,9 +24,4 @@ export function generatePublicId(organizationId, deviceId, incidentId, type) {
   return `nirikshan/organizations/${organizationId}/devices/${deviceId}/incidents/${incidentId}/${type}`;
 }
 
-export function getCloudinaryUrl(publicId, resourceType) {
-  const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
-  return `https://res.cloudinary.com/${cloudName}/${resourceType}/upload/${publicId}`;
-}
 
-export default cloudinary;

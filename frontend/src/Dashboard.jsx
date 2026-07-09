@@ -11,6 +11,7 @@ import DeviceSettingsPanel from './components/DeviceSettingsPanel';
 import CloudDashboard from './components/CloudDashboard';
 import CloudIncidents from './components/CloudIncidents';
 import CloudDevices from './components/CloudDevices';
+import CloudOperators from './components/CloudOperators';
 
 export default function Dashboard({ token, user, onLogout, mode: initialMode, onModeSwitch }) {
   const [mode, setMode] = useState(initialMode || detectMode());
@@ -329,6 +330,11 @@ export default function Dashboard({ token, user, onLogout, mode: initialMode, on
       });
     } else {
       fetchCloudDevices();
+      socketRef.current = io(CLOUD_API.SOCKET, { transports: ['websocket', 'polling'], reconnection: true, auth: { token } });
+      socketRef.current.on('new_incident', (incident) => {
+        playAlertSound();
+        setCloudIncidents((prev) => [incident, ...prev.slice(0, 19)]);
+      });
       const interval = setInterval(fetchCloudDevices, 30000);
       return () => clearInterval(interval);
     }
@@ -687,6 +693,11 @@ export default function Dashboard({ token, user, onLogout, mode: initialMode, on
 
               <div className="flex flex-col gap-1">
                 <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider px-4 mb-1">System</span>
+                {(user?.role === 'ORG_ADMIN' || user?.role === 'SUPER_ADMIN') && (
+                  <button onClick={() => setActiveTab('operators')} className={`flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all text-left ${activeTab === 'operators' ? 'bg-violet-600/15 border border-violet-500/20 text-white shadow-sm' : 'hover:bg-white/5 text-slate-400'}`}>
+                    <span className="material-symbols-outlined text-lg">manage_accounts</span><span>Operators</span>
+                  </button>
+                )}
                 <button onClick={() => setActiveTab('settings')} className={`flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all text-left ${activeTab === 'settings' ? 'bg-violet-600/15 border border-violet-500/20 text-white shadow-sm' : 'hover:bg-white/5 text-slate-400'}`}>
                   <span className="material-symbols-outlined text-lg">settings</span><span>Settings</span>
                 </button>
@@ -735,6 +746,9 @@ export default function Dashboard({ token, user, onLogout, mode: initialMode, on
                 <button className={`pb-1 text-sm font-semibold transition-all border-b-2 ${activeTab === 'dashboard' ? 'text-white border-violet-500' : 'text-slate-400 border-transparent hover:text-white'}`} onClick={() => setActiveTab('dashboard')}>Dashboard</button>
                 <button className={`pb-1 text-sm font-semibold transition-all border-b-2 ${activeTab === 'incidents' ? 'text-white border-violet-500' : 'text-slate-400 border-transparent hover:text-white'}`} onClick={() => setActiveTab('incidents')}>Incidents</button>
                 <button className={`pb-1 text-sm font-semibold transition-all border-b-2 ${activeTab === 'devices' ? 'text-white border-violet-500' : 'text-slate-400 border-transparent hover:text-white'}`} onClick={() => setActiveTab('devices')}>Devices</button>
+                {(user?.role === 'ORG_ADMIN' || user?.role === 'SUPER_ADMIN') && (
+                  <button className={`pb-1 text-sm font-semibold transition-all border-b-2 ${activeTab === 'operators' ? 'text-white border-violet-500' : 'text-slate-400 border-transparent hover:text-white'}`} onClick={() => setActiveTab('operators')}>Operators</button>
+                )}
                 <button className={`pb-1 text-sm font-semibold transition-all border-b-2 ${activeTab === 'settings' ? 'text-white border-violet-500' : 'text-slate-400 border-transparent hover:text-white'}`} onClick={() => setActiveTab('settings')}>Settings</button>
               </>
             )}
@@ -786,6 +800,11 @@ export default function Dashboard({ token, user, onLogout, mode: initialMode, on
                 token={token}
                 onLogout={onLogout}
               />
+            )}
+            {activeTab === 'operators' && (
+              <div className="flex-1 flex overflow-hidden gap-6 min-h-0 w-full">
+                <CloudOperators token={token} user={user} onLogout={onLogout} />
+              </div>
             )}
             {activeTab === 'settings' && (
               <div className="flex-1 flex flex-col gap-6 overflow-y-auto pr-1">

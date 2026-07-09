@@ -23,14 +23,13 @@ export const CLOUD_API = {
   AUTH: `${CLOUD_API_BASE}/api/auth`,
   INCIDENTS: `${CLOUD_API_BASE}/api/incidents`,
   DEVICES: `${CLOUD_API_BASE}/api/devices`,
+  OPERATORS: `${CLOUD_API_BASE}/api/operators`,
   SUMMARY: `${CLOUD_API_BASE}/api/incidents/summary`,
   SOCKET: CLOUD_API_BASE,
 };
 
 export const STREAM = {
   BASE: STREAM_BASE,
-  VIDEO_FEED: `${STREAM_BASE}/video_feed`,
-  SNAPSHOT: `${STREAM_BASE}/snapshot`,
   WS: WS_BASE,
 };
 

@@ -2,6 +2,29 @@ import { AppDataSource } from '../config/database.js';
 import { Organization } from '../entities/Organization.js';
 import * as authService from '../services/auth.service.js';
 
+export async function forgotPassword(req, res) {
+  try {
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ error: 'Email is required!' });
+    await authService.forgotPassword(email);
+    res.json({ message: 'If the email exists, a reset link has been sent.' });
+  } catch (err) {
+    res.status(500).json({ error: 'Something went wrong. Please try again later.' });
+  }
+}
+
+export async function resetPassword(req, res) {
+  try {
+    const { token, password } = req.body;
+    if (!token || !password) return res.status(400).json({ error: 'Token and new password are required!' });
+    if (password.length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters!' });
+    await authService.resetPassword(token, password);
+    res.json({ message: 'Password reset successful!' });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+}
+
 export async function register(req, res) {
   try {
     const { email, name, password, organizationId } = req.body;

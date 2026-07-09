@@ -1,38 +1,29 @@
 import { Router } from 'express';
 import { verifyToken } from '../middlewares/auth.middleware.js';
-import { registerToken, unregisterToken, getTokenCount } from '../services/notification.service.js';
+import * as notificationService from '../services/notification.service.js';
 
 const router = Router();
 
-// All notification routes require authentication
 router.use(verifyToken);
 
-// POST /api/notifications/register — Register a device FCM token
-router.post('/register', (req, res) => {
+router.post('/register', async (req, res) => {
   try {
     const { token } = req.body;
+    if (!token) return res.status(400).json({ error: 'FCM token is required.' });
 
-    if (!token) {
-      return res.status(400).json({ error: 'FCM token is required.' });
-    }
-
-    registerToken(token);
-    res.status(200).json({ message: 'Device registered for push notifications.', totalDevices: getTokenCount() });
+    await notificationService.registerToken(req.user.id, token);
+    res.status(200).json({ message: 'Device registered for push notifications.' });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
 
-// POST /api/notifications/unregister — Unregister a device FCM token
-router.post('/unregister', (req, res) => {
+router.post('/unregister', async (req, res) => {
   try {
     const { token } = req.body;
+    if (!token) return res.status(400).json({ error: 'FCM token is required.' });
 
-    if (!token) {
-      return res.status(400).json({ error: 'FCM token is required.' });
-    }
-
-    unregisterToken(token);
+    await notificationService.unregisterToken(req.user.id, token);
     res.status(200).json({ message: 'Device unregistered from push notifications.' });
   } catch (error) {
     res.status(500).json({ error: error.message });
