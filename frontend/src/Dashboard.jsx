@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { io } from 'socket.io-client';
-import { API, STREAM, CLOUD_API, detectMode } from './config';
+import { API, STREAM, CLOUD_API, detectMode, DEPLOY_MODE } from './config';
 import LiveFeedCard from './components/LiveFeedCard';
 import AddCameraModal from './components/AddCameraModal';
 import SnapshotViewer from './components/SnapshotViewer';
@@ -11,7 +11,6 @@ import DeviceSettingsPanel from './components/DeviceSettingsPanel';
 import CloudDashboard from './components/CloudDashboard';
 import CloudIncidents from './components/CloudIncidents';
 import CloudDevices from './components/CloudDevices';
-import CloudOperators from './components/CloudOperators';
 
 export default function Dashboard({ token, user, onLogout, mode: initialMode, onModeSwitch }) {
   const [mode, setMode] = useState(initialMode || detectMode());
@@ -693,11 +692,6 @@ export default function Dashboard({ token, user, onLogout, mode: initialMode, on
 
               <div className="flex flex-col gap-1">
                 <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider px-4 mb-1">System</span>
-                {(user?.role === 'ORG_ADMIN' || user?.role === 'SUPER_ADMIN') && (
-                  <button onClick={() => setActiveTab('operators')} className={`flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all text-left ${activeTab === 'operators' ? 'bg-violet-600/15 border border-violet-500/20 text-white shadow-sm' : 'hover:bg-white/5 text-slate-400'}`}>
-                    <span className="material-symbols-outlined text-lg">manage_accounts</span><span>Operators</span>
-                  </button>
-                )}
                 <button onClick={() => setActiveTab('settings')} className={`flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all text-left ${activeTab === 'settings' ? 'bg-violet-600/15 border border-violet-500/20 text-white shadow-sm' : 'hover:bg-white/5 text-slate-400'}`}>
                   <span className="material-symbols-outlined text-lg">settings</span><span>Settings</span>
                 </button>
@@ -746,25 +740,24 @@ export default function Dashboard({ token, user, onLogout, mode: initialMode, on
                 <button className={`pb-1 text-sm font-semibold transition-all border-b-2 ${activeTab === 'dashboard' ? 'text-white border-violet-500' : 'text-slate-400 border-transparent hover:text-white'}`} onClick={() => setActiveTab('dashboard')}>Dashboard</button>
                 <button className={`pb-1 text-sm font-semibold transition-all border-b-2 ${activeTab === 'incidents' ? 'text-white border-violet-500' : 'text-slate-400 border-transparent hover:text-white'}`} onClick={() => setActiveTab('incidents')}>Incidents</button>
                 <button className={`pb-1 text-sm font-semibold transition-all border-b-2 ${activeTab === 'devices' ? 'text-white border-violet-500' : 'text-slate-400 border-transparent hover:text-white'}`} onClick={() => setActiveTab('devices')}>Devices</button>
-                {(user?.role === 'ORG_ADMIN' || user?.role === 'SUPER_ADMIN') && (
-                  <button className={`pb-1 text-sm font-semibold transition-all border-b-2 ${activeTab === 'operators' ? 'text-white border-violet-500' : 'text-slate-400 border-transparent hover:text-white'}`} onClick={() => setActiveTab('operators')}>Operators</button>
-                )}
                 <button className={`pb-1 text-sm font-semibold transition-all border-b-2 ${activeTab === 'settings' ? 'text-white border-violet-500' : 'text-slate-400 border-transparent hover:text-white'}`} onClick={() => setActiveTab('settings')}>Settings</button>
               </>
             )}
           </div>
           <div className="flex items-center gap-4">
-            <button
-              onClick={() => onModeSwitch?.(mode === 'cloud' ? 'edge' : 'cloud')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-bold transition-all ${
-                mode === 'cloud'
-                  ? 'bg-violet-600/10 border border-violet-500/20 text-violet-400 hover:bg-violet-600/20'
-                  : 'bg-emerald-600/10 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-600/20'
-              }`}
-            >
-              <span className="material-symbols-outlined text-sm">{mode === 'cloud' ? 'cloud' : 'lan'}</span>
-              <span>{mode === 'cloud' ? 'Cloud' : 'Edge'}</span>
-            </button>
+            {!DEPLOY_MODE && (
+              <button
+                onClick={() => onModeSwitch?.(mode === 'cloud' ? 'edge' : 'cloud')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-bold transition-all ${
+                  mode === 'cloud'
+                    ? 'bg-violet-600/10 border border-violet-500/20 text-violet-400 hover:bg-violet-600/20'
+                    : 'bg-emerald-600/10 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-600/20'
+                }`}
+              >
+                <span className="material-symbols-outlined text-sm">{mode === 'cloud' ? 'cloud' : 'lan'}</span>
+                <span>{mode === 'cloud' ? 'Cloud' : 'Edge'}</span>
+              </button>
+            )}
             <div className="flex items-center gap-3">
               <div className="text-right">
                 <p className="text-xs font-bold text-white leading-tight">{user?.name || 'Super Admin'}</p>
@@ -800,11 +793,6 @@ export default function Dashboard({ token, user, onLogout, mode: initialMode, on
                 token={token}
                 onLogout={onLogout}
               />
-            )}
-            {activeTab === 'operators' && (
-              <div className="flex-1 flex overflow-hidden gap-6 min-h-0 w-full">
-                <CloudOperators token={token} user={user} onLogout={onLogout} />
-              </div>
             )}
             {activeTab === 'settings' && (
               <div className="flex-1 flex flex-col gap-6 overflow-y-auto pr-1">

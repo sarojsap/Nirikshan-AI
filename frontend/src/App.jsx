@@ -1,7 +1,7 @@
 import { useCallback, useState, useEffect } from 'react';
 import Login from './Login';
 import Dashboard from './Dashboard';
-import { detectMode, setMode, CLOUD_API } from './config';
+import { detectMode, setMode, CLOUD_API, DEPLOY_MODE } from './config';
 
 function App() {
   const [token, setToken] = useState(() => localStorage.getItem('token') || '');
@@ -143,9 +143,9 @@ function App() {
         )}
         <Login
           onAuthSuccess={handleAuthSuccess}
-          onModeSelect={() => setShowModeSelector(true)}
+          onModeSelect={DEPLOY_MODE ? undefined : () => setShowModeSelector(true)}
           currentMode={mode}
-          onRegisterDevice={startDeviceRegistration}
+          onRegisterDevice={DEPLOY_MODE ? undefined : startDeviceRegistration}
         />
       </>
     );

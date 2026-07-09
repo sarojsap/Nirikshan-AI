@@ -53,7 +53,7 @@ def add_cors_headers(response):
     return response
 
 api = APIClient()
-model = YOLO('yolov8n.pt')
+model = YOLO('yolo11n.pt')
 try:
     model.to('cuda')
     logger.info("YOLO model loaded on GPU (CUDA)")

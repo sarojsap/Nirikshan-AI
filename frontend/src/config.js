@@ -33,7 +33,10 @@ export const STREAM = {
   WS: WS_BASE,
 };
 
+export const DEPLOY_MODE = import.meta.env.VITE_DEPLOY_MODE || null;
+
 export function detectMode() {
+  if (DEPLOY_MODE) return DEPLOY_MODE;
   const stored = localStorage.getItem('nirikshan_mode');
   if (stored === 'cloud' || stored === 'edge') return stored;
   return 'edge';
