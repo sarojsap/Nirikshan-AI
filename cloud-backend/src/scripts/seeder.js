@@ -7,9 +7,6 @@ import { EdgeDevice } from '../entities/EdgeDevice.js';
 import * as authService from '../services/auth.service.js';
 
 async function seed() {
-  await AppDataSource.initialize();
-  console.log('Connected to PostgreSQL');
-
   const orgRepo = AppDataSource.getRepository(Organization);
   let org = await orgRepo.findOne({ where: { slug: 'nirikshan' } });
   if (!org) {
@@ -65,10 +62,6 @@ async function seed() {
   }
 
   console.log('Seed complete');
-  await AppDataSource.destroy();
 }
 
-seed().catch((err) => {
-  console.error('Seed failed:', err);
-  process.exit(1);
-});
+export { seed };

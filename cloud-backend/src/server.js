@@ -11,6 +11,9 @@ async function start() {
     await AppDataSource.initialize();
     console.log('Connected to PostgreSQL — nirikshan_cloud');
 
+    const { seed } = await import('./scripts/seeder.js');
+    await seed();
+
     const server = http.createServer(app);
     initSocket(server, app);
 
