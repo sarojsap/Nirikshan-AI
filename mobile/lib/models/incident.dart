@@ -31,7 +31,7 @@ class Incident extends Equatable {
       type: json['type'] ?? 'ALERT',
       description: json['description'] ?? 'An incident has been detected.',
       severity: json['severity'] ?? 'MEDIUM',
-      imageUrl: json['imageUrl'],
+      imageUrl: json['imageUrl'] ?? json['snapshotUrl'],
       timestamp:
           DateTime.tryParse(timestampValue?.toString() ?? '') ?? DateTime.now(),
       camera: cameraJson is Map<String, dynamic>

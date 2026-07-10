@@ -31,14 +31,13 @@ class IncidentService {
       'limit': limit.toString(),
     };
 
-    if (ApiConfig.isCloudMode) {
-      if (_deviceId != null) {
-        queryParams['deviceId'] = _deviceId!;
-      }
-      if (_organizationId != null) {
-        queryParams['organizationId'] = _organizationId!;
-      }
+    if (_deviceId != null) {
+      queryParams['deviceId'] = _deviceId!;
     }
+    if (_organizationId != null) {
+      queryParams['organizationId'] = _organizationId!;
+    }
+
 
     final uri = Uri.parse(ApiConfig.incidentsEndpoint).replace(
       queryParameters: queryParams,

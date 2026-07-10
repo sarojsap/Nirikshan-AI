@@ -1,9 +1,6 @@
-// API Configuration
-const String apiBaseUrl = 'http://10.0.2.2:5000/api';
-const String apiOrigin = 'http://10.0.2.2:5000';
-// Physical Android device: use this laptop's Wi-Fi IPv4 address.
-// Android emulator: use http://10.0.2.2:5000/api instead.
-// const String apiBaseUrl = 'https://your-domain.com/api'; // for production
+// API Configuration — points to production cloud backend
+const String apiBaseUrl = 'https://cloud-backend-production-4a8f.up.railway.app/api';
+const String apiOrigin = 'https://cloud-backend-production-4a8f.up.railway.app';
 
 const String loginEndpoint = '$apiBaseUrl/auth/login';
 const String logoutEndpoint = '$apiBaseUrl/auth/logout';

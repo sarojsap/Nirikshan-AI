@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../bloc/auth/bloc.dart';
-import '../../config/api_config.dart';
 import '../../config/theme.dart';
 import '../../models/incident.dart';
 import '../../models/user.dart';
@@ -173,94 +172,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Future<void> _showModeSwitchDialog() async {
-    final switchToCloud = !ApiConfig.isCloudMode;
-    final newMode = switchToCloud ? 'cloud' : 'edge';
-
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: AppTheme.surface,
-        title: Text(
-          'Switch to ${newMode.toUpperCase()} mode?',
-          style: const TextStyle(color: AppTheme.onSurface),
-        ),
-        content: Text(
-          switchToCloud
-              ? 'Connect to the cloud dashboard to view incidents across all sites.'
-              : 'Connect directly to a local edge device for real-time monitoring.',
-          style: const TextStyle(color: AppTheme.onSurfaceVariant),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Switch'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirm == true && mounted) {
-      if (switchToCloud) {
-        await ApiConfig.switchToCloud();
-      } else {
-        // Show dialog to enter edge URL
-        final edgeUrl = await _promptEdgeUrl();
-        if (edgeUrl != null && mounted) {
-          await ApiConfig.switchToEdge(edgeUrl);
-        } else {
-          return;
-        }
-      }
-      setState(() {});
-      _loadIncidents();
-    }
-  }
-
-  Future<String?> _promptEdgeUrl() async {
-    final controller = TextEditingController(text: ApiConfig.baseUrl);
-    final url = await showDialog<String>(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: AppTheme.surface,
-        title: const Text(
-          'Edge Device URL',
-          style: TextStyle(color: AppTheme.onSurface),
-        ),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          style: const TextStyle(color: AppTheme.onSurface),
-          decoration: const InputDecoration(
-            hintText: 'http://10.0.2.2:5000/api',
-            hintStyle: TextStyle(color: AppTheme.onSurfaceVariant),
-            enabledBorder: UnderlineInputBorder(
-              borderSide: BorderSide(color: AppTheme.outlineVariant),
-            ),
-            focusedBorder: UnderlineInputBorder(
-              borderSide: BorderSide(color: AppTheme.primary),
-            ),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, controller.text),
-            child: const Text('Connect'),
-          ),
-        ],
-      ),
-    );
-    controller.dispose();
-    return url;
-  }
 
   Future<void> _handleLogout() async {
     await NotificationService().unregister();
@@ -275,42 +186,13 @@ class _HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       backgroundColor: AppTheme.background,
       appBar: AppBar(
-        title: Row(
-          children: [
-            const Text('NIRIKSHAN AI'),
-            const SizedBox(width: 10),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-              decoration: BoxDecoration(
-                color: ApiConfig.isCloudMode
-                    ? Colors.purple.withValues(alpha: 0.18)
-                    : Colors.green.withValues(alpha: 0.18),
-                borderRadius: BorderRadius.circular(6),
-                border: Border.all(
-                  color: ApiConfig.isCloudMode
-                      ? Colors.purple.withValues(alpha: 0.36)
-                      : Colors.green.withValues(alpha: 0.36),
-                ),
-              ),
-              child: Text(
-                ApiConfig.isCloudMode ? 'CLOUD' : 'EDGE',
-                style: TextStyle(
-                  fontSize: 9,
-                  fontWeight: FontWeight.w800,
-                  color: ApiConfig.isCloudMode ? Colors.purple[200] : Colors.green[200],
-                  letterSpacing: 1.2,
-                ),
-              ),
-            ),
-          ],
-        ),
+        title: const Text('NIRIKSHAN AI'),
         actions: [
-          if (ApiConfig.isCloudMode)
-            IconButton(
-              tooltip: 'Select device',
-              icon: const Icon(Icons.devices),
-              onPressed: () => _showDeviceSelector(),
-            ),
+          IconButton(
+            tooltip: 'Filter by device',
+            icon: const Icon(Icons.devices),
+            onPressed: () => _showDeviceSelector(),
+          ),
           IconButton(
             tooltip: 'Refresh events',
             icon: _isRefreshing
@@ -325,27 +207,11 @@ class _HomeScreenState extends State<HomeScreen> {
           PopupMenuButton<String>(
             icon: const Icon(Icons.more_vert),
             onSelected: (value) {
-              if (value == 'switch_mode') {
-                _showModeSwitchDialog();
-              } else if (value == 'logout') {
+              if (value == 'logout') {
                 _handleLogout();
               }
             },
             itemBuilder: (context) => [
-              PopupMenuItem(
-                value: 'switch_mode',
-                child: Row(
-                  children: [
-                    Icon(
-                      ApiConfig.isCloudMode ? Icons.lan : Icons.cloud,
-                      size: 18,
-                    ),
-                    const SizedBox(width: 10),
-                    Text(ApiConfig.isCloudMode ? 'Switch to Edge' : 'Switch to Cloud'),
-                  ],
-                ),
-              ),
-              const PopupMenuDivider(),
               const PopupMenuItem(
                 value: 'logout',
                 child: Row(
