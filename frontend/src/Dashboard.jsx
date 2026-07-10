@@ -15,6 +15,17 @@ import EdgeIncidents from './components/EdgeIncidents';
 
 export default function Dashboard({ token, user, onLogout, mode: initialMode, onModeSwitch }) {
   const [mode, setMode] = useState(initialMode || detectMode());
+
+  const getNavClass = (tabId) => {
+    const isActive = activeTab === tabId;
+    return isActive
+      ? "flex items-center gap-3 py-2.5 rounded-r-xl rounded-l-none text-xs font-bold transition-all pl-[13px] pr-4 bg-soc-cardElevated border-l-[3px] border-l-primary text-white shadow-sm text-left w-full cursor-pointer"
+      : "flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all text-soc-textSecondary hover:bg-white/5 hover:text-white text-left w-full cursor-pointer";
+  };
+  
+  const getIconClass = (tabId) => {
+    return activeTab === tabId ? "material-symbols-outlined text-lg text-primary" : "material-symbols-outlined text-lg text-soc-textMuted";
+  };
   const [cameras, setCameras] = useState([]);
   const [selectedCamera, setSelectedCamera] = useState(null);
   const [incidents, setIncidents] = useState([]);
@@ -578,15 +589,15 @@ export default function Dashboard({ token, user, onLogout, mode: initialMode, on
   };
 
   return (
-    <div className="h-screen w-screen overflow-hidden text-[#dae2fd] antialiased flex bg-[#060b13] relative font-sans select-none">
-      <aside className="w-72 bg-[#090f19] border-r border-[#162235] flex flex-col p-6 shrink-0 h-full">
+    <div className="h-screen w-screen overflow-hidden text-soc-textSecondary antialiased flex bg-soc-bg relative font-sans select-none">
+      <aside className="w-72 bg-soc-sidebar border-r border-soc-border flex flex-col p-6 shrink-0 h-full">
         <div className="flex items-center gap-3 mb-8">
-          <div className="w-10 h-10 rounded-xl bg-violet-600/10 border border-violet-500/20 flex items-center justify-center shadow-[0_0_15px_rgba(139,92,246,0.15)] text-violet-400">
+          <div className="w-10 h-10 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary">
             <span className="material-symbols-outlined text-xl">visibility</span>
           </div>
           <div>
-            <h1 className="text-sm font-bold tracking-wider text-white uppercase font-sans">Nirikshan AI</h1>
-            <p className="text-[10px] text-slate-500 uppercase tracking-widest font-semibold font-sans">Command Console</p>
+            <h1 className="text-sm font-bold tracking-wider text-soc-textPrimary uppercase font-sans">Nirikshan AI</h1>
+            <p className="text-[10px] text-soc-textMuted uppercase tracking-widest font-semibold font-sans">Command Console</p>
           </div>
         </div>
 
@@ -594,55 +605,55 @@ export default function Dashboard({ token, user, onLogout, mode: initialMode, on
           {mode === 'edge' ? (
             <>
               <div className="flex flex-col gap-1">
-                <button onClick={() => setActiveTab('surveillance')} className={`flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all text-left ${activeTab === 'surveillance' ? 'bg-violet-600/15 border border-violet-500/20 text-white shadow-sm' : 'hover:bg-white/5 text-slate-400'}`}>
-                  <span className="material-symbols-outlined text-lg">dashboard</span><span>Dashboard</span>
+                <button onClick={() => setActiveTab('surveillance')} className={getNavClass('surveillance')}>
+                  <span className={getIconClass('surveillance')}>dashboard</span><span>Dashboard</span>
                 </button>
               </div>
 
               <div className="flex flex-col gap-1">
-                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider px-4 mb-1">Monitoring</span>
-                <button onClick={() => setActiveTab('surveillance')} className={`flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all text-left ${activeTab === 'surveillance' ? 'bg-violet-600/15 border border-violet-500/20 text-white shadow-sm' : 'hover:bg-white/5 text-slate-400'}`}>
-                  <span className="material-symbols-outlined text-lg">videocam</span><span>Camera Registry</span>
+                <span className="text-[10px] font-bold text-soc-textMuted uppercase tracking-wider px-4 mb-1">Monitoring</span>
+                <button onClick={() => setActiveTab('surveillance')} className={getNavClass('surveillance')}>
+                  <span className={getIconClass('surveillance')}>videocam</span><span>Camera Registry</span>
                 </button>
-                <button onClick={() => setActiveTab('live_feeds')} className={`flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all text-left ${activeTab === 'live_feeds' ? 'bg-violet-600/15 border border-violet-500/20 text-white shadow-sm' : 'hover:bg-white/5 text-slate-400'}`}>
-                  <span className="material-symbols-outlined text-lg">live_tv</span><span>Live Feeds</span>
+                <button onClick={() => setActiveTab('live_feeds')} className={getNavClass('live_feeds')}>
+                  <span className={getIconClass('live_feeds')}>live_tv</span><span>Live Feeds</span>
                 </button>
               </div>
 
               <div className="flex flex-col gap-1">
-                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider px-4 mb-1">Alerts & Events</span>
-                <button onClick={() => setActiveTab('alerts')} className={`flex items-center justify-between px-4 py-2.5 rounded-xl text-xs font-semibold transition-all text-left ${activeTab === 'alerts' ? 'bg-violet-600/15 border border-violet-500/20 text-white shadow-sm' : 'hover:bg-white/5 text-slate-400'}`}>
+                <span className="text-[10px] font-bold text-soc-textMuted uppercase tracking-wider px-4 mb-1">Alerts & Events</span>
+                <button onClick={() => setActiveTab('alerts')} className={getNavClass('alerts')}>
                   <div className="flex items-center gap-3">
-                    <span className="material-symbols-outlined text-lg">notifications_active</span>
+                    <span className={getIconClass('alerts')}>notifications_active</span>
                     <span>Alerts</span>
                   </div>
-                  <span className="bg-rose-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">{stats.totalIncidents || 0}</span>
+                  <span className="bg-soc-danger text-white text-[10px] font-bold px-2 py-0.5 rounded-full">{stats.totalIncidents || 0}</span>
                 </button>
               </div>
 
               <div className="flex flex-col gap-1">
-                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider px-4 mb-1">System</span>
+                <span className="text-[10px] font-bold text-soc-textMuted uppercase tracking-wider px-4 mb-1">System</span>
                 {user?.role === 'ADMIN' && (
-                  <button onClick={() => setActiveTab('operators')} className={`flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all text-left ${activeTab === 'operators' ? 'bg-violet-600/15 border border-violet-500/20 text-white shadow-sm' : 'hover:bg-white/5 text-slate-400'}`}>
-                    <span className="material-symbols-outlined text-lg">manage_accounts</span><span>Operators</span>
+                  <button onClick={() => setActiveTab('operators')} className={getNavClass('operators')}>
+                    <span className={getIconClass('operators')}>manage_accounts</span><span>Operators</span>
                   </button>
                 )}
                 {user?.role === 'ADMIN' && (
-                  <button onClick={() => setActiveTab('settings')} className={`flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all text-left ${activeTab === 'settings' ? 'bg-violet-600/15 border border-violet-500/20 text-white shadow-sm' : 'hover:bg-white/5 text-slate-400'}`}>
-                    <span className="material-symbols-outlined text-lg">settings</span><span>Settings</span>
+                  <button onClick={() => setActiveTab('settings')} className={getNavClass('settings')}>
+                    <span className={getIconClass('settings')}>settings</span><span>Settings</span>
                   </button>
                 )}
                 <button className="flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-600 cursor-not-allowed text-left">
-                  <span className="material-symbols-outlined text-lg">receipt_long</span><span>Audit Logs</span>
+                  <span className="material-symbols-outlined text-lg text-slate-700">receipt_long</span><span>Audit Logs</span>
                 </button>
               </div>
 
               <SyncStatusBadge token={token} onLogout={onLogout} />
 
-              <div className="flex flex-col gap-1 mt-2 min-h-0 overflow-hidden border-t border-white/5 pt-4">
+              <div className="flex flex-col gap-1 mt-2 min-h-0 overflow-hidden border-t border-soc-border pt-4">
                 <div className="flex justify-between items-center px-4 mb-2 shrink-0">
-                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Cameras</span>
-                  <span className="bg-emerald-500/10 text-emerald-400 text-[8px] font-mono px-1.5 py-0.5 rounded border border-emerald-500/20 font-bold shrink-0">
+                  <span className="text-[10px] font-bold text-soc-textMuted uppercase tracking-wider">Cameras</span>
+                  <span className="bg-soc-success/10 text-soc-success text-[8px] font-mono px-1.5 py-0.5 rounded border border-soc-success/20 font-bold shrink-0">
                     {cameras.filter(c => c.status === 'ACTIVE').length} / {cameras.length}
                   </span>
                 </div>
@@ -651,12 +662,12 @@ export default function Dashboard({ token, user, onLogout, mode: initialMode, on
                     <span className="text-slate-500 text-[10px] px-4 py-2">No cameras registered.</span>
                   ) : (
                     cameras.map((cam) => (
-                      <button key={cam.id} onClick={() => { setActiveTab('surveillance'); setSelectedCamera(cam); }} onContextMenu={(e) => handleContextMenu(e, cam)} className={`flex items-center justify-between px-3 py-2 rounded-xl text-xs transition-all text-left w-full border ${selectedCamera?.id === cam.id ? 'bg-violet-600/15 border-violet-500/35 text-white font-semibold shadow-[0_0_10px_rgba(139,92,246,0.1)]' : 'hover:bg-white/5 bg-transparent border-transparent text-slate-400'}`}>
+                      <button key={cam.id} onClick={() => { setActiveTab('surveillance'); setSelectedCamera(cam); }} onContextMenu={(e) => handleContextMenu(e, cam)} className={`flex items-center justify-between px-3 py-2 rounded-xl text-xs transition-all text-left w-full border ${selectedCamera?.id === cam.id ? 'bg-soc-cardElevated border-primary/30 text-white font-bold' : 'hover:bg-white/5 bg-transparent border-transparent text-soc-textSecondary'}`}>
                         <div className="flex items-center gap-2 truncate flex-1 mr-2">
                           <span className="material-symbols-outlined text-base shrink-0">{cam.rtspUrl.length === 1 ? 'videocam' : 'sensors'}</span>
                           <span className="truncate text-[11px] font-sans">{cam.name}</span>
                         </div>
-                        <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${cam.status === 'ACTIVE' ? 'bg-emerald-400 shadow-[0_0_6px_#34d399]' : 'bg-rose-500'}`} />
+                        <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${cam.status === 'ACTIVE' ? 'bg-soc-success shadow-[0_0_6px_#22c55e]' : 'bg-soc-danger'}`} />
                       </button>
                     ))
                   )}
@@ -666,32 +677,32 @@ export default function Dashboard({ token, user, onLogout, mode: initialMode, on
           ) : (
             <>
               <div className="flex flex-col gap-1">
-                <button onClick={() => setActiveTab('dashboard')} className={`flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all text-left ${activeTab === 'dashboard' ? 'bg-violet-600/15 border border-violet-500/20 text-white shadow-sm' : 'hover:bg-white/5 text-slate-400'}`}>
-                  <span className="material-symbols-outlined text-lg">dashboard</span><span>Dashboard</span>
+                <button onClick={() => setActiveTab('dashboard')} className={getNavClass('dashboard')}>
+                  <span className={getIconClass('dashboard')}>dashboard</span><span>Dashboard</span>
                 </button>
               </div>
 
               <div className="flex flex-col gap-1">
-                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider px-4 mb-1">Data</span>
-                <button onClick={() => setActiveTab('incidents')} className={`flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all text-left ${activeTab === 'incidents' ? 'bg-violet-600/15 border border-violet-500/20 text-white shadow-sm' : 'hover:bg-white/5 text-slate-400'}`}>
-                  <span className="material-symbols-outlined text-lg">warning</span><span>Incidents</span>
+                <span className="text-[10px] font-bold text-soc-textMuted uppercase tracking-wider px-4 mb-1">Data</span>
+                <button onClick={() => setActiveTab('incidents')} className={getNavClass('incidents')}>
+                  <span className={getIconClass('incidents')}>warning</span><span>Incidents</span>
                 </button>
-                <button onClick={() => setActiveTab('devices')} className={`flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all text-left ${activeTab === 'devices' ? 'bg-violet-600/15 border border-violet-500/20 text-white shadow-sm' : 'hover:bg-white/5 text-slate-400'}`}>
-                  <span className="material-symbols-outlined text-lg">devices</span><span>Devices</span>
+                <button onClick={() => setActiveTab('devices')} className={getNavClass('devices')}>
+                  <span className={getIconClass('devices')}>devices</span><span>Devices</span>
                 </button>
               </div>
 
               <div className="flex flex-col gap-1">
-                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider px-4 mb-1">System</span>
-                <button onClick={() => setActiveTab('settings')} className={`flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all text-left ${activeTab === 'settings' ? 'bg-violet-600/15 border border-violet-500/20 text-white shadow-sm' : 'hover:bg-white/5 text-slate-400'}`}>
-                  <span className="material-symbols-outlined text-lg">settings</span><span>Settings</span>
+                <span className="text-[10px] font-bold text-soc-textMuted uppercase tracking-wider px-4 mb-1">System</span>
+                <button onClick={() => setActiveTab('settings')} className={getNavClass('settings')}>
+                  <span className={getIconClass('settings')}>settings</span><span>Settings</span>
                 </button>
               </div>
 
-              <div className="flex flex-col gap-1 mt-2 min-h-0 overflow-hidden border-t border-white/5 pt-4">
+              <div className="flex flex-col gap-1 mt-2 min-h-0 overflow-hidden border-t border-soc-border pt-4">
                 <div className="flex justify-between items-center px-4 mb-2 shrink-0">
-                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Devices</span>
-                  <span className="bg-violet-500/10 text-violet-400 text-[8px] font-mono px-1.5 py-0.5 rounded border border-violet-500/20 font-bold shrink-0">
+                  <span className="text-[10px] font-bold text-soc-textMuted uppercase tracking-wider">Devices</span>
+                  <span className="bg-primary/10 text-primary text-[8px] font-mono px-1.5 py-0.5 rounded border border-primary/20 font-bold shrink-0">
                     {cloudDevices.length}
                   </span>
                 </div>
@@ -700,12 +711,12 @@ export default function Dashboard({ token, user, onLogout, mode: initialMode, on
                     <span className="text-slate-500 text-[10px] px-4 py-2">No devices registered.</span>
                   ) : (
                     cloudDevices.map((d) => (
-                      <button key={d.id} onClick={() => setActiveTab('devices')} className="flex items-center justify-between px-3 py-2 rounded-xl text-xs transition-all text-left w-full border hover:bg-white/5 bg-transparent border-transparent text-slate-400">
+                      <button key={d.id} onClick={() => setActiveTab('devices')} className="flex items-center justify-between px-3 py-2 rounded-xl text-xs transition-all text-left w-full border hover:bg-white/5 bg-transparent border-transparent text-soc-textSecondary">
                         <div className="flex items-center gap-2 truncate flex-1 mr-2">
                           <span className="material-symbols-outlined text-base shrink-0">devices</span>
                           <span className="truncate text-[11px] font-sans">{d.name}</span>
                         </div>
-                        <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${d.isActive !== false ? 'bg-emerald-400 shadow-[0_0_6px_#34d399]' : 'bg-rose-500'}`} />
+                        <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${d.isActive !== false ? 'bg-soc-success shadow-[0_0_6px_#22c55e]' : 'bg-soc-danger'}`} />
                       </button>
                     ))
                   )}
@@ -717,22 +728,22 @@ export default function Dashboard({ token, user, onLogout, mode: initialMode, on
       </aside>
 
       <div className="flex-1 flex flex-col h-full overflow-hidden min-w-0">
-        <nav className="bg-[#090f19] border-b border-[#162235] h-20 px-8 flex justify-between items-center z-10 shrink-0">
+        <nav className="bg-soc-sidebar border-b border-soc-border h-20 px-8 flex justify-between items-center z-10 shrink-0">
           <div className="flex items-center gap-6 ml-4">
             {mode === 'edge' ? (
               <>
-                <button className={`pb-1 text-sm font-semibold transition-all border-b-2 ${activeTab === 'surveillance' ? 'text-white border-violet-500' : 'text-slate-400 border-transparent hover:text-white'}`} onClick={() => setActiveTab('surveillance')}>Surveillance</button>
-                <button className={`pb-1 text-sm font-semibold transition-all border-b-2 ${activeTab === 'alerts' ? 'text-white border-violet-500' : 'text-slate-400 border-transparent hover:text-white'}`} onClick={() => setActiveTab('alerts')}>Alerts</button>
+                <button className={`pb-1 text-sm font-semibold transition-all border-b-2 ${activeTab === 'surveillance' ? 'text-white border-primary' : 'text-soc-textMuted border-transparent hover:text-white'}`} onClick={() => setActiveTab('surveillance')}>Surveillance</button>
+                <button className={`pb-1 text-sm font-semibold transition-all border-b-2 ${activeTab === 'alerts' ? 'text-white border-primary' : 'text-soc-textMuted border-transparent hover:text-white'}`} onClick={() => setActiveTab('alerts')}>Alerts</button>
                 {user?.role === 'ADMIN' && (
-                  <button className={`pb-1 text-sm font-semibold transition-all border-b-2 ${activeTab === 'operators' ? 'text-white border-violet-500' : 'text-slate-400 border-transparent hover:text-white'}`} onClick={() => setActiveTab('operators')}>Operators</button>
+                  <button className={`pb-1 text-sm font-semibold transition-all border-b-2 ${activeTab === 'operators' ? 'text-white border-primary' : 'text-soc-textMuted border-transparent hover:text-white'}`} onClick={() => setActiveTab('operators')}>Operators</button>
                 )}
               </>
             ) : (
               <>
-                <button className={`pb-1 text-sm font-semibold transition-all border-b-2 ${activeTab === 'dashboard' ? 'text-white border-violet-500' : 'text-slate-400 border-transparent hover:text-white'}`} onClick={() => setActiveTab('dashboard')}>Dashboard</button>
-                <button className={`pb-1 text-sm font-semibold transition-all border-b-2 ${activeTab === 'incidents' ? 'text-white border-violet-500' : 'text-slate-400 border-transparent hover:text-white'}`} onClick={() => setActiveTab('incidents')}>Incidents</button>
-                <button className={`pb-1 text-sm font-semibold transition-all border-b-2 ${activeTab === 'devices' ? 'text-white border-violet-500' : 'text-slate-400 border-transparent hover:text-white'}`} onClick={() => setActiveTab('devices')}>Devices</button>
-                <button className={`pb-1 text-sm font-semibold transition-all border-b-2 ${activeTab === 'settings' ? 'text-white border-violet-500' : 'text-slate-400 border-transparent hover:text-white'}`} onClick={() => setActiveTab('settings')}>Settings</button>
+                <button className={`pb-1 text-sm font-semibold transition-all border-b-2 ${activeTab === 'dashboard' ? 'text-white border-primary' : 'text-soc-textMuted border-transparent hover:text-white'}`} onClick={() => setActiveTab('dashboard')}>Dashboard</button>
+                <button className={`pb-1 text-sm font-semibold transition-all border-b-2 ${activeTab === 'incidents' ? 'text-white border-primary' : 'text-soc-textMuted border-transparent hover:text-white'}`} onClick={() => setActiveTab('incidents')}>Incidents</button>
+                <button className={`pb-1 text-sm font-semibold transition-all border-b-2 ${activeTab === 'devices' ? 'text-white border-primary' : 'text-soc-textMuted border-transparent hover:text-white'}`} onClick={() => setActiveTab('devices')}>Devices</button>
+                <button className={`pb-1 text-sm font-semibold transition-all border-b-2 ${activeTab === 'settings' ? 'text-white border-primary' : 'text-soc-textMuted border-transparent hover:text-white'}`} onClick={() => setActiveTab('settings')}>Settings</button>
               </>
             )}
           </div>
@@ -742,8 +753,8 @@ export default function Dashboard({ token, user, onLogout, mode: initialMode, on
                 onClick={() => onModeSwitch?.(mode === 'cloud' ? 'edge' : 'cloud')}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-bold transition-all ${
                   mode === 'cloud'
-                    ? 'bg-violet-600/10 border border-violet-500/20 text-violet-400 hover:bg-violet-600/20'
-                    : 'bg-emerald-600/10 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-600/20'
+                    ? 'bg-primary/10 border border-primary/20 text-primary hover:bg-primary/20'
+                    : 'bg-soc-success/10 border border-soc-success/20 text-soc-success hover:bg-soc-success/20'
                 }`}
               >
                 <span className="material-symbols-outlined text-sm">{mode === 'cloud' ? 'cloud' : 'lan'}</span>
@@ -752,13 +763,13 @@ export default function Dashboard({ token, user, onLogout, mode: initialMode, on
             )}
             <div className="flex items-center gap-3">
               <div className="text-right">
-                <p className="text-xs font-bold text-white leading-tight">{user?.name || 'Super Admin'}</p>
-                <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">{user?.role || 'Administrator'}</p>
+                <p className="text-xs font-bold text-soc-textPrimary leading-tight">{user?.name || 'Super Admin'}</p>
+                <p className="text-[10px] text-soc-textMuted font-semibold uppercase tracking-wider">{user?.role || 'Administrator'}</p>
               </div>
-              <div className="w-10 h-10 rounded-full border border-[#1b2a47] bg-[#101a2e] flex items-center justify-center text-violet-400 text-lg font-bold">{user?.name ? user.name.charAt(0).toUpperCase() : 'A'}</div>
+              <div className="w-10 h-10 rounded-full border border-soc-border bg-soc-sidebar flex items-center justify-center text-primary text-lg font-bold">{user?.name ? user.name.charAt(0).toUpperCase() : 'A'}</div>
             </div>
-            <div className="h-6 w-px bg-[#162235]"></div>
-            <button onClick={onLogout} className="text-slate-400 hover:text-white text-xs font-semibold flex items-center gap-2 transition-colors py-2 px-3 hover:bg-white/5 border border-[#162235] rounded-xl">
+            <div className="h-6 w-px bg-soc-border"></div>
+            <button onClick={onLogout} className="text-soc-textSecondary hover:text-white text-xs font-semibold flex items-center gap-2 transition-colors py-2 px-3 hover:bg-white/5 border border-soc-border rounded-xl cursor-pointer">
               <span className="material-symbols-outlined text-base">logout</span><span>Sign Out</span>
             </button>
           </div>
@@ -819,25 +830,25 @@ export default function Dashboard({ token, user, onLogout, mode: initialMode, on
             ) : (
               <div className="flex-1 h-full min-h-0 flex flex-col gap-6 overflow-y-auto pr-1">
                 <div className="flex justify-between items-center shrink-0">
-                  <div><h2 className="text-xl font-bold text-white tracking-tight">Camera Registry</h2><p className="text-xs text-slate-400 mt-0.5">Monitor and manage all connected cameras</p></div>
+                  <div><h2 className="text-xl font-bold text-soc-textPrimary tracking-tight">Camera Registry</h2><p className="text-xs text-soc-textMuted mt-0.5">Monitor and manage all connected cameras</p></div>
                   <div className="flex items-center gap-3">
                     <div className="relative">
-                      <button onClick={(e) => { e.stopPropagation(); setIsCameraDropdownOpen(!isCameraDropdownOpen); }} className="flex items-center gap-2 px-4 py-2 border border-[#162235] bg-[#0c1524] hover:bg-[#121c2e] text-slate-300 hover:text-white rounded-xl text-xs font-semibold transition-all shadow-sm">
+                      <button onClick={(e) => { e.stopPropagation(); setIsCameraDropdownOpen(!isCameraDropdownOpen); }} className="flex items-center gap-2 px-4 py-2 border border-soc-border bg-soc-card hover:bg-soc-cardElevated text-soc-textSecondary hover:text-white rounded-xl text-xs font-semibold transition-all shadow-sm cursor-pointer">
                         <span className="material-symbols-outlined text-sm">videocam</span>
                         <span>{selectedCamera ? selectedCamera.name : 'Choose Camera'}</span>
                         <span className="material-symbols-outlined text-xs ml-1 select-none">{isCameraDropdownOpen ? 'expand_less' : 'expand_more'}</span>
                       </button>
                       {isCameraDropdownOpen && (
-                        <div className="absolute right-0 mt-2 w-56 bg-[#0c1524] border border-[#162235] rounded-xl shadow-2xl z-50 py-1.5 flex flex-col min-w-[200px] font-sans" onClick={(e) => e.stopPropagation()}>
-                          <div className="px-3 py-1.5 text-[10px] font-bold text-slate-500 uppercase tracking-wider border-b border-white/5 mb-1 select-none">Select Camera Source</div>
+                        <div className="absolute right-0 mt-2 w-56 bg-soc-sidebar border border-soc-border rounded-xl shadow-2xl z-50 py-1.5 flex flex-col min-w-[200px] font-sans" onClick={(e) => e.stopPropagation()}>
+                          <div className="px-3 py-1.5 text-[10px] font-bold text-soc-textMuted uppercase tracking-wider border-b border-soc-border mb-1 select-none">Select Camera Source</div>
                           <div className="max-h-60 overflow-y-auto">
                             {cameras.length === 0 ? (
-                              <div className="px-4 py-2.5 text-xs text-slate-500 select-none">No cameras registered.</div>
+                               <div className="px-4 py-2.5 text-xs text-soc-textMuted select-none">No cameras registered.</div>
                             ) : (
                               cameras.map((cam) => (
-                                <button key={cam.id} onClick={() => { setSelectedCamera(cam); setIsCameraDropdownOpen(false); }} className={`w-full flex items-center justify-between px-4 py-2.5 text-xs text-left transition-colors ${selectedCamera?.id === cam.id ? 'bg-violet-600/10 text-violet-400 font-bold' : 'text-slate-400 hover:bg-white/5 hover:text-white'}`}>
+                                <button key={cam.id} onClick={() => { setSelectedCamera(cam); setIsCameraDropdownOpen(false); }} className={`w-full flex items-center justify-between px-4 py-2.5 text-xs text-left transition-colors ${selectedCamera?.id === cam.id ? 'bg-primary/10 text-primary font-bold' : 'text-soc-textSecondary hover:bg-white/5 hover:text-white'}`}>
                                   <span className="truncate flex-1 mr-2">{cam.name}</span>
-                                  <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${cam.status === 'ACTIVE' ? 'bg-emerald-400 shadow-[0_0_6px_#34d399]' : 'bg-rose-500'}`} />
+                                  <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${cam.status === 'ACTIVE' ? 'bg-soc-success shadow-[0_0_6px_#22c55e]' : 'bg-soc-danger'}`} />
                                 </button>
                               ))
                             )}
@@ -846,31 +857,31 @@ export default function Dashboard({ token, user, onLogout, mode: initialMode, on
                       )}
                     </div>
                     {user?.role === 'ADMIN' && (
-                      <button onClick={() => setIsAddModalOpen(true)} className="flex items-center gap-2 px-4 py-2 bg-violet-600 hover:bg-violet-500 text-white rounded-xl text-xs font-semibold transition-all shadow-[0_0_15px_rgba(124,58,237,0.2)]">
+                      <button onClick={() => setIsAddModalOpen(true)} className="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary-hover text-white rounded-xl text-xs font-bold transition-all shadow-sm cursor-pointer">
                         <span className="material-symbols-outlined text-sm">add</span><span>Add Camera</span>
                       </button>
                     )}
                   </div>
                 </div>
 
-                <div ref={playerRef} className="bg-[#090f19] border border-[#162235] rounded-2xl relative overflow-hidden flex flex-col aspect-video w-full shadow-2xl shrink-0">
+                 <div ref={playerRef} className="bg-soc-sidebar border border-soc-border rounded-2xl relative overflow-hidden flex flex-col aspect-video w-full shadow-2xl shrink-0">
                   {selectedCamera && (
                     <div className="absolute top-0 left-0 w-full p-4 flex justify-between items-start z-10 bg-gradient-to-b from-black/80 to-transparent">
                       <div>
                         <div className="flex items-center gap-2">
                           <h3 className="text-xs font-semibold text-white drop-shadow-md">{selectedCamera.name}</h3>
-                          <span className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded-full font-bold text-[9px] flex items-center gap-1 shadow-sm">
-                            <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse"></span><span>LIVE</span>
+                          <span className="bg-soc-success/10 text-soc-success border border-soc-success/20 px-2 py-0.5 rounded-full font-bold text-[9px] flex items-center gap-1 shadow-sm">
+                            <span className="w-1.5 h-1.5 bg-soc-success rounded-full animate-pulse"></span><span>LIVE</span>
                           </span>
                         </div>
-                        <p className="text-[10px] text-slate-400 flex items-center gap-0.5 mt-0.5">
+                        <p className="text-[10px] text-soc-textMuted flex items-center gap-0.5 mt-0.5">
                           <span className="material-symbols-outlined text-[10px]">location_on</span>
                           <span>{selectedCamera.location}</span>
                         </p>
                       </div>
                       <div className="flex gap-2">
                         {user?.role === 'ADMIN' && !isDrawingPerimeter && (
-                          <button onClick={startDrawingMode} className="px-3 py-1.5 text-[10px] bg-violet-600/10 hover:bg-violet-600/20 border border-violet-500/20 hover:border-violet-500/40 text-violet-400 rounded-xl transition-all flex items-center gap-1.5 font-semibold shadow-sm">
+                          <button onClick={startDrawingMode} className="px-3 py-1.5 text-[10px] bg-primary/10 hover:bg-primary/20 border border-primary/20 hover:border-primary/40 text-primary rounded-xl transition-all flex items-center gap-1.5 font-bold shadow-sm cursor-pointer">
                             <span className="material-symbols-outlined text-sm">polyline</span><span>Virtual Perimeter</span>
                           </button>
                         )}
@@ -882,24 +893,24 @@ export default function Dashboard({ token, user, onLogout, mode: initialMode, on
                     {isDrawingPerimeter ? (
                       <div className="absolute inset-0 flex flex-col items-center justify-center p-4 bg-black/60 z-20">
                         <canvas ref={canvasRef} className="max-h-[80%] max-w-full rounded-lg border border-white/10 shadow-2xl bg-slate-950" onClick={handleCanvasClick} onMouseMove={handleCanvasMouseMove} style={{ cursor: 'crosshair' }} />
-                        <div className="mt-3 text-center bg-[#090f19]/95 border border-[#162235] px-4 py-2 rounded-xl max-w-md shadow-2xl">
-                          <p className="text-[10px] font-bold text-violet-400 uppercase tracking-wider mb-0.5">Perimeter Drawing Mode</p>
-                          <p className="text-[10px] text-slate-300">Click to place points. Connect back to the green start node to close the loop.</p>
+                        <div className="mt-3 text-center bg-soc-sidebar/95 border border-soc-border px-4 py-2 rounded-xl max-w-md shadow-2xl">
+                          <p className="text-[10px] font-bold text-primary uppercase tracking-wider mb-0.5">Perimeter Drawing Mode</p>
+                          <p className="text-[10px] text-soc-textSecondary">Click to place points. Connect back to the green start node to close the loop.</p>
                         </div>
                       </div>
                     ) : selectedCamera ? (
                       <canvas ref={streamCanvasRef} className="w-full h-full object-cover" />
                     ) : null}
 
-                    <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-4 bg-[#06060c]" style={{ display: (selectedCamera && !streamError) || isDrawingPerimeter ? 'none' : 'flex' }}>
-                      <div className="w-14 h-14 rounded-full bg-[#0c1524] flex items-center justify-center mb-4 text-violet-400 shadow-lg border border-[#162235]">
+                    <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-4 bg-soc-bg" style={{ display: (selectedCamera && !streamError) || isDrawingPerimeter ? 'none' : 'flex' }}>
+                      <div className="w-14 h-14 rounded-full bg-soc-card flex items-center justify-center mb-4 text-primary border border-soc-border">
                         <span className="material-symbols-outlined text-2xl">videocam_off</span>
                       </div>
-                      <span className="text-slate-400 text-xs max-w-md px-6 leading-relaxed">
+                      <span className="text-soc-textMuted text-xs max-w-md px-6 leading-relaxed">
                         {streamError ? streamError : 'Select a camera card from the left sidebar to start monitoring'}
                       </span>
                       {selectedCamera && streamError && (
-                        <button onClick={() => { setStreamError(''); setStreamTimestamp(Date.now()); }} className="mt-4 px-3 py-1.5 bg-[#101a2e] hover:bg-[#15233d] border border-[#1f2f4c] text-slate-300 hover:text-white rounded-xl text-xs font-bold transition-all uppercase tracking-wider flex items-center gap-1.5 shadow-md">
+                        <button onClick={() => { setStreamError(''); setStreamTimestamp(Date.now()); }} className="mt-4 px-3 py-1.5 bg-soc-card hover:bg-soc-cardElevated border border-soc-border text-soc-textSecondary hover:text-white rounded-xl text-xs font-bold transition-all uppercase tracking-wider flex items-center gap-1.5 shadow-md cursor-pointer">
                           <span className="material-symbols-outlined text-sm">refresh</span><span>Retry Connection</span>
                         </button>
                       )}
@@ -907,13 +918,13 @@ export default function Dashboard({ token, user, onLogout, mode: initialMode, on
                   </div>
 
                   {selectedCamera && (
-                    <div className="bg-[#0c1524] border-t border-[#162235] px-4 py-3 flex justify-between items-center shrink-0">
+                    <div className="bg-soc-card border-t border-soc-border px-4 py-3 flex justify-between items-center shrink-0">
                       <div className="flex items-center gap-4">
-                        <div className="flex items-center gap-1.5 text-xs text-slate-300">
+                        <div className="flex items-center gap-1.5 text-xs text-soc-textSecondary">
                           <span className="material-symbols-outlined text-sm">videocam</span><span>Webcam</span>
                         </div>
                       </div>
-                      <div className="flex items-center gap-3 text-slate-400">
+                      <div className="flex items-center gap-3 text-soc-textMuted">
                         <button onClick={handleFullscreen} className="hover:text-white transition-colors flex items-center justify-center" title="Toggle Fullscreen">
                           <span className="material-symbols-outlined text-base">{isFullscreen ? 'fullscreen_exit' : 'fullscreen'}</span>
                         </button>
@@ -925,14 +936,14 @@ export default function Dashboard({ token, user, onLogout, mode: initialMode, on
                   )}
 
                   {isDrawingPerimeter && (
-                    <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-[#0c1524]/90 backdrop-blur-md px-4 py-2 border border-[#162235] rounded-xl flex items-center gap-3 z-30 shadow-2xl">
-                      <button className="px-3 py-1 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-[10px] font-semibold text-slate-300 hover:text-white flex items-center gap-1" onClick={clearDrawing}>
+                    <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-soc-card/90 backdrop-blur-md px-4 py-2 border border-soc-border rounded-xl flex items-center gap-3 z-30 shadow-2xl">
+                      <button className="px-3 py-1 bg-soc-sidebar hover:bg-white/5 border border-soc-border rounded-lg text-[10px] font-semibold text-soc-textSecondary hover:text-white flex items-center gap-1 cursor-pointer" onClick={clearDrawing}>
                         <span className="material-symbols-outlined text-[12px]">delete</span><span>Clear</span>
                       </button>
-                      <button className="px-3 py-1 bg-violet-600 hover:bg-violet-500 text-white rounded-lg text-[10px] font-semibold flex items-center gap-1 shadow-md shadow-violet-500/20" onClick={saveDrawing}>
+                      <button className="px-3 py-1 bg-primary hover:bg-primary-hover text-white rounded-lg text-[10px] font-bold flex items-center gap-1 shadow-sm cursor-pointer" onClick={saveDrawing}>
                         <span className="material-symbols-outlined text-[12px]">save</span><span>Save Perimeter</span>
                       </button>
-                      <button className="px-3 py-1 bg-rose-600/10 hover:bg-rose-600/25 border border-rose-500/20 text-rose-400 rounded-lg text-[10px] font-semibold flex items-center gap-1" onClick={cancelDrawing}>
+                      <button className="px-3 py-1 bg-soc-danger/10 hover:bg-soc-danger/25 border border-soc-danger/20 text-soc-danger rounded-lg text-[10px] font-bold flex items-center gap-1 cursor-pointer" onClick={cancelDrawing}>
                         <span className="material-symbols-outlined text-[12px]">close</span><span>Cancel</span>
                       </button>
                     </div>
@@ -942,38 +953,36 @@ export default function Dashboard({ token, user, onLogout, mode: initialMode, on
             )}
 
             {activeTab !== 'live_feeds' && (
-              <aside className="w-80 bg-[#090f19] border border-[#162235] rounded-2xl flex flex-col shrink-0 h-full overflow-hidden shadow-2xl">
-                <div className="p-4 border-b border-[#162235] flex justify-between items-center shrink-0">
-                  <div><h2 className="text-xs font-bold text-white uppercase tracking-wider">Security Alerts</h2><p className="text-[10px] text-slate-500">Real-time feed</p></div>
-                  <button onClick={() => setIsAlertsHistoryOpen(true)} className="text-slate-400 hover:text-white border border-[#162235] bg-[#0c1524] px-3 py-1 rounded-xl text-[10px] font-semibold transition-colors">View All</button>
+              <aside className="w-80 bg-soc-sidebar border border-soc-border rounded-2xl flex flex-col shrink-0 h-full overflow-hidden shadow-2xl">
+                <div className="p-4 border-b border-soc-border flex justify-between items-center shrink-0">
+                  <div><h2 className="text-xs font-bold text-soc-textPrimary uppercase tracking-wider">Security Alerts</h2><p className="text-[10px] text-soc-textMuted">Real-time feed</p></div>
+                  <button onClick={() => setIsAlertsHistoryOpen(true)} className="text-soc-textSecondary hover:text-white border border-soc-border bg-soc-card px-3 py-1 rounded-xl text-[10px] font-semibold transition-colors cursor-pointer">View All</button>
                 </div>
                 <div className="flex flex-col gap-3 overflow-y-auto p-4 flex-1">
                   {incidents.length === 0 ? (
-                    <p className="text-slate-500 text-xs p-2">No alerts logged.</p>
+                    <p className="text-soc-textMuted text-xs p-2">No alerts logged.</p>
                   ) : (
                     incidents.map((incident) => {
                       const isCritical = incident.severity === 'CRITICAL';
                       const isWarning = incident.severity === 'WARNING' || incident.severity === 'HIGH' || incident.type.includes('CROWD');
-                      let borderClass = 'border-l-cyan-500';
-                      let titleClass = 'text-cyan-400';
-                      let bgOverlayClass = '';
-                      if (isCritical) { borderClass = 'border-l-rose-500'; titleClass = 'text-rose-400'; bgOverlayClass = 'bg-rose-500/5 group-hover:bg-rose-500/10'; }
-                      else if (isWarning) { borderClass = 'border-l-amber-500'; titleClass = 'text-amber-400'; bgOverlayClass = 'bg-amber-500/5 group-hover:bg-amber-500/10'; }
+                      let borderClass = 'border-l-soc-info';
+                      let titleClass = 'text-soc-info';
+                      if (isCritical) { borderClass = 'border-l-soc-danger'; titleClass = 'text-soc-danger'; }
+                      else if (isWarning) { borderClass = 'border-l-soc-warning'; titleClass = 'text-soc-warning'; }
                       return (
-                        <div key={incident.id} onClick={() => setSelectedSnapshot(incident)} className={`bg-[#0d1624] border border-[#162235] p-3 rounded-xl border-l-4 relative overflow-hidden group flex-shrink-0 h-auto cursor-pointer hover:border-slate-600 transition-all ${borderClass}`}>
-                          {bgOverlayClass && <div className={`absolute inset-0 transition-colors pointer-events-none ${bgOverlayClass}`} />}
+                        <div key={incident.id} onClick={() => setSelectedSnapshot(incident)} className={`bg-soc-card border border-soc-border p-3 rounded-xl border-l-4 relative overflow-hidden group flex-shrink-0 h-auto cursor-pointer hover:border-primary/50 transition-all ${borderClass}`}>
                           <div className="relative z-10 flex flex-col gap-1">
                             <div className="flex justify-between items-center">
                               <span className={`text-[10px] font-bold tracking-wide uppercase ${titleClass}`}>{incident.type}</span>
-                              <span className="text-[9px] text-slate-500 font-mono">{new Date(incident.timestamp || incident.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
+                              <span className="text-[9px] text-soc-textMuted font-mono">{new Date(incident.timestamp || incident.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
                             </div>
-                            <p className="text-xs text-slate-300 leading-normal">{incident.description}</p>
-                            <div className="flex items-center gap-1 text-[9px] text-slate-500 mt-1 font-sans">
+                            <p className="text-xs text-soc-textSecondary leading-normal font-medium">{incident.description}</p>
+                            <div className="flex items-center gap-1 text-[9px] text-soc-textMuted mt-1 font-sans">
                               <span className="material-symbols-outlined text-[10px]">location_on</span>
                               <span>{incident.camera ? incident.camera.location : incident.location || 'Surveillance Area'}</span>
                             </div>
                             {incident.imageUrl && (
-                              <div className="mt-2 relative rounded-lg overflow-hidden border border-white/5 aspect-video bg-black/50 group/thumb">
+                              <div className="mt-2 relative rounded-lg overflow-hidden border border-soc-border aspect-video bg-black/50 group/thumb">
                                 <img src={incident.imageUrl} alt="Incident snapshot thumbnail" className="w-full h-full object-cover transition-transform duration-300 group-hover/thumb:scale-105" />
                                 <div className="absolute inset-0 bg-black/35 opacity-0 group-hover/thumb:opacity-100 transition-opacity flex items-center justify-center">
                                   <span className="material-symbols-outlined text-white text-base">zoom_in</span>
@@ -986,8 +995,8 @@ export default function Dashboard({ token, user, onLogout, mode: initialMode, on
                     })
                   )}
                 </div>
-                <div className="p-3 border-t border-[#162235] bg-[#0c1524] shrink-0">
-                  <button onClick={() => setIsAlertsHistoryOpen(true)} className="w-full bg-[#121c2e] hover:bg-[#1a2942] text-slate-300 hover:text-white border border-[#1f2f4c] rounded-xl py-2 text-xs font-semibold flex items-center justify-center gap-2 transition-all">
+                <div className="p-3 border-t border-soc-border bg-soc-sidebar shrink-0">
+                  <button onClick={() => setIsAlertsHistoryOpen(true)} className="w-full bg-soc-card hover:bg-soc-cardElevated text-soc-textSecondary hover:text-white border border-soc-border rounded-xl py-2 text-xs font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer">
                     <span>View All Alerts</span><span className="material-symbols-outlined text-xs">arrow_forward</span>
                   </button>
                 </div>
@@ -997,97 +1006,97 @@ export default function Dashboard({ token, user, onLogout, mode: initialMode, on
         ) : activeTab === 'settings' ? (
           <div className="flex-1 flex flex-col p-6 gap-6 min-h-0 w-full overflow-y-auto pr-1">
             <div className="flex justify-between items-center shrink-0">
-              <div><h2 className="text-xl font-bold text-white tracking-tight">System Settings</h2><p className="text-xs text-slate-400 mt-0.5">Configure global alert parameters and thresholds for connected cameras</p></div>
+              <div><h2 className="text-xl font-bold text-soc-textPrimary tracking-tight">System Settings</h2><p className="text-xs text-soc-textMuted mt-0.5">Configure global alert parameters and thresholds for connected cameras</p></div>
             </div>
             <div className="flex flex-col gap-6 max-w-4xl">
-              <div className="bg-[#090f19] border border-[#162235] rounded-2xl p-5 shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div><h3 className="text-xs font-bold text-white uppercase tracking-wider mb-1">Select Camera</h3><p className="text-[10px] text-slate-500">Settings are loaded and applied on a per-camera basis</p></div>
-                <div className="flex items-center gap-3 bg-[#0d1625] border border-[#1b2a47] rounded-xl px-3 py-2 w-full md:w-80 shadow-inner">
-                  <span className="material-symbols-outlined text-slate-400 text-sm">videocam</span>
-                  <select value={settingsPageCameraId || ''} onChange={(e) => setSettingsPageCameraId(e.target.value)} className="bg-transparent text-xs text-white focus:outline-none w-full cursor-pointer font-semibold">
-                    <option value="" className="bg-[#090f19] text-slate-400">Choose a camera...</option>
-                    {cameras.map((c) => (<option key={c.id} value={c.id} className="bg-[#090f19] text-white">{c.name} ({c.location})</option>))}
+              <div className="bg-soc-sidebar border border-soc-border rounded-2xl p-5 shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div><h3 className="text-xs font-bold text-soc-textPrimary uppercase tracking-wider mb-1">Select Camera</h3><p className="text-[10px] text-soc-textMuted">Settings are loaded and applied on a per-camera basis</p></div>
+                <div className="flex items-center gap-3 bg-soc-card border border-soc-border rounded-xl px-3 py-2 w-full md:w-80 shadow-inner">
+                  <span className="material-symbols-outlined text-soc-textMuted text-sm">videocam</span>
+                  <select value={settingsPageCameraId || ''} onChange={(e) => setSettingsPageCameraId(e.target.value)} className="bg-transparent text-xs text-soc-textPrimary focus:outline-none w-full cursor-pointer font-semibold">
+                    <option value="" className="bg-soc-sidebar text-soc-textMuted">Choose a camera...</option>
+                    {cameras.map((c) => (<option key={c.id} value={c.id} className="bg-soc-sidebar text-white">{c.name} ({c.location})</option>))}
                   </select>
                 </div>
               </div>
 
               {settingsPageCameraId ? (
                 <form onSubmit={handleSaveSettingsPage} className="flex flex-col gap-6">
-                  {settingsPageError && (<div className="p-3.5 bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs rounded-xl shadow-md">{settingsPageError}</div>)}
-                  {settingsPageSuccess && (<div className="p-3.5 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs rounded-xl shadow-md">{settingsPageSuccess}</div>)}
+                  {settingsPageError && (<div className="p-3.5 bg-soc-danger/10 border border-soc-danger/20 text-soc-danger text-xs rounded-xl shadow-md">{settingsPageError}</div>)}
+                  {settingsPageSuccess && (<div className="p-3.5 bg-soc-success/10 border border-soc-success/20 text-soc-success text-xs rounded-xl shadow-md">{settingsPageSuccess}</div>)}
                   {settingsPageLoading && Object.keys(settingsPageValues).length === 0 ? (
-                    <div className="text-center py-12 bg-[#090f19] border border-[#162235] rounded-2xl"><p className="text-slate-400 text-xs">Loading camera configurations...</p></div>
+                    <div className="text-center py-12 bg-soc-sidebar border border-soc-border rounded-2xl"><p className="text-soc-textMuted text-xs">Loading camera configurations...</p></div>
                   ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div className="bg-[#090f19] border border-[#162235] rounded-2xl p-6 flex flex-col gap-4 shadow-xl">
-                        <div className="flex items-center gap-2 border-b border-[#162235] pb-3 mb-1">
-                          <span className="material-symbols-outlined text-violet-400 text-lg">shield</span>
-                          <h4 className="text-xs font-bold text-white uppercase tracking-wider">Intruder & Perimeter Detection</h4>
+                      <div className="bg-soc-sidebar border border-soc-border rounded-2xl p-6 flex flex-col gap-4 shadow-xl">
+                        <div className="flex items-center gap-2 border-b border-soc-border pb-3 mb-1">
+                          <span className="material-symbols-outlined text-primary text-lg">shield</span>
+                          <h4 className="text-xs font-bold text-soc-textPrimary uppercase tracking-wider">Intruder & Perimeter Detection</h4>
                         </div>
-                        <div className="flex justify-between items-center bg-[#0d1625] border border-[#17253d] rounded-xl p-3">
+                        <div className="flex justify-between items-center bg-soc-card border border-soc-border rounded-xl p-3">
                           <div className="flex flex-col gap-0.5">
-                            <span className="text-xs font-semibold text-slate-300">Intrusion Alert Status</span>
-                            <span className="text-[9px] text-slate-500">Trigger warnings for perimeter breaches</span>
+                            <span className="text-xs font-semibold text-soc-textSecondary">Intrusion Alert Status</span>
+                            <span className="text-[9px] text-soc-textMuted">Trigger warnings for perimeter breaches</span>
                           </div>
                           <label className="relative inline-flex items-center cursor-pointer">
                             <input type="checkbox" className="sr-only peer" checked={!!settingsPageValues.intrusionEnabled} onChange={(e) => setSettingsPageValues({...settingsPageValues, intrusionEnabled: e.target.checked})} />
-                            <div className="w-9 h-5 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-violet-600"></div>
+                            <div className="w-9 h-5 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"></div>
                           </label>
                         </div>
-                        <div className="flex flex-col gap-3 bg-[#0d1625] border border-[#17253d] rounded-xl p-3">
-                          <span className="text-xs font-semibold text-slate-300 mb-1">Restricted Hours (Detection Window)</span>
+                        <div className="flex flex-col gap-3 bg-soc-card border border-soc-border rounded-xl p-3">
+                          <span className="text-xs font-semibold text-soc-textSecondary mb-1">Restricted Hours (Detection Window)</span>
                           <div className="grid grid-cols-2 gap-3">
                             <div className="flex flex-col gap-1.5">
-                              <label className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Start Time</label>
-                              <input type="time" step="1" className="bg-[#0a111c] border border-[#1b2b47] rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-violet-500 font-mono w-full shadow-inner" value={settingsPageValues.restrictedStartTime ? settingsPageValues.restrictedStartTime.substring(0, 8) : ''} onChange={(e) => setSettingsPageValues({...settingsPageValues, restrictedStartTime: e.target.value || null})} />
+                              <label className="text-[9px] font-bold uppercase tracking-wider text-soc-textMuted">Start Time</label>
+                              <input type="time" step="1" className="bg-soc-bg border border-soc-border rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-primary font-mono w-full shadow-inner" value={settingsPageValues.restrictedStartTime ? settingsPageValues.restrictedStartTime.substring(0, 8) : ''} onChange={(e) => setSettingsPageValues({...settingsPageValues, restrictedStartTime: e.target.value || null})} />
                             </div>
                             <div className="flex flex-col gap-1.5">
-                              <label className="text-[9px] font-bold uppercase tracking-wider text-slate-400">End Time</label>
-                              <input type="time" step="1" className="bg-[#0a111c] border border-[#1b2b47] rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-violet-500 font-mono w-full shadow-inner" value={settingsPageValues.restrictedEndTime ? settingsPageValues.restrictedEndTime.substring(0, 8) : ''} onChange={(e) => setSettingsPageValues({...settingsPageValues, restrictedEndTime: e.target.value || null})} />
+                              <label className="text-[9px] font-bold uppercase tracking-wider text-soc-textMuted">End Time</label>
+                              <input type="time" step="1" className="bg-soc-bg border border-soc-border rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-primary font-mono w-full shadow-inner" value={settingsPageValues.restrictedEndTime ? settingsPageValues.restrictedEndTime.substring(0, 8) : ''} onChange={(e) => setSettingsPageValues({...settingsPageValues, restrictedEndTime: e.target.value || null})} />
                             </div>
                           </div>
-                          <span className="text-[9px] text-slate-500 leading-normal mt-1">Alerts will only trigger during this schedule. Leave empty to allow 24/7 detection.</span>
+                          <span className="text-[9px] text-soc-textMuted leading-normal mt-1">Alerts will only trigger during this schedule. Leave empty to allow 24/7 detection.</span>
                         </div>
-                        <div className="flex flex-col gap-1.5 bg-[#0d1625] border border-[#17253d] rounded-xl p-3">
+                        <div className="flex flex-col gap-1.5 bg-soc-card border border-soc-border rounded-xl p-3">
                           <div className="flex justify-between items-center mb-1">
-                            <span className="text-xs font-semibold text-slate-300">Alert Cooldown Time</span>
-                            <span className="bg-violet-600/10 text-violet-400 border border-violet-500/20 text-[9px] font-bold px-1.5 py-0.5 rounded font-mono">{settingsPageValues.cooldownSeconds || 60}s</span>
+                            <span className="text-xs font-semibold text-soc-textSecondary">Alert Cooldown Time</span>
+                            <span className="bg-primary/10 text-primary border border-primary/20 text-[9px] font-bold px-1.5 py-0.5 rounded font-mono">{settingsPageValues.cooldownSeconds || 60}s</span>
                           </div>
-                          <input type="range" min="5" max="300" step="5" className="w-full h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-violet-500 mt-1" value={settingsPageValues.cooldownSeconds !== undefined ? settingsPageValues.cooldownSeconds : 60} onChange={(e) => setSettingsPageValues({...settingsPageValues, cooldownSeconds: parseInt(e.target.value, 10)})} />
-                          <span className="text-[9px] text-slate-500">Minimum duration in seconds between subsequent incident alerts.</span>
+                          <input type="range" min="5" max="300" step="5" className="w-full h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-primary mt-1" value={settingsPageValues.cooldownSeconds !== undefined ? settingsPageValues.cooldownSeconds : 60} onChange={(e) => setSettingsPageValues({...settingsPageValues, cooldownSeconds: parseInt(e.target.value, 10)})} />
+                          <span className="text-[9px] text-soc-textMuted">Minimum duration in seconds between subsequent incident alerts.</span>
                         </div>
                       </div>
-                      <div className="bg-[#090f19] border border-[#162235] rounded-2xl p-6 flex flex-col gap-4 shadow-xl">
-                        <div className="flex items-center gap-2 border-b border-[#162235] pb-3 mb-1">
-                          <span className="material-symbols-outlined text-violet-400 text-lg">groups</span>
-                          <h4 className="text-xs font-bold text-white uppercase tracking-wider">Crowd & Analytics Criteria</h4>
+                      <div className="bg-soc-sidebar border border-soc-border rounded-2xl p-6 flex flex-col gap-4 shadow-xl">
+                        <div className="flex items-center gap-2 border-b border-soc-border pb-3 mb-1">
+                          <span className="material-symbols-outlined text-primary text-lg">groups</span>
+                          <h4 className="text-xs font-bold text-soc-textPrimary uppercase tracking-wider">Crowd & Analytics Criteria</h4>
                         </div>
-                        <div className="flex justify-between items-center bg-[#0d1625] border border-[#17253d] rounded-xl p-3">
-                          <div className="flex flex-col gap-0.5"><span className="text-xs font-semibold text-slate-300">Crowd Alert Status</span><span className="text-[9px] text-slate-500">Trigger warnings for density spikes</span></div>
+                        <div className="flex justify-between items-center bg-soc-card border border-soc-border rounded-xl p-3">
+                          <div className="flex flex-col gap-0.5"><span className="text-xs font-semibold text-soc-textSecondary">Crowd Alert Status</span><span className="text-[9px] text-soc-textMuted">Trigger warnings for density spikes</span></div>
                           <label className="relative inline-flex items-center cursor-pointer">
                             <input type="checkbox" className="sr-only peer" checked={!!settingsPageValues.crowdEnabled} onChange={(e) => setSettingsPageValues({...settingsPageValues, crowdEnabled: e.target.checked})} />
-                            <div className="w-9 h-5 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-violet-600"></div>
+                            <div className="w-9 h-5 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"></div>
                           </label>
                         </div>
-                        <div className="flex flex-col gap-1.5 bg-[#0d1625] border border-[#17253d] rounded-xl p-3">
-                          <div className="flex justify-between items-center mb-1"><span className="text-xs font-semibold text-slate-300">Default Crowd Limit</span><span className="bg-violet-600/10 text-violet-400 border border-violet-500/20 text-[9px] font-bold px-1.5 py-0.5 rounded font-mono">{settingsPageValues.crowdThreshold || 3} people</span></div>
-                          <input type="range" min="2" max="50" step="1" className="w-full h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-violet-500 mt-1" value={settingsPageValues.crowdThreshold !== undefined ? settingsPageValues.crowdThreshold : 3} onChange={(e) => setSettingsPageValues({...settingsPageValues, crowdThreshold: parseInt(e.target.value, 10)})} />
-                          <span className="text-[9px] text-slate-500">The minimum count of concurrent people detected required to flag as a crowd alert.</span>
+                        <div className="flex flex-col gap-1.5 bg-soc-card border border-soc-border rounded-xl p-3">
+                          <div className="flex justify-between items-center mb-1"><span className="text-xs font-semibold text-soc-textSecondary">Default Crowd Limit</span><span className="bg-primary/10 text-primary border border-primary/20 text-[9px] font-bold px-1.5 py-0.5 rounded font-mono">{settingsPageValues.crowdThreshold || 3} people</span></div>
+                          <input type="range" min="2" max="50" step="1" className="w-full h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-primary mt-1" value={settingsPageValues.crowdThreshold !== undefined ? settingsPageValues.crowdThreshold : 3} onChange={(e) => setSettingsPageValues({...settingsPageValues, crowdThreshold: parseInt(e.target.value, 10)})} />
+                          <span className="text-[9px] text-soc-textMuted">The minimum count of concurrent people detected required to flag as a crowd alert.</span>
                         </div>
-                        <div className="flex flex-col gap-1.5 bg-[#0d1625] border border-[#17253d] rounded-xl p-3">
-                          <div className="flex justify-between items-center mb-1"><span className="text-xs font-semibold text-slate-300">AI Model Confidence</span><span className="bg-violet-600/10 text-violet-400 border border-violet-500/20 text-[9px] font-bold px-1.5 py-0.5 rounded font-mono">{Math.round((settingsPageValues.confidenceThreshold || 0.4) * 100)}%</span></div>
-                          <input type="range" min="0.1" max="0.9" step="0.05" className="w-full h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-violet-500 mt-1" value={settingsPageValues.confidenceThreshold !== undefined ? settingsPageValues.confidenceThreshold : 0.4} onChange={(e) => setSettingsPageValues({...settingsPageValues, confidenceThreshold: parseFloat(e.target.value)})} />
-                          <span className="text-[9px] text-slate-500">Confidence limit required by the object-detector to classify human figures.</span>
+                        <div className="flex flex-col gap-1.5 bg-soc-card border border-soc-border rounded-xl p-3">
+                          <div className="flex justify-between items-center mb-1"><span className="text-xs font-semibold text-soc-textSecondary">AI Model Confidence</span><span className="bg-primary/10 text-primary border border-primary/20 text-[9px] font-bold px-1.5 py-0.5 rounded font-mono">{Math.round((settingsPageValues.confidenceThreshold || 0.4) * 100)}%</span></div>
+                          <input type="range" min="0.1" max="0.9" step="0.05" className="w-full h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-primary mt-1" value={settingsPageValues.confidenceThreshold !== undefined ? settingsPageValues.confidenceThreshold : 0.4} onChange={(e) => setSettingsPageValues({...settingsPageValues, confidenceThreshold: parseFloat(e.target.value)})} />
+                          <span className="text-[9px] text-soc-textMuted">Confidence limit required by the object-detector to classify human figures.</span>
                         </div>
                       </div>
                     </div>
                   )}
                   <div className="flex justify-end">
-                    <button type="submit" disabled={settingsPageLoading} className="px-6 py-2.5 bg-violet-600 hover:bg-violet-500 text-white rounded-xl text-xs font-semibold shadow-lg shadow-violet-500/10 transition-colors shrink-0">{settingsPageLoading ? 'Saving changes...' : 'Save Settings'}</button>
+                    <button type="submit" disabled={settingsPageLoading} className="px-6 py-2.5 bg-primary hover:bg-primary-hover text-white rounded-xl text-xs font-bold shadow-sm transition-colors shrink-0 cursor-pointer">{settingsPageLoading ? 'Saving changes...' : 'Save Settings'}</button>
                   </div>
                 </form>
               ) : (
-                <div className="text-center py-12 bg-[#090f19] border border-[#162235] rounded-2xl"><p className="text-slate-400 text-xs">Please choose or register a camera to configure settings.</p></div>
+                <div className="text-center py-12 bg-soc-sidebar border border-soc-border rounded-2xl"><p className="text-soc-textMuted text-xs">Please choose or register a camera to configure settings.</p></div>
               )}
             </div>
           </div>
@@ -1102,25 +1111,25 @@ export default function Dashboard({ token, user, onLogout, mode: initialMode, on
               />
             ) : (
               <>
-                <section className="bg-[#090f19] border border-[#162235] flex-1 rounded-2xl p-6 flex flex-col h-full overflow-hidden shadow-2xl">
-                  <h3 className="text-sm font-bold text-white uppercase tracking-wider mb-4 shrink-0">Registered Operators</h3>
+                <section className="bg-soc-sidebar border border-soc-border flex-1 rounded-2xl p-6 flex flex-col h-full overflow-hidden shadow-2xl">
+                  <h3 className="text-sm font-bold text-soc-textPrimary uppercase tracking-wider mb-4 shrink-0">Registered Operators</h3>
                   <div className="flex-1 overflow-y-auto pr-2 min-h-0">
                     {operators.length === 0 ? (
-                      <p className="text-slate-500 text-xs">No operators registered.</p>
+                      <p className="text-soc-textMuted text-xs">No operators registered.</p>
                     ) : (
                       <div className="w-full flex flex-col gap-2">
-                        <div className="grid grid-cols-3 text-[10px] text-slate-400 font-bold uppercase tracking-wider pb-2 border-b border-[#162235] px-4 shrink-0">
+                        <div className="grid grid-cols-3 text-[10px] text-soc-textMuted font-bold uppercase tracking-wider pb-2 border-b border-soc-border px-4 shrink-0">
                           <span>Name</span><span>Email Address</span><span className="text-right">Action</span>
                         </div>
                         {operators.map((op) => (
-                          <div key={op.id} className="grid grid-cols-3 items-center py-3 border-b border-[#162235] hover:bg-white/5 transition-colors rounded-xl px-4 text-xs">
+                          <div key={op.id} className="grid grid-cols-3 items-center py-3 border-b border-soc-border hover:bg-white/5 transition-colors rounded-xl px-4 text-xs">
                             <div className="flex items-center gap-2">
-                              <div className="w-7 h-7 rounded-full bg-violet-600/10 border border-violet-500/20 flex items-center justify-center text-violet-400 font-bold text-xs uppercase">{op.name.charAt(0)}</div>
-                              <span className="font-semibold text-white">{op.name}</span>
+                              <div className="w-7 h-7 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center text-primary font-bold text-xs uppercase">{op.name.charAt(0)}</div>
+                              <span className="font-semibold text-soc-textPrimary">{op.name}</span>
                             </div>
-                            <span className="text-slate-400 font-mono text-[11px] truncate">{op.email}</span>
+                            <span className="text-soc-textMuted font-mono text-[11px] truncate">{op.email}</span>
                             <div className="text-right">
-                              <button onClick={() => handleDeleteOperator(op.id, op.name)} className="px-3 py-1 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 text-rose-400 text-xs font-semibold rounded-xl transition-colors">Delete</button>
+                              <button onClick={() => handleDeleteOperator(op.id, op.name)} className="px-3 py-1 bg-soc-danger/10 hover:bg-soc-danger/20 border border-soc-danger/20 text-soc-danger text-xs font-semibold rounded-xl transition-colors cursor-pointer">Delete</button>
                             </div>
                           </div>
                         ))}
@@ -1128,24 +1137,24 @@ export default function Dashboard({ token, user, onLogout, mode: initialMode, on
                     )}
                   </div>
                 </section>
-                <section className="bg-[#090f19] border border-[#162235] w-96 rounded-2xl p-6 flex flex-col h-fit shrink-0 shadow-2xl">
-                  <h3 className="text-sm font-bold text-white uppercase tracking-wider mb-4 shrink-0">Register Operator</h3>
+                <section className="bg-soc-sidebar border border-soc-border w-96 rounded-2xl p-6 flex flex-col h-fit shrink-0 shadow-2xl">
+                  <h3 className="text-sm font-bold text-soc-textPrimary uppercase tracking-wider mb-4 shrink-0">Register Operator</h3>
                   <form onSubmit={handleAddOperator} className="flex flex-col gap-4">
-                    {opError && (<div className="p-3 bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs rounded-xl">{opError}</div>)}
-                    {opSuccess && (<div className="p-3 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs rounded-xl">{opSuccess}</div>)}
+                    {opError && (<div className="p-3 bg-soc-danger/10 border border-soc-danger/20 text-soc-danger text-xs rounded-xl">{opError}</div>)}
+                    {opSuccess && (<div className="p-3 bg-soc-success/10 border border-soc-success/20 text-soc-success text-xs rounded-xl">{opSuccess}</div>)}
                     <div className="flex flex-col gap-1.5">
-                      <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Full Name</label>
-                      <input type="text" className="bg-[#0d1625] border border-[#1b2a47] rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-violet-500 focus:ring-4 focus:ring-violet-500/20 font-sans" placeholder="Enter full name" value={newOpName} onChange={(e) => setNewOpName(e.target.value)} required />
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-soc-textMuted">Full Name</label>
+                      <input type="text" className="bg-soc-card border border-soc-border rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 font-sans" placeholder="Enter full name" value={newOpName} onChange={(e) => setNewOpName(e.target.value)} required />
                     </div>
                     <div className="flex flex-col gap-1.5">
-                      <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Email Address</label>
-                      <input type="email" className="bg-[#0d1625] border border-[#1b2a47] rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-violet-500 focus:ring-4 focus:ring-violet-500/20 font-sans" placeholder="operator@nirikshan.com" value={newOpEmail} onChange={(e) => setNewOpEmail(e.target.value)} required />
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-soc-textMuted">Email Address</label>
+                      <input type="email" className="bg-soc-card border border-soc-border rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 font-sans" placeholder="operator@nirikshan.com" value={newOpEmail} onChange={(e) => setNewOpEmail(e.target.value)} required />
                     </div>
                     <div className="flex flex-col gap-1.5">
-                      <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Temporary Password</label>
-                      <input type="password" className="bg-[#0d1625] border border-[#1b2a47] rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-violet-500 focus:ring-4 focus:ring-violet-500/20 font-sans" placeholder="••••••••" value={newOpPassword} onChange={(e) => setNewOpPassword(e.target.value)} required />
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-soc-textMuted">Temporary Password</label>
+                      <input type="password" className="bg-soc-card border border-soc-border rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 font-sans" placeholder="••••••••" value={newOpPassword} onChange={(e) => setNewOpPassword(e.target.value)} required />
                     </div>
-                    <button type="submit" className="w-full bg-violet-600 hover:bg-violet-500 text-white py-2.5 rounded-xl font-semibold text-xs shadow-[0_0_15px_rgba(124,58,237,0.2)] mt-2 transition-colors">Create Operator</button>
+                    <button type="submit" className="w-full bg-primary hover:bg-primary-hover text-white py-2.5 rounded-xl font-semibold text-xs shadow-sm mt-2 transition-colors cursor-pointer">Create Operator</button>
                   </form>
                 </section>
               </>
@@ -1154,19 +1163,19 @@ export default function Dashboard({ token, user, onLogout, mode: initialMode, on
         )}
 
         {mode === 'edge' && isSettingsOpen && selectedCamera && (
-          <aside className="fixed top-24 right-6 bottom-6 w-80 bg-[#090f19]/95 backdrop-blur-md border border-[#162235] rounded-2xl flex flex-col z-[150] shadow-2xl overflow-hidden">
-            <div className="p-4 border-b border-[#162235] flex justify-between items-center shrink-0">
+          <aside className="fixed top-24 right-6 bottom-6 w-80 bg-soc-sidebar/95 backdrop-blur-md border border-soc-border rounded-2xl flex flex-col z-[150] shadow-2xl overflow-hidden animate-slide-in">
+            <div className="p-4 border-b border-soc-border flex justify-between items-center shrink-0">
               <div className="flex items-center gap-2">
-                <span className="material-symbols-outlined text-violet-400 text-sm">settings</span>
-                <h4 className="text-xs font-bold text-white uppercase tracking-wider">AI Parameters</h4>
+                <span className="material-symbols-outlined text-primary text-sm">settings</span>
+                <h4 className="text-xs font-bold text-soc-textPrimary uppercase tracking-wider">AI Parameters</h4>
               </div>
-              <button className="text-slate-400 hover:text-white text-lg font-bold" onClick={() => setIsSettingsOpen(false)}>×</button>
+              <button className="text-soc-textMuted hover:text-white text-lg font-bold cursor-pointer" onClick={() => setIsSettingsOpen(false)}>×</button>
             </div>
             <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-4">
-              {settingsError && (<div className="p-3 bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs rounded-xl">{settingsError}</div>)}
-              {settingsSuccess && (<div className="p-3 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs rounded-xl">{settingsSuccess}</div>)}
+              {settingsError && (<div className="p-3 bg-soc-danger/10 border border-soc-danger/20 text-soc-danger text-xs rounded-xl">{settingsError}</div>)}
+              {settingsSuccess && (<div className="p-3 bg-soc-success/10 border border-soc-success/20 text-soc-success text-xs rounded-xl">{settingsSuccess}</div>)}
               {settingsLoading && configSchema.length === 0 ? (
-                <p className="text-slate-400 text-xs">Loading settings...</p>
+                <p className="text-soc-textMuted text-xs">Loading settings...</p>
               ) : (
                 Object.entries(configSchema.reduce((acc, entry) => {
                   const cat = entry.category || 'General';
@@ -1175,34 +1184,34 @@ export default function Dashboard({ token, user, onLogout, mode: initialMode, on
                   return acc;
                 }, {})).map(([category, entries]) => (
                   <div key={category} className="flex flex-col gap-3">
-                    <h5 className="text-[10px] font-bold text-violet-400 uppercase tracking-wider border-b border-[#162235] pb-1">{category}</h5>
+                    <h5 className="text-[10px] font-bold text-primary uppercase tracking-wider border-b border-soc-border pb-1">{category}</h5>
                     {entries.map(entry => (
-                      <div key={entry.key} className="flex flex-col gap-1.5 bg-[#0e1624] border border-[#17253d] rounded-xl p-3">
+                      <div key={entry.key} className="flex flex-col gap-1.5 bg-soc-card border border-soc-border rounded-xl p-3">
                         <div className="flex justify-between items-center">
-                          <span className="text-xs font-semibold text-slate-300">{entry.label}</span>
-                          {entry.type !== 'boolean' && entry.type !== 'time' && (<span className="bg-violet-600/10 text-violet-400 border border-violet-500/20 text-[9px] font-bold px-1.5 py-0.5 rounded uppercase font-mono">{settingsValues[entry.key]}</span>)}
+                          <span className="text-xs font-semibold text-soc-textSecondary">{entry.label}</span>
+                          {entry.type !== 'boolean' && entry.type !== 'time' && (<span className="bg-primary/10 text-primary border border-primary/20 text-[9px] font-bold px-1.5 py-0.5 rounded uppercase font-mono">{settingsValues[entry.key]}</span>)}
                         </div>
                         {entry.type === 'boolean' ? (
                           <label className="relative inline-flex items-center cursor-pointer mt-1">
                             <input type="checkbox" className="sr-only peer" checked={!!settingsValues[entry.key]} onChange={(e) => setSettingsValues({...settingsValues, [entry.key]: e.target.checked})} />
-                            <div className="w-9 h-5 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-violet-600"></div>
+                            <div className="w-9 h-5 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"></div>
                           </label>
                         ) : entry.type === 'integer' || entry.type === 'float' ? (
-                          <input type="range" className="w-full h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-violet-500 mt-1.5" min={entry.min !== undefined ? entry.min : 0} max={entry.max !== undefined ? entry.max : 100} step={entry.step !== undefined ? entry.step : 1} value={settingsValues[entry.key] !== undefined ? settingsValues[entry.key] : entry.default} onChange={(e) => setSettingsValues({...settingsValues, [entry.key]: entry.type === 'integer' ? parseInt(e.target.value, 10) : parseFloat(e.target.value)})} />
+                          <input type="range" className="w-full h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-primary mt-1.5" min={entry.min !== undefined ? entry.min : 0} max={entry.max !== undefined ? entry.max : 100} step={entry.step !== undefined ? entry.step : 1} value={settingsValues[entry.key] !== undefined ? settingsValues[entry.key] : entry.default} onChange={(e) => setSettingsValues({...settingsValues, [entry.key]: entry.type === 'integer' ? parseInt(e.target.value, 10) : parseFloat(e.target.value)})} />
                         ) : entry.type === 'time' ? (
-                          <input type="time" step="1" className="bg-[#0a111c] border border-[#1b2b47] rounded-xl px-2 py-1 text-xs text-white focus:outline-none focus:border-violet-500 mt-1 font-mono w-full" value={settingsValues[entry.key] ? settingsValues[entry.key].substring(0, 8) : ''} onChange={(e) => { const newVal = e.target.value || null; setSettingsValues(prev => { const next = {...prev, [entry.key]: newVal}; if (newVal === null) { next.restrictedStartTime = null; next.restrictedEndTime = null; } return next; }); }} />
+                          <input type="time" step="1" className="bg-soc-bg border border-soc-border rounded-xl px-2 py-1 text-xs text-white focus:outline-none focus:border-primary mt-1 font-mono w-full" value={settingsValues[entry.key] ? settingsValues[entry.key].substring(0, 8) : ''} onChange={(e) => { const newVal = e.target.value || null; setSettingsValues(prev => { const next = {...prev, [entry.key]: newVal}; if (newVal === null) { next.restrictedStartTime = null; next.restrictedEndTime = null; } return next; }); }} />
                         ) : (
-                          <input type="text" className="bg-[#0a111c] border border-[#1b2b47] rounded-xl px-2 py-1 text-xs text-white focus:outline-none focus:border-violet-500 mt-1 font-mono w-full" value={settingsValues[entry.key] || ''} onChange={(e) => setSettingsValues({...settingsValues, [entry.key]: e.target.value})} />
+                          <input type="text" className="bg-soc-bg border border-soc-border rounded-xl px-2 py-1 text-xs text-white focus:outline-none focus:border-primary mt-1 font-mono w-full" value={settingsValues[entry.key] || ''} onChange={(e) => setSettingsValues({...settingsValues, [entry.key]: e.target.value})} />
                         )}
-                        <span className="text-[10px] text-slate-500 leading-relaxed mt-0.5">{entry.description}</span>
+                        <span className="text-[10px] text-soc-textMuted leading-relaxed mt-0.5">{entry.description}</span>
                       </div>
                     ))}
                   </div>
                 ))
               )}
             </div>
-            <div className="p-4 border-t border-[#162235] shrink-0">
-              <button className="w-full bg-violet-600 hover:bg-violet-500 text-white py-2 rounded-xl font-medium text-xs shadow-[0_0_15px_rgba(124,58,237,0.2)] transition-colors" onClick={handleSaveSettings} disabled={settingsLoading}>
+            <div className="p-4 border-t border-soc-border shrink-0">
+              <button className="w-full bg-primary hover:bg-primary-hover text-white py-2 rounded-xl font-medium text-xs shadow-sm transition-colors cursor-pointer" onClick={handleSaveSettings} disabled={settingsLoading}>
                 {settingsLoading ? 'Saving...' : 'Save Settings'}
               </button>
             </div>

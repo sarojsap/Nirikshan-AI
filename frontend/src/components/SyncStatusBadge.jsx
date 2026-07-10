@@ -37,13 +37,13 @@ export default function SyncStatusBadge({ token, onLogout }) {
   const synced = syncStatus.synced;
   const cloudConfigured = syncStatus.cloudConfigured;
   const color = pending > 0 ? 'amber' : failed > 0 ? 'rose' : 'emerald';
-  const indicatorColor = color === 'emerald' ? 'bg-emerald-400' : color === 'amber' ? 'bg-amber-400' : 'bg-rose-400';
+  const indicatorColor = color === 'emerald' ? 'bg-soc-success' : color === 'amber' ? 'bg-soc-warning' : 'bg-soc-danger';
 
   return (
     <div className="px-4">
       <button
         onClick={() => setExpanded(!expanded)}
-        className="flex items-center justify-between w-full px-3 py-2 rounded-xl hover:bg-white/5 text-slate-400 text-xs transition-all"
+        className="flex items-center justify-between w-full px-3 py-2 rounded-xl hover:bg-white/5 text-soc-textMuted text-xs transition-all cursor-pointer"
       >
         <div className="flex items-center gap-2">
           <span className={`h-1.5 w-1.5 rounded-full ${indicatorColor} ${pending > 0 ? 'animate-pulse' : ''}`} />
@@ -51,45 +51,45 @@ export default function SyncStatusBadge({ token, onLogout }) {
         </div>
         <div className="flex gap-1.5">
           {pending > 0 && (
-            <span className="bg-amber-600/10 text-amber-400 text-[9px] font-bold px-1.5 py-0.5 rounded-full border border-amber-500/20">
+            <span className="bg-soc-warning/10 text-soc-warning text-[9px] font-bold px-1.5 py-0.5 rounded-full border border-soc-warning/20">
               {pending}
             </span>
           )}
           {failed > 0 && (
-            <span className="bg-rose-600/10 text-rose-400 text-[9px] font-bold px-1.5 py-0.5 rounded-full border border-rose-500/20">
+            <span className="bg-soc-danger/10 text-soc-danger text-[9px] font-bold px-1.5 py-0.5 rounded-full border border-soc-danger/20">
               {failed}
             </span>
           )}
         </div>
       </button>
       {expanded && (
-        <div className="mx-3 mb-2 px-3 py-2 bg-[#0c1524] border border-[#162235] rounded-xl text-[10px] space-y-1">
-          <div className="flex justify-between text-slate-400">
+        <div className="mx-3 mb-2 px-3 py-2 bg-soc-sidebar border border-soc-border rounded-xl text-[10px] space-y-1">
+          <div className="flex justify-between text-soc-textMuted font-medium">
             <span>Total Incidents</span>
-            <span className="text-white font-semibold">{total}</span>
+            <span className="text-soc-textPrimary font-bold">{total}</span>
           </div>
-          <div className="flex justify-between text-slate-400">
+          <div className="flex justify-between text-soc-textMuted font-medium">
             <span>Synced</span>
-            <span className="text-emerald-400 font-semibold">{synced}</span>
+            <span className="text-soc-success font-bold">{synced}</span>
           </div>
-          <div className="flex justify-between text-slate-400">
+          <div className="flex justify-between text-soc-textMuted font-medium">
             <span>Pending</span>
-            <span className="text-amber-400 font-semibold">{pending}</span>
+            <span className="text-soc-warning font-bold">{pending}</span>
           </div>
           {failed > 0 && (
-            <div className="flex justify-between text-slate-400">
+            <div className="flex justify-between text-soc-textMuted font-medium">
               <span>Failed</span>
-              <span className="text-rose-400 font-semibold">{failed}</span>
+              <span className="text-soc-danger font-bold">{failed}</span>
             </div>
           )}
           {syncStatus.edgeId && (
-            <div className="flex justify-between text-slate-400 pt-1 border-t border-white/5 mt-1">
+            <div className="flex justify-between text-soc-textMuted pt-1 border-t border-soc-border mt-1">
               <span>Edge ID</span>
-              <span className="text-slate-300 font-mono text-[8px]">{syncStatus.edgeId.slice(0, 8)}...</span>
+              <span className="text-soc-textSecondary font-mono text-[8px]">{syncStatus.edgeId.slice(0, 8)}...</span>
             </div>
           )}
           {!cloudConfigured && (
-            <div className="text-amber-400 font-semibold">Cloud not configured</div>
+            <div className="text-soc-warning font-bold">Cloud not configured</div>
           )}
         </div>
       )}

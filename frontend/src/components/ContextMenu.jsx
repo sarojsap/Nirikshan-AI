@@ -8,12 +8,12 @@ export default function ContextMenu({ contextMenu, onDrawPerimeter, onDeleteCame
 
   return (
     <div
-      className="fixed z-[300] bg-[#0c1524] border border-[#1b2a47] rounded-xl shadow-2xl py-1.5 flex flex-col min-w-[150px] font-sans"
+      className="fixed z-[300] bg-soc-sidebar border border-soc-border rounded-xl shadow-2xl py-1.5 flex flex-col min-w-[150px] font-sans"
       style={style}
       onClick={(e) => e.stopPropagation()}
     >
       <button
-        className="flex items-center gap-2 px-4 py-2 text-xs font-semibold text-[#fbbf24] hover:bg-white/5 transition-all text-left"
+        className="flex items-center gap-2 px-4 py-2 text-xs font-semibold text-soc-warning hover:bg-white/5 transition-all text-left cursor-pointer"
         onClick={(e) => {
           e.stopPropagation();
           onClose();
@@ -24,7 +24,7 @@ export default function ContextMenu({ contextMenu, onDrawPerimeter, onDeleteCame
         <span>Virtual Perimeter</span>
       </button>
       <button
-        className="flex items-center gap-2 px-4 py-2 text-xs font-semibold text-rose-400 hover:bg-white/5 transition-all text-left"
+        className="flex items-center gap-2 px-4 py-2 text-xs font-semibold text-soc-danger hover:bg-white/5 transition-all text-left cursor-pointer"
         onClick={(e) => onDeleteCamera(e, contextMenu.cameraId, contextMenu.cameraName)}
       >
         <span className="material-symbols-outlined text-sm">delete</span>

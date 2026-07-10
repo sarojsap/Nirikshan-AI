@@ -60,25 +60,25 @@ export default function AddCameraModal({ isOpen, onClose, token, onLogout, onSuc
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-[200] p-4">
-      <div className="bg-[#090f19] border border-[#162235] w-full max-w-md rounded-2xl p-6 flex flex-col shadow-2xl relative font-sans">
-        <div className="flex justify-between items-center pb-3 border-b border-[#162235] mb-4 shrink-0">
-          <h3 className="text-sm font-bold text-white uppercase tracking-wider">Register New Camera</h3>
-          <button className="text-slate-400 hover:text-white text-lg font-bold" onClick={onClose}>×</button>
+    <div className="fixed inset-0 bg-[#070B14]/85 flex items-center justify-center z-[200] p-4">
+      <div className="bg-soc-sidebar border border-soc-border w-full max-w-md rounded-2xl p-6 flex flex-col shadow-2xl relative font-sans">
+        <div className="flex justify-between items-center pb-3 border-b border-soc-border mb-4 shrink-0">
+          <h3 className="text-sm font-bold text-soc-textPrimary uppercase tracking-wider">Register New Camera</h3>
+          <button className="text-soc-textMuted hover:text-white text-lg font-bold cursor-pointer" onClick={onClose}>×</button>
         </div>
         
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           {error && (
-            <div className="p-3 bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs rounded-xl shrink-0">
+            <div className="p-3 bg-soc-danger/10 border border-soc-danger/20 text-soc-danger text-xs rounded-xl shrink-0">
               {error}
             </div>
           )}
 
           <div className="flex flex-col gap-1.5">
-            <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Camera Name</label>
+            <label className="text-[10px] font-bold uppercase tracking-wider text-soc-textMuted">Camera Name</label>
             <input
               type="text"
-              className="bg-[#0d1625] border border-[#1b2a47] rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-violet-500 focus:ring-4 focus:ring-violet-500/20 font-sans"
+              className="bg-soc-card border border-soc-border rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 font-sans"
               placeholder="e.g. Front Gate Entrance"
               value={name}
               onChange={(e) => setName(e.target.value)}
@@ -87,10 +87,10 @@ export default function AddCameraModal({ isOpen, onClose, token, onLogout, onSuc
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Location</label>
+            <label className="text-[10px] font-bold uppercase tracking-wider text-soc-textMuted">Location</label>
             <input
               type="text"
-              className="bg-[#0d1625] border border-[#1b2a47] rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-violet-500 focus:ring-4 focus:ring-violet-500/20 font-sans"
+              className="bg-soc-card border border-soc-border rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 font-sans"
               placeholder="e.g. Lobby / Parking Lot"
               value={location}
               onChange={(e) => setLocation(e.target.value)}
@@ -99,14 +99,14 @@ export default function AddCameraModal({ isOpen, onClose, token, onLogout, onSuc
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Source Type</label>
+            <label className="text-[10px] font-bold uppercase tracking-wider text-soc-textMuted">Source Type</label>
             <div className="grid grid-cols-2 gap-2 mt-1">
               <button
                 type="button"
-                className={`py-2 px-3 text-xs font-semibold rounded-xl border transition-all ${
+                className={`py-2 px-3 text-xs font-semibold rounded-xl border transition-all cursor-pointer ${
                   sourceType === 'webcam'
-                    ? 'bg-violet-600/10 border-violet-500 text-violet-400 font-bold'
-                    : 'bg-transparent border-[#1b2a47] text-slate-400 hover:bg-white/5'
+                    ? 'bg-primary/10 border-primary text-primary font-bold'
+                    : 'bg-transparent border-soc-border text-soc-textSecondary hover:bg-white/5'
                 }`}
                 onClick={() => handleSourceTypeChange('webcam')}
               >
@@ -114,10 +114,10 @@ export default function AddCameraModal({ isOpen, onClose, token, onLogout, onSuc
               </button>
               <button
                 type="button"
-                className={`py-2 px-3 text-xs font-semibold rounded-xl border transition-all ${
+                className={`py-2 px-3 text-xs font-semibold rounded-xl border transition-all cursor-pointer ${
                   sourceType === 'rtsp'
-                    ? 'bg-violet-600/10 border-violet-500 text-violet-400 font-bold'
-                    : 'bg-transparent border-[#1b2a47] text-slate-400 hover:bg-white/5'
+                    ? 'bg-primary/10 border-primary text-primary font-bold'
+                    : 'bg-transparent border-soc-border text-soc-textSecondary hover:bg-white/5'
                 }`}
                 onClick={() => handleSourceTypeChange('rtsp')}
               >
@@ -127,12 +127,12 @@ export default function AddCameraModal({ isOpen, onClose, token, onLogout, onSuc
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+            <label className="text-[10px] font-bold uppercase tracking-wider text-soc-textMuted">
               {sourceType === 'webcam' ? 'Webcam Device Index' : 'RTSP Network Address'}
             </label>
             <input
               type="text"
-              className="bg-[#0d1625] border border-[#1b2a47] rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-violet-500 focus:ring-4 focus:ring-violet-500/20 font-sans"
+              className="bg-soc-card border border-soc-border rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 font-sans"
               placeholder={sourceType === 'webcam' ? '0, 1, 2' : 'rtsp://user:pass@ip:port/h264'}
               value={rtspUrl}
               onChange={(e) => setRtspUrl(e.target.value)}
@@ -144,14 +144,14 @@ export default function AddCameraModal({ isOpen, onClose, token, onLogout, onSuc
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 border border-[#1b2a47] text-slate-400 hover:text-white rounded-xl text-xs font-semibold transition-all"
+              className="px-4 py-2 border border-soc-border bg-soc-card text-soc-textSecondary hover:text-white rounded-xl text-xs font-bold transition-all cursor-pointer"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={loading}
-              className="px-4 py-2 bg-violet-600 text-white rounded-xl text-xs font-semibold hover:bg-violet-500 transition-colors shadow-[0_0_15px_rgba(124,58,237,0.2)] disabled:opacity-60"
+              className="px-4 py-2 bg-primary text-white rounded-xl text-xs font-bold hover:bg-primary-hover transition-colors shadow-sm disabled:opacity-60 cursor-pointer"
             >
               Register Camera
             </button>
