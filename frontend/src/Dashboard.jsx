@@ -11,6 +11,7 @@ import DeviceSettingsPanel from './components/DeviceSettingsPanel';
 import CloudDashboard from './components/CloudDashboard';
 import CloudIncidents from './components/CloudIncidents';
 import CloudDevices from './components/CloudDevices';
+import EdgeIncidents from './components/EdgeIncidents';
 
 export default function Dashboard({ token, user, onLogout, mode: initialMode, onModeSwitch }) {
   const [mode, setMode] = useState(initialMode || detectMode());
@@ -606,26 +607,16 @@ export default function Dashboard({ token, user, onLogout, mode: initialMode, on
                 <button onClick={() => setActiveTab('live_feeds')} className={`flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all text-left ${activeTab === 'live_feeds' ? 'bg-violet-600/15 border border-violet-500/20 text-white shadow-sm' : 'hover:bg-white/5 text-slate-400'}`}>
                   <span className="material-symbols-outlined text-lg">live_tv</span><span>Live Feeds</span>
                 </button>
-                <button className="flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-600 cursor-not-allowed text-left">
-                  <span className="material-symbols-outlined text-lg">video_library</span><span>Recordings</span>
-                </button>
-                <button className="flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-600 cursor-not-allowed text-left">
-                  <span className="material-symbols-outlined text-lg">analytics</span><span>Analytics</span>
-                </button>
               </div>
 
               <div className="flex flex-col gap-1">
                 <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider px-4 mb-1">Alerts & Events</span>
-                <button onClick={() => setActiveTab('surveillance')} className="flex items-center justify-between px-4 py-2.5 rounded-xl text-xs font-semibold hover:bg-white/5 text-slate-400 text-left w-full">
-                  <div className="flex items-center gap-3"><span className="material-symbols-outlined text-lg">shield</span><span>Security Alerts</span></div>
-                  <span className="bg-rose-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">{incidents.filter(i => i.severity === 'CRITICAL').length || 8}</span>
-                </button>
-                <button onClick={() => setActiveTab('surveillance')} className="flex items-center justify-between px-4 py-2.5 rounded-xl text-xs font-semibold hover:bg-white/5 text-slate-400 text-left w-full">
-                  <div className="flex items-center gap-3"><span className="material-symbols-outlined text-lg">groups</span><span>Crowd Alerts</span></div>
-                  <span className="bg-amber-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">{incidents.filter(i => i.type.includes('CROWD') || i.severity === 'WARNING').length || 12}</span>
-                </button>
-                <button className="flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-600 cursor-not-allowed text-left">
-                  <span className="material-symbols-outlined text-lg">description</span><span>System Logs</span>
+                <button onClick={() => setActiveTab('alerts')} className={`flex items-center justify-between px-4 py-2.5 rounded-xl text-xs font-semibold transition-all text-left ${activeTab === 'alerts' ? 'bg-violet-600/15 border border-violet-500/20 text-white shadow-sm' : 'hover:bg-white/5 text-slate-400'}`}>
+                  <div className="flex items-center gap-3">
+                    <span className="material-symbols-outlined text-lg">notifications_active</span>
+                    <span>Alerts</span>
+                  </div>
+                  <span className="bg-rose-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">{stats.totalIncidents || 0}</span>
                 </button>
               </div>
 
@@ -731,6 +722,7 @@ export default function Dashboard({ token, user, onLogout, mode: initialMode, on
             {mode === 'edge' ? (
               <>
                 <button className={`pb-1 text-sm font-semibold transition-all border-b-2 ${activeTab === 'surveillance' ? 'text-white border-violet-500' : 'text-slate-400 border-transparent hover:text-white'}`} onClick={() => setActiveTab('surveillance')}>Surveillance</button>
+                <button className={`pb-1 text-sm font-semibold transition-all border-b-2 ${activeTab === 'alerts' ? 'text-white border-violet-500' : 'text-slate-400 border-transparent hover:text-white'}`} onClick={() => setActiveTab('alerts')}>Alerts</button>
                 {user?.role === 'ADMIN' && (
                   <button className={`pb-1 text-sm font-semibold transition-all border-b-2 ${activeTab === 'operators' ? 'text-white border-violet-500' : 'text-slate-400 border-transparent hover:text-white'}`} onClick={() => setActiveTab('operators')}>Operators</button>
                 )}
@@ -804,7 +796,7 @@ export default function Dashboard({ token, user, onLogout, mode: initialMode, on
               </div>
             )}
           </div>
-        ) : activeTab === 'surveillance' || activeTab === 'live_feeds' || user?.role !== 'ADMIN' ? (
+        ) : (activeTab === 'surveillance' || activeTab === 'live_feeds' || user?.role !== 'ADMIN') && activeTab !== 'alerts' ? (
           <div className="flex-1 flex overflow-hidden p-6 gap-6 min-h-0 w-full">
             {activeTab === 'live_feeds' ? (
               <div className="flex-1 h-full min-h-0 flex flex-col gap-6 overflow-y-auto pr-1">
@@ -1101,52 +1093,63 @@ export default function Dashboard({ token, user, onLogout, mode: initialMode, on
           </div>
         ) : (
           <div className="flex-1 flex overflow-hidden p-6 gap-6 min-h-0 w-full">
-            <section className="bg-[#090f19] border border-[#162235] flex-1 rounded-2xl p-6 flex flex-col h-full overflow-hidden shadow-2xl">
-              <h3 className="text-sm font-bold text-white uppercase tracking-wider mb-4 shrink-0">Registered Operators</h3>
-              <div className="flex-1 overflow-y-auto pr-2 min-h-0">
-                {operators.length === 0 ? (
-                  <p className="text-slate-500 text-xs">No operators registered.</p>
-                ) : (
-                  <div className="w-full flex flex-col gap-2">
-                    <div className="grid grid-cols-3 text-[10px] text-slate-400 font-bold uppercase tracking-wider pb-2 border-b border-[#162235] px-4 shrink-0">
-                      <span>Name</span><span>Email Address</span><span className="text-right">Action</span>
-                    </div>
-                    {operators.map((op) => (
-                      <div key={op.id} className="grid grid-cols-3 items-center py-3 border-b border-[#162235] hover:bg-white/5 transition-colors rounded-xl px-4 text-xs">
-                        <div className="flex items-center gap-2">
-                          <div className="w-7 h-7 rounded-full bg-violet-600/10 border border-violet-500/20 flex items-center justify-center text-violet-400 font-bold text-xs uppercase">{op.name.charAt(0)}</div>
-                          <span className="font-semibold text-white">{op.name}</span>
+            {activeTab === 'alerts' ? (
+              <EdgeIncidents
+                token={token}
+                cameras={cameras}
+                onLogout={onLogout}
+                onSelectIncident={(inc) => setSelectedSnapshot(inc)}
+              />
+            ) : (
+              <>
+                <section className="bg-[#090f19] border border-[#162235] flex-1 rounded-2xl p-6 flex flex-col h-full overflow-hidden shadow-2xl">
+                  <h3 className="text-sm font-bold text-white uppercase tracking-wider mb-4 shrink-0">Registered Operators</h3>
+                  <div className="flex-1 overflow-y-auto pr-2 min-h-0">
+                    {operators.length === 0 ? (
+                      <p className="text-slate-500 text-xs">No operators registered.</p>
+                    ) : (
+                      <div className="w-full flex flex-col gap-2">
+                        <div className="grid grid-cols-3 text-[10px] text-slate-400 font-bold uppercase tracking-wider pb-2 border-b border-[#162235] px-4 shrink-0">
+                          <span>Name</span><span>Email Address</span><span className="text-right">Action</span>
                         </div>
-                        <span className="text-slate-400 font-mono text-[11px] truncate">{op.email}</span>
-                        <div className="text-right">
-                          <button onClick={() => handleDeleteOperator(op.id, op.name)} className="px-3 py-1 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 text-rose-400 text-xs font-semibold rounded-xl transition-colors">Delete</button>
-                        </div>
+                        {operators.map((op) => (
+                          <div key={op.id} className="grid grid-cols-3 items-center py-3 border-b border-[#162235] hover:bg-white/5 transition-colors rounded-xl px-4 text-xs">
+                            <div className="flex items-center gap-2">
+                              <div className="w-7 h-7 rounded-full bg-violet-600/10 border border-violet-500/20 flex items-center justify-center text-violet-400 font-bold text-xs uppercase">{op.name.charAt(0)}</div>
+                              <span className="font-semibold text-white">{op.name}</span>
+                            </div>
+                            <span className="text-slate-400 font-mono text-[11px] truncate">{op.email}</span>
+                            <div className="text-right">
+                              <button onClick={() => handleDeleteOperator(op.id, op.name)} className="px-3 py-1 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 text-rose-400 text-xs font-semibold rounded-xl transition-colors">Delete</button>
+                            </div>
+                          </div>
+                        ))}
                       </div>
-                    ))}
+                    )}
                   </div>
-                )}
-              </div>
-            </section>
-            <section className="bg-[#090f19] border border-[#162235] w-96 rounded-2xl p-6 flex flex-col h-fit shrink-0 shadow-2xl">
-              <h3 className="text-sm font-bold text-white uppercase tracking-wider mb-4 shrink-0">Register Operator</h3>
-              <form onSubmit={handleAddOperator} className="flex flex-col gap-4">
-                {opError && (<div className="p-3 bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs rounded-xl">{opError}</div>)}
-                {opSuccess && (<div className="p-3 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs rounded-xl">{opSuccess}</div>)}
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Full Name</label>
-                  <input type="text" className="bg-[#0d1625] border border-[#1b2a47] rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-violet-500 focus:ring-4 focus:ring-violet-500/20 font-sans" placeholder="Enter full name" value={newOpName} onChange={(e) => setNewOpName(e.target.value)} required />
-                </div>
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Email Address</label>
-                  <input type="email" className="bg-[#0d1625] border border-[#1b2a47] rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-violet-500 focus:ring-4 focus:ring-violet-500/20 font-sans" placeholder="operator@nirikshan.com" value={newOpEmail} onChange={(e) => setNewOpEmail(e.target.value)} required />
-                </div>
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Temporary Password</label>
-                  <input type="password" className="bg-[#0d1625] border border-[#1b2a47] rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-violet-500 focus:ring-4 focus:ring-violet-500/20 font-sans" placeholder="••••••••" value={newOpPassword} onChange={(e) => setNewOpPassword(e.target.value)} required />
-                </div>
-                <button type="submit" className="w-full bg-violet-600 hover:bg-violet-500 text-white py-2.5 rounded-xl font-semibold text-xs shadow-[0_0_15px_rgba(124,58,237,0.2)] mt-2 transition-colors">Create Operator</button>
-              </form>
-            </section>
+                </section>
+                <section className="bg-[#090f19] border border-[#162235] w-96 rounded-2xl p-6 flex flex-col h-fit shrink-0 shadow-2xl">
+                  <h3 className="text-sm font-bold text-white uppercase tracking-wider mb-4 shrink-0">Register Operator</h3>
+                  <form onSubmit={handleAddOperator} className="flex flex-col gap-4">
+                    {opError && (<div className="p-3 bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs rounded-xl">{opError}</div>)}
+                    {opSuccess && (<div className="p-3 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs rounded-xl">{opSuccess}</div>)}
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Full Name</label>
+                      <input type="text" className="bg-[#0d1625] border border-[#1b2a47] rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-violet-500 focus:ring-4 focus:ring-violet-500/20 font-sans" placeholder="Enter full name" value={newOpName} onChange={(e) => setNewOpName(e.target.value)} required />
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Email Address</label>
+                      <input type="email" className="bg-[#0d1625] border border-[#1b2a47] rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-violet-500 focus:ring-4 focus:ring-violet-500/20 font-sans" placeholder="operator@nirikshan.com" value={newOpEmail} onChange={(e) => setNewOpEmail(e.target.value)} required />
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Temporary Password</label>
+                      <input type="password" className="bg-[#0d1625] border border-[#1b2a47] rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-violet-500 focus:ring-4 focus:ring-violet-500/20 font-sans" placeholder="••••••••" value={newOpPassword} onChange={(e) => setNewOpPassword(e.target.value)} required />
+                    </div>
+                    <button type="submit" className="w-full bg-violet-600 hover:bg-violet-500 text-white py-2.5 rounded-xl font-semibold text-xs shadow-[0_0_15px_rgba(124,58,237,0.2)] mt-2 transition-colors">Create Operator</button>
+                  </form>
+                </section>
+              </>
+            )}
           </div>
         )}
 

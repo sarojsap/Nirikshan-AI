@@ -41,12 +41,24 @@ export const getFirstCamera = async () => {
   });
 };
 
-export const getAllIncidents = async (page = 1, limit = 10) => {
+export const getAllIncidents = async (page = 1, limit = 10, filters = {}) => {
   const incidentRepo = AppDataSource.getRepository(Incident);
   const skip = (page - 1) * limit;
 
+  const where = {};
+  if (filters.severity) {
+    where.severity = filters.severity;
+  }
+  if (filters.type) {
+    where.type = filters.type;
+  }
+  if (filters.cameraId) {
+    where.camera = { id: filters.cameraId };
+  }
+
   const [incidents, total] = await incidentRepo.findAndCount({
     relations: { camera: true },
+    where,
     order: { timestamp: 'DESC' },
     skip,
     take: limit,
