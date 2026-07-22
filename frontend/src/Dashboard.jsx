@@ -118,6 +118,9 @@ export default function Dashboard({ token, user, onLogout, mode: initialMode, on
       gainNode.connect(audioCtx.destination);
       oscillator.start();
       oscillator.stop(audioCtx.currentTime + 0.35);
+      setTimeout(() => {
+        if (audioCtx.state !== 'closed') audioCtx.close();
+      }, 500);
     } catch {
       console.warn('Audio feedback blocked by browser autoplay policy');
     }
@@ -330,7 +333,10 @@ export default function Dashboard({ token, user, onLogout, mode: initialMode, on
     if (mode === 'edge') {
       fetchData();
       socketRef.current = io(API.SOCKET, { transports: ['websocket', 'polling'], reconnection: true });
-      socketRef.current.on('connect', () => { fetchData(); });
+      socketRef.current.on('connect', () => {
+        fetchData();
+        cameras.forEach(cam => socketRef.current?.emit('join_camera', cam.id));
+      });
       socketRef.current.on('connect_error', (err) => console.error('Socket connection error:', err.message));
       socketRef.current.on('disconnect', (reason) => console.warn('Disconnected from incident stream server:', reason));
       socketRef.current.on('new_incident', (incident) => {
@@ -353,6 +359,13 @@ export default function Dashboard({ token, user, onLogout, mode: initialMode, on
       if (settingsSuccessTimeoutRef.current) clearTimeout(settingsSuccessTimeoutRef.current);
     };
   }, [token, fetchData, fetchCloudDevices, mode]);
+
+  useEffect(() => {
+    const socket = socketRef.current;
+    if (socket && mode === 'edge' && cameras.length > 0) {
+      cameras.forEach(cam => socket.emit('join_camera', cam.id));
+    }
+  }, [cameras, mode]);
 
   const { isOffline: streamOffline, retry: retryStream } = useCameraStream(
     !isDrawingPerimeter && mode === 'edge' && selectedCamera?.id ? selectedCamera.id : null,
@@ -453,7 +466,7 @@ export default function Dashboard({ token, user, onLogout, mode: initialMode, on
     }
   };
 
-  const handleDeleteCamera = async (e, camId, camName) => {
+  const handleDeleteCamera = useCallback(async (e, camId, camName) => {
     e.stopPropagation();
     setContextMenu(null);
     const confirmDelete = window.confirm(`Are you sure you want to delete camera "${camName}"? This action cannot be undone.`);
@@ -467,7 +480,12 @@ export default function Dashboard({ token, user, onLogout, mode: initialMode, on
       if (selectedCamera?.id === camId) setSelectedCamera(null);
       fetchData();
     } catch (err) { alert(err.message); }
-  };
+  }, [token, onLogout, selectedCamera, fetchData]);
+
+  const handleLiveFeedClick = useCallback((cam) => {
+    setSelectedCamera(cam);
+    setActiveTab('surveillance');
+  }, []);
 
   const redrawCanvas = useCallback(() => {
     const canvas = canvasRef.current;
@@ -802,7 +820,7 @@ export default function Dashboard({ token, user, onLogout, mode: initialMode, on
                   ) : (
                     <div className={`grid gap-4 ${cameras.length === 1 ? 'grid-cols-1' : 'grid-cols-1 md:grid-cols-2'}`}>
                       {cameras.map((cam) => (
-                        <LiveFeedCard key={cam.id} cam={cam} onDelete={handleDeleteCamera} onClick={() => { setSelectedCamera(cam); setActiveTab('surveillance'); }} />
+                        <LiveFeedCard key={cam.id} cam={cam} onDelete={handleDeleteCamera} onClick={() => handleLiveFeedClick(cam)} />
                       ))}
                     </div>
                   )}

@@ -101,6 +101,10 @@ export function useCameraStream(cameraId, externalRef) {
 
     return () => {
       conn.listeners.delete(onFrame);
+      if (conn.listeners.size === 0) {
+        try { conn.ws.close(); } catch {}
+        connections.delete(cameraId);
+      }
     };
   }, [cameraId]);
 

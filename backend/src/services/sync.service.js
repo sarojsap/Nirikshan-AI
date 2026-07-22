@@ -1,4 +1,5 @@
 import fs from 'fs';
+import fsPromises from 'fs/promises';
 import path from 'path';
 import http from 'http';
 import https from 'https';
@@ -70,8 +71,8 @@ function performSyncRequest(method, url, body = null) {
   }
 }
 
-function uploadFileToCloudinary(uploadUrl, filePath, fields) {
-  const fileBuffer = fs.readFileSync(filePath);
+async function uploadFileToCloudinary(uploadUrl, filePath, fields) {
+  const fileBuffer = await fsPromises.readFile(filePath);
   const boundary = '----FormBoundary' + Math.random().toString(36).substring(2);
   const filename = path.basename(filePath);
 
@@ -184,8 +185,10 @@ export async function syncPendingIncidents() {
       let snapshotUrl = null;
       let clipUrl = null;
 
-      if (incident.localSnapshotPath && fs.existsSync(incident.localSnapshotPath)) {
-        try {
+      if (incident.localSnapshotPath) {
+        let snapshotExists = false;
+        try { await fsPromises.access(incident.localSnapshotPath); snapshotExists = true; } catch {}
+        if (snapshotExists) try {
           const uploadRes = await performSyncRequest(
             'POST',
             `${CLOUD_API_URL}/edge/upload-url/${incident.id}`,
@@ -215,8 +218,10 @@ export async function syncPendingIncidents() {
         console.log(`[Sync] No snapshot file for ${incident.id}: path=${incident.localSnapshotPath}`);
       }
 
-      if (incident.localClipPath && fs.existsSync(incident.localClipPath)) {
-        try {
+      if (incident.localClipPath) {
+        let clipFileExists = false;
+        try { await fsPromises.access(incident.localClipPath); clipFileExists = true; } catch {}
+        if (clipFileExists) try {
           const uploadRes = await performSyncRequest(
             'POST',
             `${CLOUD_API_URL}/edge/upload-url/${incident.id}`,

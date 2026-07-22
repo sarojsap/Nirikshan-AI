@@ -7,17 +7,14 @@ import { Incident } from '../entities/Incident.js';
 const VALID_TYPES = ['PERSON_DETECTED', 'INTRUSION', 'CROWD', 'RESTRICTED_AREA'];
 const VALID_SEVERITIES = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'];
 
-const broadcastIncident = async (incidentId) => {
+const broadcastIncident = (incident) => {
+  if (!incident) return null;
   try {
-    const completeIncident = await incidentService.getIncidentById(incidentId);
-    if (!completeIncident) {
-      console.error(`Incident saved but could not be reloaded for broadcast: ${incidentId}`);
-      return null;
-    }
-
     const io = getIO();
-    io.emit('new_incident', completeIncident);
-    return completeIncident;
+    const cameraId = incident.camera?.id || incident.cameraId;
+    io.to(`camera:${cameraId}`).emit('new_incident', incident);
+    io.emit('new_incident', incident);
+    return incident;
   } catch (socketErr) {
     console.error('Socket broadcast failed:', socketErr);
     return null;
@@ -52,19 +49,21 @@ export const logIncident = async (req, res) => {
       syncStatus: process.env.CLOUD_API_URL ? 'PENDING' : 'LOCAL_ONLY',
     });
 
-    console.log(`Incident saved: ${incident.id} [syncStatus: ${incident.syncStatus}]`);
-    const completeIncident = await broadcastIncident(incident.id);
+    if (incident) {
+      console.log(`Incident saved: ${incident.id} [syncStatus: ${incident.syncStatus}]`);
+      broadcastIncident(incident);
 
-    if (completeIncident && !process.env.CLOUD_API_URL) {
-      sendPushNotification(completeIncident).catch(err =>
-        console.error('FCM push failed:', err.message),
-      );
+      if (!process.env.CLOUD_API_URL) {
+        sendPushNotification(incident).catch(err =>
+          console.error('FCM push failed:', err.message),
+        );
+      }
     }
 
     res.status(201).json({
       message: 'Incident logged successfully',
-      incident: completeIncident || incident,
-      syncStatus: incident.syncStatus,
+      incident,
+      syncStatus: incident?.syncStatus,
     });
   } catch (error) {
     const status = error.message === 'Camera not found!' ? 400 : 500;
@@ -88,15 +87,15 @@ export const createTestIncident = async (req, res) => {
     });
 
     console.log(`Test incident saved: ${incident.id}`);
-    const completeIncident = await broadcastIncident(incident.id);
+    broadcastIncident(incident);
 
-    if (completeIncident && !process.env.CLOUD_API_URL) {
-      sendPushNotification(completeIncident).catch(err =>
+    if (!process.env.CLOUD_API_URL) {
+      sendPushNotification(incident).catch(err =>
         console.error('FCM push failed:', err.message),
       );
     }
 
-    res.status(201).json({ message: 'Test incident created successfully', incident: completeIncident || incident });
+    res.status(201).json({ message: 'Test incident created successfully', incident });
   } catch (error) {
     const status = error.message === 'Camera not found!' ? 400 : 500;
     res.status(status).json({ error: error.message });

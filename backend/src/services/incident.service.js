@@ -23,7 +23,11 @@ export const createIncident = async (incidentData) => {
     camera,
   });
 
-  return await incidentRepo.save(newIncident);
+  const saved = await incidentRepo.save(newIncident);
+  return await incidentRepo.findOne({
+    where: { id: saved.id },
+    relations: { camera: true },
+  });
 };
 
 export const getIncidentById = async (id) => {

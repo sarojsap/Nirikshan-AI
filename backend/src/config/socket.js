@@ -25,6 +25,16 @@ export const initSocket = httpServer => {
     const origin = socket.handshake.headers.origin || 'unknown origin';
     console.log(`New client connected to WebSockets: ${socket.id} from ${origin}`);
 
+    socket.on('join_camera', cameraId => {
+      const room = `camera:${cameraId}`;
+      socket.join(room);
+    });
+
+    socket.on('leave_camera', cameraId => {
+      const room = `camera:${cameraId}`;
+      socket.leave(room);
+    });
+
     socket.on('disconnect', reason => {
       console.log(`Client disconnected: ${socket.id} (${reason})`);
     });

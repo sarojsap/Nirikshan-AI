@@ -312,6 +312,35 @@ def open_video_source(source):
     return cap
 
 
+class FrameReader(threading.Thread):
+    """Continuously reads frames, always keeping only the latest.
+    Owns the VideoCapture and is the ONLY component that calls release()."""
+    def __init__(self, cap):
+        super().__init__(daemon=True)
+        self.cap = cap
+        self.latest_frame = None
+        self.lock = threading.Lock()
+        self.running = True
+
+    def run(self):
+        cap = self.cap
+        while self.running:
+            ret, frame = cap.read()
+            with self.lock:
+                if ret:
+                    self.latest_frame = frame
+                else:
+                    self.latest_frame = None
+        cap.release()
+
+    def grab(self):
+        with self.lock:
+            return self.latest_frame
+
+    def stop(self):
+        self.running = False
+
+
 _camera_threads = {}
 _threads_lock = threading.Lock()
 _last_access = {}
@@ -326,7 +355,10 @@ def mark_camera_accessed(camera_id):
 def ensure_camera_thread(camera_id):
     with _threads_lock:
         thread = _camera_threads.get(camera_id)
-        if not thread or not thread.is_alive():
+        if thread and not thread.is_alive():
+            del _camera_threads[camera_id]
+            thread = None
+        if not thread:
             thread = CameraThread(camera_id)
             _camera_threads[camera_id] = thread
             thread.start()
@@ -339,11 +371,31 @@ class CameraThread(threading.Thread):
         self.camera_id = camera_id
         self.daemon = True
         self.running = True
+        self._cached_config = None
+        self._config_lock = threading.Lock()
+        self._rtsp_url_changed = False
+        self._current_video_source = None
+
+    def _start_config_updater(self):
+        def updater():
+            while self.running:
+                try:
+                    new_cfg = load_camera_config(self.camera_id)
+                    with self._config_lock:
+                        self._cached_config = new_cfg
+                    new_source = new_cfg['rtsp_url'] if new_cfg['rtsp_url'] else 0
+                    if self._current_video_source is not None and str(new_source) != str(self._current_video_source):
+                        logger.info(f"Camera {self.camera_id}: RTSP URL changed, reconnecting...")
+                        self._rtsp_url_changed = True
+                except Exception:
+                    pass
+                time.sleep(5)
+        t = threading.Thread(target=updater, daemon=True)
+        t.start()
 
     def run(self):
         logger.info(f"Background thread started for camera: {self.camera_id}")
         last_snapshot = None
-        cap = None
 
         # 30-second rolling buffer of processed frames (for video clip capture)
         clip_buffer = collections.deque(maxlen=CLIP_BUFFER_SIZE)
@@ -351,9 +403,15 @@ class CameraThread(threading.Thread):
         next_frame_time = time.time()
 
         while self.running:
+            cap = None
+            reader = None
             try:
                 cfg = load_camera_config(self.camera_id)
                 video_source = cfg['rtsp_url'] if cfg['rtsp_url'] else 0
+                self._current_video_source = video_source
+                with self._config_lock:
+                    self._cached_config = cfg
+
                 logger.info(f"Camera {self.camera_id} Thread: Opening video source {video_source}")
 
                 cap = open_video_source(video_source)
@@ -363,8 +421,28 @@ class CameraThread(threading.Thread):
                     continue
 
                 logger.info(f"Camera {self.camera_id} Thread: Video source opened successfully")
+
+                reader = FrameReader(cap)
+                reader.start()
+
+                self._start_config_updater()
+                self._rtsp_url_changed = False
+
+                # Wait for first frame (RTSP can take time to deliver)
+                frame = None
+                for _ in range(80):
+                    if not self.running:
+                        break
+                    frame = reader.grab()
+                    if frame is not None:
+                        break
+                    time.sleep(0.1)
+
+                if frame is None:
+                    logger.warning(f"Camera {self.camera_id} Thread: Timed out waiting for first frame, reconnecting...")
+                    continue
+
                 frame_count = 0
-                last_config_fetch = time.time()
 
                 while self.running:
                     with _access_lock:
@@ -374,11 +452,13 @@ class CameraThread(threading.Thread):
                         self.running = False
                         break
 
-                    ret, frame = cap.read()
-                    if not ret:
+                    if self._rtsp_url_changed:
+                        logger.info(f"Camera {self.camera_id} Thread: RTSP URL changed, reconnecting...")
+                        break
+
+                    frame = reader.grab()
+                    if frame is None:
                         logger.warning(f"Camera {self.camera_id} Thread: Failed to read frame, reconnecting...")
-                        cap.release()
-                        cap = None
                         time.sleep(2)
                         break
 
@@ -395,12 +475,8 @@ class CameraThread(threading.Thread):
                     if frame_count % 300 == 0:
                         logger.info(f"Camera {self.camera_id} Thread: Processed {frame_count} frames at {TARGET_FPS} FPS")
 
-                    if now - last_config_fetch > 5.0:
-                        try:
-                            cfg = load_camera_config(self.camera_id)
-                            last_config_fetch = now
-                        except Exception as e:
-                            logger.warning(f"Camera {self.camera_id} Thread: Error reloading config: {e}")
+                    with self._config_lock:
+                        cfg = self._cached_config or cfg
 
                     results = model(frame, conf=cfg['confidence_threshold'], classes=[0], verbose=False)
                     person_count = 0
@@ -432,8 +508,7 @@ class CameraThread(threading.Thread):
                     cv2.putText(frame, f"People Count: {person_count}", (20, 40), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 0), 2)
 
                     # ── Add processed frame to clip buffer ──
-                    # Store a copy at inference resolution for the 30s clip
-                    clip_buffer.append(frame.copy())
+                    clip_buffer.append(frame)
 
                     if cfg['alerts_enabled'] and is_within_time_window(cfg['start_time_str'], cfg['end_time_str']):
                         if cfg['intrusion_enabled'] and intrusion_detected:
@@ -457,25 +532,31 @@ class CameraThread(threading.Thread):
                                     frame.copy(),
                                     list(clip_buffer),
                                 )
-                    # Streaming frames
-                    ret, buffer = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 80])
-                    if ret:
-                        frame_bytes = buffer.tobytes()
-                        with _frame_cache_lock:
-                            _frame_cache[self.camera_id] = frame_bytes
-                            _last_frame_time[self.camera_id] = now
+
+                    # Store raw frame for streaming (lazy JPEG encoding in handlers)
+                    with _frame_cache_lock:
+                        _frame_cache[self.camera_id] = frame
+                        _last_frame_time[self.camera_id] = now
 
             except Exception as e:
                 logger.error(f"Camera {self.camera_id} Thread: Uncaught error: {e}")
                 time.sleep(5)
             finally:
-                if cap:
+                if reader:
+                    reader.stop()
+                elif cap:
                     cap.release()
-                    cap = None
         logger.info(f"Background thread ended for camera: {self.camera_id}")
 
 
 # ── WebSocket Video Streaming Server ──
+
+def _encode_jpeg(frame, quality=80):
+    ret, buffer = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, quality])
+    if ret:
+        return buffer.tobytes()
+    return None
+
 
 async def ws_video_feed(websocket):
     try:
@@ -511,7 +592,7 @@ async def ws_video_feed(websocket):
             mark_camera_accessed(camera_id)
 
             with _frame_cache_lock:
-                cached = _frame_cache.get(camera_id)
+                raw_frame = _frame_cache.get(camera_id)
                 last_time = _last_frame_time.get(camera_id, 0)
 
             fresh = time.time() - last_time <= 8.0
@@ -525,12 +606,14 @@ async def ws_video_feed(websocket):
 
             stale_cycles = 0
 
-            if cached is not None and last_time != last_send_time:
-                try:
-                    await websocket.send(cached)
-                    last_send_time = last_time
-                except websockets.ConnectionClosed:
-                    break
+            if raw_frame is not None and last_time != last_send_time:
+                jpeg_bytes = _encode_jpeg(raw_frame)
+                if jpeg_bytes:
+                    try:
+                        await websocket.send(jpeg_bytes)
+                        last_send_time = last_time
+                    except websockets.ConnectionClosed:
+                        break
 
             await asyncio.sleep(FRAME_INTERVAL)
 
@@ -617,7 +700,7 @@ def video_feed():
         return Response("Camera offline", status=503)
 
     def stream_cached_frames():
-        last_frame = None
+        last_frame_time = 0
         consecutive_missing = 0
         try:
             while True:
@@ -625,17 +708,18 @@ def video_feed():
 
                 with _frame_cache_lock:
                     last_time = _last_frame_time.get(cid, 0)
-                    cached = _frame_cache.get(cid)
+                    raw_frame = _frame_cache.get(cid)
 
                 if time.time() - last_time > 8.0:
                     logger.warning(f"Closing stream connection for camera {cid} due to feed loss")
                     break
 
-                if cached:
-                    if cached != last_frame:
-                        last_frame = cached
+                if raw_frame is not None and last_time != last_frame_time:
+                    jpeg_bytes = _encode_jpeg(raw_frame)
+                    if jpeg_bytes:
+                        last_frame_time = last_time
                         yield (b'--frame\r\n'
-                               b'Content-Type: image/jpeg\r\n\r\n' + cached + b'\r\n')
+                               b'Content-Type: image/jpeg\r\n\r\n' + jpeg_bytes + b'\r\n')
                         consecutive_missing = 0
                 else:
                     consecutive_missing += 1
@@ -662,11 +746,13 @@ def snapshot():
     for _ in range(10):
         with _frame_cache_lock:
             last_time = _last_frame_time.get(cid, 0)
-            cached = _frame_cache.get(cid)
+            raw_frame = _frame_cache.get(cid)
             is_valid = time.time() - last_time < 8.0
-        if cached and is_valid:
-            return Response(cached, mimetype='image/jpeg',
-                            headers={'Cache-Control': 'no-cache, no-store, must-revalidate'})
+        if raw_frame is not None and is_valid:
+            jpeg_bytes = _encode_jpeg(raw_frame)
+            if jpeg_bytes:
+                return Response(jpeg_bytes, mimetype='image/jpeg',
+                                headers={'Cache-Control': 'no-cache, no-store, must-revalidate'})
         time.sleep(0.1)
 
     return Response(status=503)

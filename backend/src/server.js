@@ -48,10 +48,11 @@ AppDataSource.initialize()
           }
         } catch (err) {
           console.error('[Sync] Cycle error:', err.message);
+        } finally {
+          setTimeout(runSync, 30000);
         }
       };
 
-      setInterval(runSync, 30000);
       runSync();
     }
 

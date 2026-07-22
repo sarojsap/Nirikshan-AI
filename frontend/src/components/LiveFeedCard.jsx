@@ -1,6 +1,7 @@
+import { memo } from 'react';
 import { useCameraStream } from '../hooks/useCameraStream';
 
-export default function LiveFeedCard({ cam, onClick, onDelete }) {
+function LiveFeedCard({ cam, onClick, onDelete }) {
   const { canvasRef, isOffline, retry } = useCameraStream(cam.id);
 
   return (
@@ -64,3 +65,7 @@ export default function LiveFeedCard({ cam, onClick, onDelete }) {
     </div>
   );
 }
+
+export default memo(LiveFeedCard, (prev, next) => {
+  return prev.cam.id === next.cam.id;
+});
