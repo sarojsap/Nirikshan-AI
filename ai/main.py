@@ -8,6 +8,7 @@ import logging
 import asyncio
 import collections
 import subprocess
+import concurrent.futures
 from datetime import datetime, timezone, timedelta
 from urllib.parse import urlparse, parse_qs
 from flask import Flask, request, Response, jsonify, send_from_directory
@@ -29,7 +30,7 @@ if not os.path.isabs(MEDIA_DIR):
 _api_url = os.getenv('API_URL', 'http://localhost:5000/api').rstrip('/')
 BACKEND_BASE = _api_url[:-4] if _api_url.endswith('/api') else _api_url
 
-TARGET_FPS = 5
+TARGET_FPS = 24
 FRAME_INTERVAL = 1.0 / TARGET_FPS
 
 # 30-second clip buffer: stores the last 30 seconds of processed frames
@@ -104,6 +105,25 @@ INCIDENT_SNAPSHOT_DIR = os.path.join(os.path.dirname(__file__), 'snapshots')
 os.makedirs(INCIDENT_SNAPSHOT_DIR, exist_ok=True)
 os.makedirs(MEDIA_DIR, exist_ok=True)
 
+_alert_executor = concurrent.futures.ThreadPoolExecutor(max_workers=2)
+
+
+def _handle_alert_background(camera_id, alert_type, description, severity, frame, clip_frames):
+    snapshot_path = _save_snapshot(frame, camera_id, alert_type)
+    clip_path = _save_clip(clip_frames, camera_id, alert_type)
+    snapshot_url = f"{BACKEND_BASE}/snapshots/{os.path.basename(snapshot_path)}" if snapshot_path else None
+    clip_url = f"{BACKEND_BASE}/media/{os.path.basename(clip_path)}" if clip_path else None
+    api.send_incident(
+        alert_type,
+        description,
+        severity,
+        camera_id,
+        image_url=snapshot_url,
+        clip_url=clip_url,
+        local_snapshot_path=snapshot_path,
+        local_clip_path=clip_path,
+    )
+
 
 def _cleanup_stale_cooldowns():
     global _last_cooldown_cleanup
@@ -148,7 +168,7 @@ def is_within_time_window(start_time_str, end_time_str):
         logger.warning(f"Error parsing time window '{start_time_str}-{end_time_str}': {e}")
         return True
 
-
+# Snapshots (saved to disk for incidents)
 def _save_snapshot(frame, camera_id, alert_type):
     ret, buffer = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 75])
     if not ret:
@@ -349,8 +369,8 @@ class CameraThread(threading.Thread):
                 while self.running:
                     with _access_lock:
                         last_req_time = _last_access.get(self.camera_id, 0)
-                    if time.time() - last_req_time > 30.0:
-                        logger.info(f"Camera {self.camera_id} Thread: Stopping due to inactivity (>30 seconds)")
+                    if time.time() - last_req_time > 60.0:
+                        logger.info(f"Camera {self.camera_id} Thread: Stopping due to inactivity (>60 seconds)")
                         self.running = False
                         break
 
@@ -418,39 +438,27 @@ class CameraThread(threading.Thread):
                     if cfg['alerts_enabled'] and is_within_time_window(cfg['start_time_str'], cfg['end_time_str']):
                         if cfg['intrusion_enabled'] and intrusion_detected:
                             if check_cooldown(self.camera_id, "INTRUSION", cfg['cooldown_seconds']):
-                                snapshot_path = _save_snapshot(frame, self.camera_id, "INTRUSION")
-                                clip_path = _save_clip(list(clip_buffer), self.camera_id, "INTRUSION")
-                                snapshot_url = f"{BACKEND_BASE}/snapshots/{os.path.basename(snapshot_path)}" if snapshot_path else None
-                                clip_url = f"{BACKEND_BASE}/media/{os.path.basename(clip_path)}" if clip_path else None
-                                api.send_incident(
-                                    "INTRUSION",
+                                _alert_executor.submit(
+                                    _handle_alert_background,
+                                    self.camera_id, "INTRUSION",
                                     "Perimeter breached during restricted hours.",
                                     "CRITICAL",
-                                    self.camera_id,
-                                    image_url=snapshot_url,
-                                    clip_url=clip_url,
-                                    local_snapshot_path=snapshot_path,
-                                    local_clip_path=clip_path,
+                                    frame.copy(),
+                                    list(clip_buffer),
                                 )
 
                         if cfg['crowd_enabled'] and person_count >= cfg['crowd_threshold']:
                             if check_cooldown(self.camera_id, "CROWD", cfg['cooldown_seconds']):
-                                snapshot_path = _save_snapshot(frame, self.camera_id, "CROWD")
-                                clip_path = _save_clip(list(clip_buffer), self.camera_id, "CROWD")
-                                snapshot_url = f"{BACKEND_BASE}/snapshots/{os.path.basename(snapshot_path)}" if snapshot_path else None
-                                clip_url = f"{BACKEND_BASE}/media/{os.path.basename(clip_path)}" if clip_path else None
-                                api.send_incident(
-                                    "CROWD",
+                                _alert_executor.submit(
+                                    _handle_alert_background,
+                                    self.camera_id, "CROWD",
                                     f"Crowd threshold exceeded. {person_count} people detected.",
                                     "MEDIUM",
-                                    self.camera_id,
-                                    image_url=snapshot_url,
-                                    clip_url=clip_url,
-                                    local_snapshot_path=snapshot_path,
-                                    local_clip_path=clip_path,
+                                    frame.copy(),
+                                    list(clip_buffer),
                                 )
-
-                    ret, buffer = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 60])
+                    # Streaming frames
+                    ret, buffer = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 80])
                     if ret:
                         frame_bytes = buffer.tobytes()
                         with _frame_cache_lock:

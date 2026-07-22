@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { io } from 'socket.io-client';
-import { API, STREAM, CLOUD_API, detectMode, DEPLOY_MODE } from './config';
+import { API, CLOUD_API, detectMode, DEPLOY_MODE } from './config';
 import LiveFeedCard from './components/LiveFeedCard';
 import AddCameraModal from './components/AddCameraModal';
 import SnapshotViewer from './components/SnapshotViewer';
@@ -12,6 +12,7 @@ import CloudDashboard from './components/CloudDashboard';
 import CloudIncidents from './components/CloudIncidents';
 import CloudDevices from './components/CloudDevices';
 import EdgeIncidents from './components/EdgeIncidents';
+import { useCameraStream } from './hooks/useCameraStream';
 
 export default function Dashboard({ token, user, onLogout, mode: initialMode, onModeSwitch }) {
   const [mode, setMode] = useState(initialMode || detectMode());
@@ -46,7 +47,6 @@ export default function Dashboard({ token, user, onLogout, mode: initialMode, on
   const [drawingPoints, setDrawingPoints] = useState([]);
   const [mousePos, setMousePos] = useState(null);
   const [isDrawingClosed, setIsDrawingClosed] = useState(false);
-  const [streamTimestamp, setStreamTimestamp] = useState(() => Date.now());
   const [streamError, setStreamError] = useState('');
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [configSchema, setConfigSchema] = useState([]);
@@ -73,7 +73,6 @@ export default function Dashboard({ token, user, onLogout, mode: initialMode, on
   const [settingsPageSuccess, setSettingsPageSuccess] = useState('');
 
   const streamCanvasRef = useRef(null);
-  const wsRef = useRef(null);
   const canvasRef = useRef(null);
   const frozenFrameRef = useRef(null);
   const settingsSuccessTimeoutRef = useRef(null);
@@ -355,38 +354,21 @@ export default function Dashboard({ token, user, onLogout, mode: initialMode, on
     };
   }, [token, fetchData, fetchCloudDevices, mode]);
 
+  const { isOffline: streamOffline, retry: retryStream } = useCameraStream(
+    !isDrawingPerimeter && mode === 'edge' && selectedCamera?.id ? selectedCamera.id : null,
+    streamCanvasRef
+  );
+
+  const hadStreamRef = useRef(false);
+
   useEffect(() => {
-    if (!selectedCamera || isDrawingPerimeter || mode !== 'edge') return;
-    const cameraId = selectedCamera.id;
-    const url = `${STREAM.WS}/video_feed?camera_id=${cameraId}`;
-    let ws = new WebSocket(url);
-    ws.binaryType = 'blob';
-    ws.onopen = () => setStreamError('');
-    ws.onmessage = (event) => {
-      const canvas = streamCanvasRef.current;
-      if (!canvas) return;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return;
-      const blob = event.data;
-      const img = new Image();
-      img.onload = () => {
-        if (canvas.width !== img.width || canvas.height !== img.height) {
-          canvas.width = img.width;
-          canvas.height = img.height;
-        }
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        URL.revokeObjectURL(img.src);
-      };
-      img.onerror = () => URL.revokeObjectURL(img.src);
-      img.src = URL.createObjectURL(blob);
-    };
-    ws.onerror = () => setStreamError('Stream unavailable. Check if the AI service is running.');
-    ws.onclose = () => { if (ws === wsRef.current) setStreamError('Stream disconnected. Attempting reconnect...'); };
-    wsRef.current = ws;
-    return () => {
-      if (wsRef.current === ws) { ws.close(); wsRef.current = null; }
-    };
-  }, [selectedCamera?.id, isDrawingPerimeter]);
+    if (!streamOffline) {
+      hadStreamRef.current = true;
+      setStreamError('');
+    } else if (hadStreamRef.current && selectedCamera?.id) {
+      setStreamError('Stream disconnected. Attempting reconnect...');
+    }
+  }, [streamOffline, selectedCamera?.id]);
 
   useEffect(() => {
     if (activeTab === 'operators') fetchOperators();
@@ -578,7 +560,6 @@ export default function Dashboard({ token, user, onLogout, mode: initialMode, on
       setCameras(cameras.map(c => c.id === updatedCam.id ? updatedCam : c));
       setIsDrawingPerimeter(false); setDrawingPoints([]); setMousePos(null);
       setIsDrawingClosed(false); frozenFrameRef.current = null;
-      setStreamTimestamp(Date.now());
     } catch (err) { alert(err.message); }
   };
 
@@ -910,7 +891,7 @@ export default function Dashboard({ token, user, onLogout, mode: initialMode, on
                         {streamError ? streamError : 'Select a camera card from the left sidebar to start monitoring'}
                       </span>
                       {selectedCamera && streamError && (
-                        <button onClick={() => { setStreamError(''); setStreamTimestamp(Date.now()); }} className="mt-4 px-3 py-1.5 bg-soc-card hover:bg-soc-cardElevated border border-soc-border text-soc-textSecondary hover:text-white rounded-xl text-xs font-bold transition-all uppercase tracking-wider flex items-center gap-1.5 shadow-md cursor-pointer">
+                        <button onClick={() => { setStreamError(''); retryStream(); }} className="mt-4 px-3 py-1.5 bg-soc-card hover:bg-soc-cardElevated border border-soc-border text-soc-textSecondary hover:text-white rounded-xl text-xs font-bold transition-all uppercase tracking-wider flex items-center gap-1.5 shadow-md cursor-pointer">
                           <span className="material-symbols-outlined text-sm">refresh</span><span>Retry Connection</span>
                         </button>
                       )}

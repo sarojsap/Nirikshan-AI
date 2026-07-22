@@ -2,6 +2,7 @@ import os
 import json
 import time
 import logging
+import threading
 import requests
 from dotenv import load_dotenv
 
@@ -31,58 +32,62 @@ class APIClient:
         self._session = requests.Session()
         self._last_login_attempt = 0
         self._login_retry_delay = 5
+        self._lock = threading.RLock()
         self.login()
 
     def _ensure_authenticated(self):
-        if not self.token:
-            return self.login()
-        return True
+        with self._lock:
+            if not self.token:
+                return self.login()
+            return True
 
     def login(self):
-        now = time.time()
-        if now - self._last_login_attempt < self._login_retry_delay:
-            return False
-        self._last_login_attempt = now
-        try:
-            resp = self._session.post(
-                f"{API_URL}/auth/login",
-                json={"email": USERNAME, "password": PASSWORD},
-                timeout=10,
-            )
-            resp.raise_for_status()
-            data = resp.json()
-            self.token = data.get('data', {}).get('token')
-            self._session.headers.update({"Authorization": f"Bearer {self.token}"})
-            logger.info('Successfully logged into Edge Backend')
-            self._login_retry_delay = 5
-            self._retry_failed()
-            return True
-        except Exception as e:
-            logger.error(f"Failed to login to API: {e}")
-            self.token = None
-            self._login_retry_delay = min(self._login_retry_delay * 2, 300)
-            return False
+        with self._lock:
+            now = time.time()
+            if now - self._last_login_attempt < self._login_retry_delay:
+                return False
+            self._last_login_attempt = now
+            try:
+                resp = self._session.post(
+                    f"{API_URL}/auth/login",
+                    json={"email": USERNAME, "password": PASSWORD},
+                    timeout=10,
+                )
+                resp.raise_for_status()
+                data = resp.json()
+                self.token = data.get('data', {}).get('token')
+                self._session.headers.update({"Authorization": f"Bearer {self.token}"})
+                logger.info('Successfully logged into Edge Backend')
+                self._login_retry_delay = 5
+                self._retry_failed()
+                return True
+            except Exception as e:
+                logger.error(f"Failed to login to API: {e}")
+                self.token = None
+                self._login_retry_delay = min(self._login_retry_delay * 2, 300)
+                return False
 
     def _request(self, method, path, **kwargs):
-        kwargs.setdefault('timeout', 10)
-        if self.token:
-            self._session.headers.update({"Authorization": f"Bearer {self.token}"})
-        for attempt in range(3):
-            try:
-                resp = self._session.request(method, f"{API_URL}{path}", **kwargs)
-                if resp.status_code == 401 and attempt < 2:
-                    if self.login():
-                        continue
-                    return None
-                resp.raise_for_status()
-                return resp.json()
-            except requests.RequestException as e:
-                logger.warning(f"Request failed (attempt {attempt + 1}/3): {e}")
-                if attempt < 2:
-                    time.sleep(1 * (2 ** attempt))
-                else:
-                    logger.error(f"Request failed after 3 attempts: {e}")
-                    return None
+        with self._lock:
+            kwargs.setdefault('timeout', 10)
+            if self.token:
+                self._session.headers.update({"Authorization": f"Bearer {self.token}"})
+            for attempt in range(3):
+                try:
+                    resp = self._session.request(method, f"{API_URL}{path}", **kwargs)
+                    if resp.status_code == 401 and attempt < 2:
+                        if self.login():
+                            continue
+                        return None
+                    resp.raise_for_status()
+                    return resp.json()
+                except requests.RequestException as e:
+                    logger.warning(f"Request failed (attempt {attempt + 1}/3): {e}")
+                    if attempt < 2:
+                        time.sleep(1 * (2 ** attempt))
+                    else:
+                        logger.error(f"Request failed after 3 attempts: {e}")
+                        return None
 
     def _queue_failed(self, payload):
         failed = []

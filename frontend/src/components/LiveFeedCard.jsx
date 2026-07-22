@@ -1,70 +1,7 @@
-import { useState, useEffect, useRef } from 'react';
-import { STREAM } from '../config';
+import { useCameraStream } from '../hooks/useCameraStream';
 
 export default function LiveFeedCard({ cam, onClick, onDelete }) {
-  const [isOffline, setIsOffline] = useState(true);
-  const [retryKey, setRetryKey] = useState(0);
-  const canvasRef = useRef(null);
-  const cardWsRef = useRef(null);
-
-  useEffect(() => {
-    const cameraId = cam.id;
-    const url = `${STREAM.WS}/video_feed?camera_id=${cameraId}`;
-
-    let ws = new WebSocket(url);
-    ws.binaryType = 'blob';
-
-    ws.onopen = () => setIsOffline(false);
-
-    ws.onmessage = (event) => {
-      const canvas = canvasRef.current;
-      if (!canvas) return;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return;
-
-      const blob = event.data;
-      const img = new Image();
-      img.onload = () => {
-        if (canvas.width !== img.width || canvas.height !== img.height) {
-          canvas.width = img.width;
-          canvas.height = img.height;
-        }
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        URL.revokeObjectURL(img.src);
-      };
-      img.onerror = () => URL.revokeObjectURL(img.src);
-      img.src = URL.createObjectURL(blob);
-    };
-
-    ws.onerror = () => setIsOffline(true);
-    ws.onclose = () => {
-      if (ws === cardWsRef.current) {
-        setIsOffline(true);
-      }
-    };
-
-    cardWsRef.current = ws;
-
-    return () => {
-      if (cardWsRef.current === ws) {
-        ws.close();
-        cardWsRef.current = null;
-      }
-    };
-  }, [cam.id, retryKey]);
-
-  useEffect(() => {
-    if (!isOffline) return;
-    const interval = setInterval(() => {
-      setRetryKey((prev) => prev + 1);
-    }, 15000);
-    return () => clearInterval(interval);
-  }, [isOffline]);
-
-  const handleRetry = (e) => {
-    e.stopPropagation();
-    setRetryKey((prev) => prev + 1);
-  };
+  const { canvasRef, isOffline, retry } = useCameraStream(cam.id);
 
   return (
     <div
@@ -82,7 +19,7 @@ export default function LiveFeedCard({ cam, onClick, onDelete }) {
             <span className="material-symbols-outlined text-lg mb-1 text-soc-textMuted">videocam_off</span>
             <span className="font-semibold text-soc-textMuted mb-2">Feed Offline</span>
             <button
-              onClick={handleRetry}
+              onClick={(e) => { e.stopPropagation(); retry(); }}
               className="px-2.5 py-1 bg-soc-card hover:bg-soc-cardElevated border border-soc-border text-soc-textSecondary hover:text-white rounded-lg text-[9px] font-bold transition-all uppercase tracking-wider flex items-center gap-1 shadow-md cursor-pointer"
             >
               <span className="material-symbols-outlined text-[10px]">refresh</span>

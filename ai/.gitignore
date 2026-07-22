@@ -20,6 +20,7 @@ scripts/
 logs/
 snapshots/
 media/
+failed_incidents.json/
 
 # ====================================================================
 # OpenCV & Media Outputs
