@@ -738,12 +738,14 @@ export default function Dashboard({ token, user, onLogout, mode: initialMode, on
                 )}
               </>
             ) : (
-              <>
-                <button className={`pb-1 text-sm font-semibold transition-all border-b-2 ${activeTab === 'dashboard' ? 'text-white border-primary' : 'text-soc-textMuted border-transparent hover:text-white'}`} onClick={() => setActiveTab('dashboard')}>Dashboard</button>
-                <button className={`pb-1 text-sm font-semibold transition-all border-b-2 ${activeTab === 'incidents' ? 'text-white border-primary' : 'text-soc-textMuted border-transparent hover:text-white'}`} onClick={() => setActiveTab('incidents')}>Incidents</button>
-                <button className={`pb-1 text-sm font-semibold transition-all border-b-2 ${activeTab === 'devices' ? 'text-white border-primary' : 'text-soc-textMuted border-transparent hover:text-white'}`} onClick={() => setActiveTab('devices')}>Devices</button>
-                <button className={`pb-1 text-sm font-semibold transition-all border-b-2 ${activeTab === 'settings' ? 'text-white border-primary' : 'text-soc-textMuted border-transparent hover:text-white'}`} onClick={() => setActiveTab('settings')}>Settings</button>
-              </>
+              <div className="flex items-center gap-2 font-sans">
+                <span className="bg-primary/10 text-primary border border-primary/20 text-[10px] font-extrabold px-2.5 py-1 rounded-lg uppercase tracking-wider flex items-center gap-1.5 shadow-sm">
+                  <span className="material-symbols-outlined text-xs">cloud</span>
+                  <span>Cloud Mode</span>
+                </span>
+                <span className="text-soc-textMuted text-xs font-semibold">/</span>
+                <span className="text-white text-xs font-bold capitalize tracking-tight">{activeTab}</span>
+              </div>
             )}
           </div>
           <div className="flex items-center gap-4">

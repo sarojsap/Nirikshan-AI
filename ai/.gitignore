@@ -71,3 +71,13 @@ conda-env/
 *.njsproj
 *.sln
 *.swp
+
+# ====================================================================
+# RTSP Stream Scripts & Assets
+# ====================================================================
+video/
+stream_videos.py
+mediamtx.exe
+mediamtx.yml
+mediamtx.zip
+mediamtx.log
