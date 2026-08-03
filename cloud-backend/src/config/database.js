@@ -4,6 +4,8 @@ import { User } from "../entities/User.js";
 import { EdgeDevice } from "../entities/EdgeDevice.js";
 import { Incident } from "../entities/Incident.js";
 
+const useSSL = process.env.DB_SSL === 'true';
+
 export const AppDataSource = new DataSource({
   type: "postgres",
   url: process.env.DATABASE_URL,
@@ -12,6 +14,7 @@ export const AppDataSource = new DataSource({
   username: process.env.DB_USER || "postgres",
   password: process.env.DB_PASSWORD || "postgres",
   database: process.env.DB_NAME || "nirikshan_cloud",
+  ssl: useSSL ? { rejectUnauthorized: false } : false,
   synchronize: true,
   entities: [Organization, User, EdgeDevice, Incident],
 });
