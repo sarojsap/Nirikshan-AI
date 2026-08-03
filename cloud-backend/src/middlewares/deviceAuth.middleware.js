@@ -26,7 +26,7 @@ export async function authenticateDevice(req, res, next) {
     req.organizationId = device.organizationId;
     next();
   } catch (err) {
-    console.error('Device auth error:', err);
-    return res.status(500).json({ error: 'Device authentication failed' });
+    console.error('Device auth error:', err.stack || err.message || err);
+    return res.status(500).json({ error: `Device authentication failed: ${err.message}` });
   }
 }

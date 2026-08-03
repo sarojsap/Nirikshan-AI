@@ -61,12 +61,20 @@ function performSyncRequest(method, url, body = null) {
           }
         });
       });
-      req.on('error', () => resolve(null));
-      req.on('timeout', () => { req.destroy(); resolve(null); });
+      req.on('error', (err) => {
+        console.error(`[Sync Request Error] ${method} ${url}: ${err.message}`);
+        resolve(null);
+      });
+      req.on('timeout', () => {
+        console.error(`[Sync Request Timeout] ${method} ${url}`);
+        req.destroy();
+        resolve(null);
+      });
       if (body) req.write(JSON.stringify(body));
       req.end();
     });
-  } catch {
+  } catch (err) {
+    console.error(`[Sync Exception] ${method} ${url}: ${err.message}`);
     return null;
   }
 }
