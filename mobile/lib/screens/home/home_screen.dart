@@ -12,6 +12,10 @@ import '../../models/user.dart';
 import '../../services/incident_service.dart';
 import '../../services/notification_service.dart';
 
+import 'dashboard_tab.dart';
+import 'incidents_tab.dart';
+import 'settings_tab.dart';
+
 class HomeScreen extends StatefulWidget {
   final User user;
   final bool initializeNotifications;
@@ -28,6 +32,8 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   late final IncidentService _incidentService;
+  int _currentTabIndex = 0;
+
   String? _organizationId;
   String? _deviceId;
 
@@ -82,7 +88,7 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     try {
-      final incidents = await _incidentService.getIncidents(limit: 30);
+      final incidents = await _incidentService.getIncidents(limit: 50);
       if (!mounted) return;
       setState(() {
         _incidents = incidents;
@@ -207,10 +213,22 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  void _showIncidentDetails(Incident incident) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppTheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (context) {
+        return _IncidentDetailsSheet(incident: incident);
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final role = widget.user.role.toUpperCase();
-
     return Scaffold(
       backgroundColor: AppTheme.background,
       appBar: AppBar(
@@ -248,11 +266,6 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         actions: [
           IconButton(
-            tooltip: 'Filter Devices',
-            icon: const Icon(Icons.tune_outlined, color: AppTheme.primary, size: 22),
-            onPressed: _showDeviceSelector,
-          ),
-          IconButton(
             tooltip: 'Refresh Feed',
             icon: _isRefreshing
                 ? const SizedBox(
@@ -263,224 +276,97 @@ class _HomeScreenState extends State<HomeScreen> {
                 : const Icon(Icons.refresh, color: AppTheme.onSurfaceVariant, size: 22),
             onPressed: _isRefreshing ? null : () => _loadIncidents(),
           ),
-          IconButton(
-            tooltip: 'Sign Out',
-            icon: const Icon(Icons.logout_rounded, color: AppTheme.error, size: 20),
-            onPressed: _handleLogout,
-          ),
           const SizedBox(width: 8),
         ],
       ),
       body: SafeArea(
-        child: RefreshIndicator(
-          onRefresh: () => _loadIncidents(),
-          color: AppTheme.primary,
+        child: IndexedStack(
+          index: _currentTabIndex,
+          children: [
+            // Tab 0: Dashboard (Top 5 Incidents)
+            DashboardTab(
+              user: widget.user,
+              incidents: _incidents,
+              isLoading: _isLoading,
+              isRefreshing: _isRefreshing,
+              error: _error,
+              lastUpdated: _lastUpdated,
+              onRefresh: _loadIncidents,
+              onViewAllTap: () => setState(() => _currentTabIndex = 1),
+              onIncidentTap: _showIncidentDetails,
+            ),
+
+            // Tab 1: Incidents (Full Filtered Feed)
+            IncidentsTab(
+              incidents: _incidents,
+              isLoading: _isLoading,
+              error: _error,
+              onRefresh: _loadIncidents,
+              onIncidentTap: _showIncidentDetails,
+            ),
+
+            // Tab 2: Settings (Configuration & Profile)
+            SettingsTab(
+              user: widget.user,
+              onLogout: _handleLogout,
+            ),
+          ],
+        ),
+      ),
+      bottomNavigationBar: Container(
+        decoration: BoxDecoration(
+          color: AppTheme.surface,
+          border: Border(top: BorderSide(color: AppTheme.outline.withOpacity(0.5), width: 1)),
+        ),
+        child: BottomNavigationBar(
+          currentIndex: _currentTabIndex,
+          onTap: (index) => setState(() => _currentTabIndex = index),
           backgroundColor: AppTheme.surface,
-          child: CustomScrollView(
-            physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
-            slivers: [
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
-                  child: _Header(
-                    user: widget.user,
-                    role: role,
-                    incidentCount: _incidents.length,
-                    lastUpdated: _lastUpdated,
-                  ),
-                ),
-              ),
-              if (_error != null)
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
-                    child: _StatusPanel(
-                      icon: Icons.error_outline,
-                      title: 'Sync Error',
-                      message: _error!,
-                      color: AppTheme.error,
-                    ),
-                  ),
-                ),
-              if (_isLoading)
-                const SliverFillRemaining(
-                  hasScrollBody: false,
-                  child: Center(
-                    child: CircularProgressIndicator(color: AppTheme.primary),
-                  ),
-                )
-              else if (_incidents.isEmpty)
-                SliverFillRemaining(
-                  hasScrollBody: false,
-                  child: Padding(
-                    padding: const EdgeInsets.all(20),
-                    child: _StatusPanel(
-                      icon: Icons.verified_user_outlined,
-                      title: 'All Clear',
-                      message: 'No security threats or intrusions detected on active nodes.',
-                      color: AppTheme.severityLow,
-                    ),
-                  ),
-                )
-              else
-                SliverPadding(
-                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
-                  sliver: SliverList.separated(
-                    itemBuilder: (context, index) {
-                      final incident = _incidents[index];
-                      return _IncidentCard(
-                        incident: incident,
-                        onTap: () => _showIncidentDetails(incident),
-                      );
-                    },
-                    separatorBuilder: (context, index) => const SizedBox(height: 14),
-                    itemCount: _incidents.length,
-                  ),
-                ),
-            ],
-          ),
+          selectedItemColor: AppTheme.primary,
+          unselectedItemColor: AppTheme.onSurfaceVariant,
+          selectedFontSize: 11,
+          unselectedFontSize: 11,
+          type: BottomNavigationBarType.fixed,
+          elevation: 0,
+          items: [
+            const BottomNavigationBarItem(
+              icon: Icon(Icons.dashboard_outlined),
+              activeIcon: Icon(Icons.dashboard),
+              label: 'Dashboard',
+            ),
+            BottomNavigationBarItem(
+              icon: _incidents.isNotEmpty
+                  ? Badge(
+                      label: Text(_incidents.length.toString()),
+                      backgroundColor: AppTheme.primary,
+                      textColor: Colors.white,
+                      child: const Icon(Icons.shield_outlined),
+                    )
+                  : const Icon(Icons.shield_outlined),
+              activeIcon: const Icon(Icons.shield),
+              label: 'Incidents',
+            ),
+            const BottomNavigationBarItem(
+              icon: Icon(Icons.settings_outlined),
+              activeIcon: Icon(Icons.settings),
+              label: 'Settings',
+            ),
+          ],
         ),
       ),
     );
   }
-
-  void _showIncidentDetails(Incident incident) {
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: AppTheme.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (context) {
-        return _IncidentDetailsSheet(incident: incident);
-      },
-    );
-  }
 }
 
-class _Header extends StatelessWidget {
-  final User user;
-  final String role;
-  final int incidentCount;
-  final DateTime? lastUpdated;
-
-  const _Header({
-    required this.user,
-    required this.role,
-    required this.incidentCount,
-    required this.lastUpdated,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Hello, ${user.name}',
-                  style: const TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.w800,
-                    color: Colors.white,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Row(
-                  children: [
-                    Container(
-                      width: 7,
-                      height: 7,
-                      decoration: const BoxDecoration(
-                        color: AppTheme.severityLow,
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    const Text(
-                      'Live Surveillance Active',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
-                        color: AppTheme.severityLow,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-            _RoleChip(role: role),
-          ],
-        ),
-        const SizedBox(height: 20),
-
-        Row(
-          children: [
-            Expanded(
-              child: _MetricTile(
-                label: 'Security Events',
-                value: incidentCount.toString(),
-                icon: Icons.security_outlined,
-                accentColor: AppTheme.primary,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _MetricTile(
-                label: 'Last Synced',
-                value: lastUpdated == null ? '--:--' : _formatClock(lastUpdated!),
-                icon: Icons.schedule,
-                accentColor: AppTheme.secondary,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 24),
-
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            const Text(
-              'Recent Incidents',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w800,
-                color: Colors.white,
-                letterSpacing: 0.5,
-              ),
-            ),
-            Text(
-              'Real-Time Feed',
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
-                color: AppTheme.onSurfaceVariant,
-                letterSpacing: 0.5,
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-}
-
-class _IncidentCard extends StatelessWidget {
+class IncidentCard extends StatelessWidget {
   final Incident incident;
   final VoidCallback onTap;
 
-  const _IncidentCard({required this.incident, required this.onTap});
+  const IncidentCard({super.key, required this.incident, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    final severityColor = _severityColor(incident.severity);
-    final hasVideo = incident.resolvedVideoUrl != null;
+    final severityColor = severityColorOf(incident.severity);
 
     return Container(
       decoration: BoxDecoration(
@@ -504,45 +390,12 @@ class _IncidentCard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Stack(
-                children: [
-                  ClipRRect(
-                    borderRadius: const BorderRadius.vertical(top: Radius.circular(19)),
-                    child: AspectRatio(
-                      aspectRatio: 16 / 9,
-                      child: _SnapshotImage(url: incident.resolvedImageUrl),
-                    ),
-                  ),
-                  if (hasVideo)
-                    Positioned(
-                      top: 12,
-                      left: 12,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: Colors.black.withOpacity(0.75),
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: AppTheme.primary.withOpacity(0.5)),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: const [
-                            Icon(Icons.play_circle_fill, color: AppTheme.primary, size: 14),
-                            SizedBox(width: 4),
-                            Text(
-                              'VIDEO CLIP',
-                              style: TextStyle(
-                                fontSize: 9,
-                                fontWeight: FontWeight.w800,
-                                color: Colors.white,
-                                letterSpacing: 0.5,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                ],
+              ClipRRect(
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(19)),
+                child: AspectRatio(
+                  aspectRatio: 16 / 9,
+                  child: SnapshotImage(url: incident.resolvedImageUrl),
+                ),
               ),
               Padding(
                 padding: const EdgeInsets.all(16),
@@ -562,7 +415,7 @@ class _IncidentCard extends StatelessWidget {
                             ),
                           ),
                         ),
-                        _SeverityChip(
+                        SeverityChip(
                           severity: incident.severity,
                           color: severityColor,
                         ),
@@ -583,14 +436,14 @@ class _IncidentCard extends StatelessWidget {
                     const SizedBox(height: 14),
                     Row(
                       children: [
-                        _MetaText(
+                        MetaText(
                           icon: Icons.videocam_outlined,
                           text: incident.displayCamera,
                         ),
                         const Spacer(),
-                        _MetaText(
+                        MetaText(
                           icon: Icons.schedule_outlined,
-                          text: _formatDateTime(incident.timestamp),
+                          text: formatDateTime(incident.timestamp),
                         ),
                       ],
                     ),
@@ -625,7 +478,7 @@ class _IncidentDetailsSheetState extends State<_IncidentDetailsSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final severityColor = _severityColor(widget.incident.severity);
+    final severityColor = severityColorOf(widget.incident.severity);
     final videoUrl = widget.incident.resolvedVideoUrl;
 
     return DraggableScrollableSheet(
@@ -731,7 +584,7 @@ class _IncidentDetailsSheetState extends State<_IncidentDetailsSheet> {
                 borderRadius: BorderRadius.circular(16),
                 child: AspectRatio(
                   aspectRatio: 16 / 9,
-                  child: _SnapshotImage(url: widget.incident.resolvedImageUrl),
+                  child: SnapshotImage(url: widget.incident.resolvedImageUrl),
                 ),
               ),
             const SizedBox(height: 20),
@@ -748,7 +601,7 @@ class _IncidentDetailsSheetState extends State<_IncidentDetailsSheet> {
                     ),
                   ),
                 ),
-                _SeverityChip(
+                SeverityChip(
                   severity: widget.incident.severity,
                   color: severityColor,
                 ),
@@ -766,7 +619,7 @@ class _IncidentDetailsSheetState extends State<_IncidentDetailsSheet> {
             ),
             const SizedBox(height: 20),
 
-            _DetailBlock(
+            DetailBlock(
               label: 'Alert Description',
               icon: Icons.notes_outlined,
               child: Text(
@@ -780,7 +633,7 @@ class _IncidentDetailsSheetState extends State<_IncidentDetailsSheet> {
             ),
             const SizedBox(height: 12),
 
-            _DetailBlock(
+            DetailBlock(
               label: 'Camera Node & Location',
               icon: Icons.videocam_outlined,
               child: Text(
@@ -793,11 +646,11 @@ class _IncidentDetailsSheetState extends State<_IncidentDetailsSheet> {
             ),
             const SizedBox(height: 12),
 
-            _DetailBlock(
+            DetailBlock(
               label: 'Incident Timestamp',
               icon: Icons.schedule_outlined,
               child: Text(
-                _formatDateTime(widget.incident.timestamp),
+                formatDateTime(widget.incident.timestamp),
                 style: const TextStyle(
                   fontSize: 14,
                   color: Colors.white,
@@ -831,13 +684,11 @@ class _IncidentVideoPlayerState extends State<_IncidentVideoPlayer> {
 
   String get _effectiveUrl {
     var url = widget.videoUrl;
-    // Substitute localhost / 127.0.0.1 for Android Emulator (10.0.2.2)
     if (url.contains('localhost')) {
       url = url.replaceAll('localhost', '10.0.2.2');
     } else if (url.contains('127.0.0.1')) {
       url = url.replaceAll('127.0.0.1', '10.0.2.2');
     }
-    // Cloudinary ExoPlayer extension safety
     if (url.contains('res.cloudinary.com') &&
         !url.contains('.mp4') &&
         !url.contains('.m3u8') &&
@@ -877,8 +728,6 @@ class _IncidentVideoPlayerState extends State<_IncidentVideoPlayer> {
     });
 
     final url = _effectiveUrl;
-    print('[VideoPlayer] Loading native stream: $url');
-
     final controller = VideoPlayerController.networkUrl(
       Uri.parse(url),
       httpHeaders: const {
@@ -900,7 +749,6 @@ class _IncidentVideoPlayerState extends State<_IncidentVideoPlayer> {
         controller.setLooping(true);
       }
     }).catchError((error) {
-      print('[VideoPlayer] ExoPlayer network error ($url): $error');
       if (mounted && _controller == controller) {
         setState(() {
           _hasError = true;
@@ -1032,8 +880,6 @@ class _IncidentVideoPlayerState extends State<_IncidentVideoPlayer> {
               aspectRatio: _controller!.value.aspectRatio > 0 ? _controller!.value.aspectRatio : 16 / 9,
               child: VideoPlayer(_controller!),
             ),
-
-            // Top Action Bar (Speed & Fullscreen)
             Positioned(
               top: 8,
               left: 10,
@@ -1041,7 +887,6 @@ class _IncidentVideoPlayerState extends State<_IncidentVideoPlayer> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  // Playback Speed Pill Button
                   GestureDetector(
                     onTap: _cycleSpeed,
                     child: Container(
@@ -1067,8 +912,6 @@ class _IncidentVideoPlayerState extends State<_IncidentVideoPlayer> {
                       ),
                     ),
                   ),
-
-                  // Fullscreen Button
                   GestureDetector(
                     onTap: () => _openFullScreenPlayer(context),
                     child: Container(
@@ -1088,12 +931,9 @@ class _IncidentVideoPlayerState extends State<_IncidentVideoPlayer> {
                 ],
               ),
             ),
-
-            // Center Controls Overlay (-5s, Play/Pause, +5s)
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                // -5s Seek Backward
                 GestureDetector(
                   onTap: () => _seekRelative(-5),
                   child: Container(
@@ -1106,8 +946,6 @@ class _IncidentVideoPlayerState extends State<_IncidentVideoPlayer> {
                   ),
                 ),
                 const SizedBox(width: 20),
-
-                // Play / Pause Button
                 GestureDetector(
                   onTap: () {
                     setState(() {
@@ -1131,8 +969,6 @@ class _IncidentVideoPlayerState extends State<_IncidentVideoPlayer> {
                   ),
                 ),
                 const SizedBox(width: 20),
-
-                // +5s Seek Forward
                 GestureDetector(
                   onTap: () => _seekRelative(5),
                   child: Container(
@@ -1146,8 +982,6 @@ class _IncidentVideoPlayerState extends State<_IncidentVideoPlayer> {
                 ),
               ],
             ),
-
-            // Bottom Progress Bar & Timestamps
             Positioned(
               bottom: 0,
               left: 0,
@@ -1178,7 +1012,7 @@ class _IncidentVideoPlayerState extends State<_IncidentVideoPlayer> {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text(
-                          '${_formatDuration(position)} / ${_formatDuration(duration)}',
+                          '${formatDuration(position)} / ${formatDuration(duration)}',
                           style: const TextStyle(
                             fontSize: 10,
                             fontWeight: FontWeight.w700,
@@ -1280,8 +1114,6 @@ class _FullScreenVideoViewerState extends State<_FullScreenVideoViewer> {
                 child: VideoPlayer(widget.controller),
               ),
             ),
-
-            // Top Bar (Close & Speed Dropdown)
             Positioned(
               top: 16,
               left: 16,
@@ -1332,8 +1164,6 @@ class _FullScreenVideoViewerState extends State<_FullScreenVideoViewer> {
                 ],
               ),
             ),
-
-            // Center Controls (-5s, Play/Pause, +5s)
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -1385,8 +1215,6 @@ class _FullScreenVideoViewerState extends State<_FullScreenVideoViewer> {
                 ),
               ],
             ),
-
-            // Bottom Bar (Progress & Timestamps)
             Positioned(
               bottom: 20,
               left: 20,
@@ -1408,7 +1236,7 @@ class _FullScreenVideoViewerState extends State<_FullScreenVideoViewer> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        '${_formatDuration(position)} / ${_formatDuration(duration)}',
+                        '${formatDuration(position)} / ${formatDuration(duration)}',
                         style: const TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w700,
@@ -1432,21 +1260,15 @@ class _FullScreenVideoViewerState extends State<_FullScreenVideoViewer> {
   }
 }
 
-String _formatDuration(Duration duration) {
-  final minutes = duration.inMinutes.remainder(60).toString().padLeft(2, '0');
-  final seconds = duration.inSeconds.remainder(60).toString().padLeft(2, '0');
-  return '$minutes:$seconds';
-}
-
-class _SnapshotImage extends StatelessWidget {
+class SnapshotImage extends StatelessWidget {
   final String? url;
 
-  const _SnapshotImage({required this.url});
+  const SnapshotImage({super.key, required this.url});
 
   @override
   Widget build(BuildContext context) {
     if (url == null) {
-      return const _MissingSnapshot();
+      return const MissingSnapshot();
     }
 
     if (url!.startsWith('data:image')) {
@@ -1457,10 +1279,10 @@ class _SnapshotImage extends StatelessWidget {
           return Image.memory(
             bytes,
             fit: BoxFit.cover,
-            errorBuilder: (context, error, stackTrace) => const _MissingSnapshot(),
+            errorBuilder: (context, error, stackTrace) => const MissingSnapshot(),
           );
         } catch (_) {
-          return const _MissingSnapshot();
+          return const MissingSnapshot();
         }
       }
     }
@@ -1475,13 +1297,13 @@ class _SnapshotImage extends StatelessWidget {
           child: const Center(child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.primary)),
         );
       },
-      errorBuilder: (context, error, stackTrace) => const _MissingSnapshot(),
+      errorBuilder: (context, error, stackTrace) => const MissingSnapshot(),
     );
   }
 }
 
-class _MissingSnapshot extends StatelessWidget {
-  const _MissingSnapshot();
+class MissingSnapshot extends StatelessWidget {
+  const MissingSnapshot({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -1509,38 +1331,11 @@ class _MissingSnapshot extends StatelessWidget {
   }
 }
 
-class _RoleChip extends StatelessWidget {
-  final String role;
-
-  const _RoleChip({required this.role});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: AppTheme.primary.withOpacity(0.12),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppTheme.primary.withOpacity(0.3)),
-      ),
-      child: Text(
-        role,
-        style: const TextStyle(
-          fontSize: 10,
-          fontWeight: FontWeight.w800,
-          color: AppTheme.primary,
-          letterSpacing: 0.8,
-        ),
-      ),
-    );
-  }
-}
-
-class _SeverityChip extends StatelessWidget {
+class SeverityChip extends StatelessWidget {
   final String severity;
   final Color color;
 
-  const _SeverityChip({required this.severity, required this.color});
+  const SeverityChip({super.key, required this.severity, required this.color});
 
   @override
   Widget build(BuildContext context) {
@@ -1564,75 +1359,11 @@ class _SeverityChip extends StatelessWidget {
   }
 }
 
-class _MetricTile extends StatelessWidget {
-  final String label;
-  final String value;
-  final IconData icon;
-  final Color accentColor;
-
-  const _MetricTile({
-    required this.label,
-    required this.value,
-    required this.icon,
-    required this.accentColor,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: AppTheme.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppTheme.outline, width: 1),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: accentColor.withOpacity(0.12),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(icon, color: accentColor, size: 20),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  label,
-                  style: const TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    color: AppTheme.onSurfaceVariant,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  value,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w800,
-                    color: Colors.white,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _MetaText extends StatelessWidget {
+class MetaText extends StatelessWidget {
   final IconData icon;
   final String text;
 
-  const _MetaText({required this.icon, required this.text});
+  const MetaText({super.key, required this.icon, required this.text});
 
   @override
   Widget build(BuildContext context) {
@@ -1655,12 +1386,13 @@ class _MetaText extends StatelessWidget {
   }
 }
 
-class _DetailBlock extends StatelessWidget {
+class DetailBlock extends StatelessWidget {
   final String label;
   final IconData icon;
   final Widget child;
 
-  const _DetailBlock({
+  const DetailBlock({
+    super.key,
     required this.label,
     required this.icon,
     required this.child,
@@ -1701,13 +1433,14 @@ class _DetailBlock extends StatelessWidget {
   }
 }
 
-class _StatusPanel extends StatelessWidget {
+class StatusPanel extends StatelessWidget {
   final IconData icon;
   final String title;
   final String message;
   final Color color;
 
-  const _StatusPanel({
+  const StatusPanel({
+    super.key,
     required this.icon,
     required this.title,
     required this.message,
@@ -1753,7 +1486,7 @@ class _StatusPanel extends StatelessWidget {
   }
 }
 
-Color _severityColor(String severity) {
+Color severityColorOf(String severity) {
   switch (severity.toUpperCase()) {
     case 'CRITICAL':
       return AppTheme.severityCritical;
@@ -1767,15 +1500,21 @@ Color _severityColor(String severity) {
   }
 }
 
-String _formatClock(DateTime dateTime) {
+String formatClock(DateTime dateTime) {
   final local = dateTime.toLocal();
-  return '${_twoDigits(local.hour)}:${_twoDigits(local.minute)}';
+  return '${twoDigits(local.hour)}:${twoDigits(local.minute)}';
 }
 
-String _formatDateTime(DateTime dateTime) {
+String formatDateTime(DateTime dateTime) {
   final local = dateTime.toLocal();
-  return '${local.year}-${_twoDigits(local.month)}-${_twoDigits(local.day)} '
-      '${_twoDigits(local.hour)}:${_twoDigits(local.minute)}';
+  return '${local.year}-${twoDigits(local.month)}-${twoDigits(local.day)} '
+      '${twoDigits(local.hour)}:${twoDigits(local.minute)}';
 }
 
-String _twoDigits(int value) => value.toString().padLeft(2, '0');
+String formatDuration(Duration duration) {
+  final minutes = duration.inMinutes.remainder(60).toString().padLeft(2, '0');
+  final seconds = duration.inSeconds.remainder(60).toString().padLeft(2, '0');
+  return '$minutes:$seconds';
+}
+
+String twoDigits(int value) => value.toString().padLeft(2, '0');
