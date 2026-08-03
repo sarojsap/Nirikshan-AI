@@ -108,59 +108,64 @@ class _HomeScreenState extends State<HomeScreen> {
       context: context,
       backgroundColor: AppTheme.surface,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(8)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       builder: (context) {
         return Padding(
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+          padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               Container(
-                width: 44, height: 4,
+                width: 40,
+                height: 4,
                 decoration: BoxDecoration(
                   color: AppTheme.outlineVariant,
                   borderRadius: BorderRadius.circular(4),
                 ),
               ),
-              const SizedBox(height: 18),
-              Text(
-                'Device Filter',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  color: AppTheme.onSurface,
-                  fontWeight: FontWeight.w700,
+              const SizedBox(height: 20),
+              const Text(
+                'Select Edge Device',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                  color: Colors.white,
                 ),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 6),
               Text(
-                'Filter events by organization and device.',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                'Filter live security events by camera node.',
+                style: TextStyle(
+                  fontSize: 13,
                   color: AppTheme.onSurfaceVariant,
                 ),
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 24),
               SizedBox(
                 width: double.infinity,
-                child: ElevatedButton(
+                height: 48,
+                child: ElevatedButton.icon(
                   onPressed: () {
                     _setDeviceFilter(organizationId: null, deviceId: null);
                     Navigator.pop(context);
                   },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppTheme.primaryContainer,
-                    foregroundColor: AppTheme.onSurface,
-                  ),
-                  child: const Text('Show All Devices'),
+                  icon: const Icon(Icons.devices, size: 18),
+                  label: const Text('Show All Edge Devices'),
                 ),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 12),
               SizedBox(
                 width: double.infinity,
+                height: 48,
                 child: OutlinedButton(
                   onPressed: () => Navigator.pop(context),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: AppTheme.onSurfaceVariant,
-                    side: BorderSide(color: AppTheme.outlineVariant),
+                    side: const BorderSide(color: AppTheme.outline),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
                   ),
                   child: const Text('Cancel'),
                 ),
@@ -172,11 +177,33 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-
   Future<void> _handleLogout() async {
-    await NotificationService().unregister();
-    if (!mounted) return;
-    context.read<AuthBloc>().add(const LogoutRequested());
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppTheme.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('Sign Out', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+        content: const Text('Are you sure you want to log out of Command Center?', style: TextStyle(color: AppTheme.onSurfaceVariant)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel', style: TextStyle(color: AppTheme.onSurfaceVariant)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.error),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Logout'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      await NotificationService().unregister();
+      if (!mounted) return;
+      context.read<AuthBloc>().add(const LogoutRequested());
+    }
   }
 
   @override
@@ -186,57 +213,74 @@ class _HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       backgroundColor: AppTheme.background,
       appBar: AppBar(
-        title: const Text('NIRIKSHAN AI'),
+        automaticallyImplyLeading: false,
+        backgroundColor: AppTheme.background,
+        elevation: 0,
+        title: Row(
+          children: [
+            Container(
+              width: 34,
+              height: 34,
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: AppTheme.surface,
+                border: Border.all(color: AppTheme.primary.withOpacity(0.3)),
+              ),
+              child: Image.asset(
+                'assets/logo.png',
+                fit: BoxFit.contain,
+                errorBuilder: (context, error, stackTrace) => const Icon(Icons.shield, color: AppTheme.primary, size: 18),
+              ),
+            ),
+            const SizedBox(width: 10),
+            const Text(
+              'NIRIKSHAN AI',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w900,
+                color: Colors.white,
+                letterSpacing: 1.2,
+              ),
+            ),
+          ],
+        ),
         actions: [
           IconButton(
-            tooltip: 'Filter by device',
-            icon: const Icon(Icons.devices),
-            onPressed: () => _showDeviceSelector(),
+            tooltip: 'Filter Devices',
+            icon: const Icon(Icons.tune_outlined, color: AppTheme.primary, size: 22),
+            onPressed: _showDeviceSelector,
           ),
           IconButton(
-            tooltip: 'Refresh events',
+            tooltip: 'Refresh Feed',
             icon: _isRefreshing
                 ? const SizedBox(
                     width: 18,
                     height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
+                    child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.primary),
                   )
-                : const Icon(Icons.refresh),
+                : const Icon(Icons.refresh, color: AppTheme.onSurfaceVariant, size: 22),
             onPressed: _isRefreshing ? null : () => _loadIncidents(),
           ),
-          PopupMenuButton<String>(
-            icon: const Icon(Icons.more_vert),
-            onSelected: (value) {
-              if (value == 'logout') {
-                _handleLogout();
-              }
-            },
-            itemBuilder: (context) => [
-              const PopupMenuItem(
-                value: 'logout',
-                child: Row(
-                  children: [
-                    Icon(Icons.logout, size: 18),
-                    SizedBox(width: 10),
-                    Text('Logout'),
-                  ],
-                ),
-              ),
-            ],
+          IconButton(
+            tooltip: 'Sign Out',
+            icon: const Icon(Icons.logout_rounded, color: AppTheme.error, size: 20),
+            onPressed: _handleLogout,
           ),
+          const SizedBox(width: 8),
         ],
       ),
       body: SafeArea(
         child: RefreshIndicator(
           onRefresh: () => _loadIncidents(),
-          color: AppTheme.tertiary,
-          backgroundColor: AppTheme.surfaceContainer,
+          color: AppTheme.primary,
+          backgroundColor: AppTheme.surface,
           child: CustomScrollView(
-            physics: const AlwaysScrollableScrollPhysics(),
+            physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
             slivers: [
               SliverToBoxAdapter(
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
+                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
                   child: _Header(
                     user: widget.user,
                     role: role,
@@ -248,10 +292,10 @@ class _HomeScreenState extends State<HomeScreen> {
               if (_error != null)
                 SliverToBoxAdapter(
                   child: Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
                     child: _StatusPanel(
-                      icon: Icons.warning_amber,
-                      title: 'Unable to load events',
+                      icon: Icons.error_outline,
+                      title: 'Sync Error',
                       message: _error!,
                       color: AppTheme.error,
                     ),
@@ -260,7 +304,9 @@ class _HomeScreenState extends State<HomeScreen> {
               if (_isLoading)
                 const SliverFillRemaining(
                   hasScrollBody: false,
-                  child: Center(child: CircularProgressIndicator()),
+                  child: Center(
+                    child: CircularProgressIndicator(color: AppTheme.primary),
+                  ),
                 )
               else if (_incidents.isEmpty)
                 SliverFillRemaining(
@@ -268,11 +314,10 @@ class _HomeScreenState extends State<HomeScreen> {
                   child: Padding(
                     padding: const EdgeInsets.all(20),
                     child: _StatusPanel(
-                      icon: Icons.notifications_none,
-                      title: 'No events captured yet',
-                      message:
-                          'New intrusion and crowd snapshots will appear here.',
-                      color: AppTheme.tertiary,
+                      icon: Icons.verified_user_outlined,
+                      title: 'All Clear',
+                      message: 'No security threats or intrusions detected on active nodes.',
+                      color: AppTheme.severityLow,
                     ),
                   ),
                 )
@@ -287,8 +332,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         onTap: () => _showIncidentDetails(incident),
                       );
                     },
-                    separatorBuilder: (context, index) =>
-                        const SizedBox(height: 12),
+                    separatorBuilder: (context, index) => const SizedBox(height: 14),
                     itemCount: _incidents.length,
                   ),
                 ),
@@ -305,7 +349,7 @@ class _HomeScreenState extends State<HomeScreen> {
       isScrollControlled: true,
       backgroundColor: AppTheme.surface,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(8)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       builder: (context) {
         return _IncidentDetailsSheet(incident: incident);
@@ -332,40 +376,93 @@ class _Header extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(children: [_RoleChip(role: role)]),
-        const SizedBox(height: 18),
-        Text(
-          'Event Snapshots',
-          style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-            color: AppTheme.onSurface,
-            fontWeight: FontWeight.w700,
-          ),
+        // User & Role Header Row
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Hello, ${user.name}',
+                  style: const TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Row(
+                  children: [
+                    Container(
+                      width: 7,
+                      height: 7,
+                      decoration: const BoxDecoration(
+                        color: AppTheme.severityLow,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    const Text(
+                      'Live Surveillance Active',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                        color: AppTheme.severityLow,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+            _RoleChip(role: role),
+          ],
         ),
-        const SizedBox(height: 8),
-        Text(
-          'Review detected intrusions and crowd events with captured frames.',
-          style: Theme.of(
-            context,
-          ).textTheme.bodyMedium?.copyWith(color: AppTheme.onSurfaceVariant),
-        ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 20),
+
+        // Quick Metrics Tiles Row
         Row(
           children: [
             Expanded(
               child: _MetricTile(
-                label: 'Events',
+                label: 'Security Events',
                 value: incidentCount.toString(),
-                icon: Icons.sensors,
+                icon: Icons.security_outlined,
+                accentColor: AppTheme.primary,
               ),
             ),
-            const SizedBox(width: 10),
+            const SizedBox(width: 12),
             Expanded(
               child: _MetricTile(
-                label: 'Updated',
-                value: lastUpdated == null
-                    ? '--:--'
-                    : _formatClock(lastUpdated!),
+                label: 'Last Synced',
+                value: lastUpdated == null ? '--:--' : _formatClock(lastUpdated!),
                 icon: Icons.schedule,
+                accentColor: AppTheme.secondary,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 24),
+
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text(
+              'Recent Incidents',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w800,
+                color: Colors.white,
+                letterSpacing: 0.5,
+              ),
+            ),
+            Text(
+              'Real-Time Feed',
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                color: AppTheme.onSurfaceVariant,
+                letterSpacing: 0.5,
               ),
             ),
           ],
@@ -385,31 +482,37 @@ class _IncidentCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final severityColor = _severityColor(incident.severity);
 
-    return Material(
-      color: AppTheme.surfaceContainer,
-      borderRadius: BorderRadius.circular(8),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(8),
-        child: Container(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: AppTheme.outlineVariant),
+    return Container(
+      decoration: BoxDecoration(
+        color: AppTheme.surface,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppTheme.outline, width: 1),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.2),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
           ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(20),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(20),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               ClipRRect(
-                borderRadius: const BorderRadius.vertical(
-                  top: Radius.circular(7),
-                ),
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(19)),
                 child: AspectRatio(
                   aspectRatio: 16 / 9,
                   child: _SnapshotImage(url: incident.resolvedImageUrl),
                 ),
               ),
               Padding(
-                padding: const EdgeInsets.all(14),
+                padding: const EdgeInsets.all(16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -419,11 +522,11 @@ class _IncidentCard extends StatelessWidget {
                           child: Text(
                             incident.displayType,
                             overflow: TextOverflow.ellipsis,
-                            style: Theme.of(context).textTheme.labelLarge
-                                ?.copyWith(
-                                  color: AppTheme.onSurface,
-                                  fontWeight: FontWeight.w700,
-                                ),
+                            style: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w800,
+                              color: Colors.white,
+                            ),
                           ),
                         ),
                         _SeverityChip(
@@ -432,31 +535,28 @@ class _IncidentCard extends StatelessWidget {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 6),
                     Text(
                       incident.description,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w400,
                         color: AppTheme.onSurfaceVariant,
-                        fontSize: 14,
+                        height: 1.4,
                       ),
                     ),
-                    const SizedBox(height: 12),
-                    Wrap(
-                      spacing: 10,
-                      runSpacing: 8,
+                    const SizedBox(height: 14),
+                    Row(
                       children: [
                         _MetaText(
                           icon: Icons.videocam_outlined,
                           text: incident.displayCamera,
                         ),
+                        const Spacer(),
                         _MetaText(
-                          icon: Icons.location_on_outlined,
-                          text: incident.displayLocation,
-                        ),
-                        _MetaText(
-                          icon: Icons.access_time,
+                          icon: Icons.schedule_outlined,
                           text: _formatDateTime(incident.timestamp),
                         ),
                       ],
@@ -483,17 +583,17 @@ class _IncidentDetailsSheet extends StatelessWidget {
 
     return DraggableScrollableSheet(
       expand: false,
-      initialChildSize: 0.86,
+      initialChildSize: 0.88,
       minChildSize: 0.5,
-      maxChildSize: 0.94,
+      maxChildSize: 0.95,
       builder: (context, scrollController) {
         return ListView(
           controller: scrollController,
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
           children: [
             Center(
               child: Container(
-                width: 44,
+                width: 36,
                 height: 4,
                 decoration: BoxDecoration(
                   color: AppTheme.outlineVariant,
@@ -501,23 +601,27 @@ class _IncidentDetailsSheet extends StatelessWidget {
                 ),
               ),
             ),
-            const SizedBox(height: 18),
+            const SizedBox(height: 20),
+
+            // High-Res Image Preview
             ClipRRect(
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(16),
               child: AspectRatio(
-                aspectRatio: 16 / 10,
+                aspectRatio: 16 / 9,
                 child: _SnapshotImage(url: incident.resolvedImageUrl),
               ),
             ),
-            const SizedBox(height: 18),
+            const SizedBox(height: 20),
+
             Row(
               children: [
                 Expanded(
                   child: Text(
                     incident.displayType,
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      color: AppTheme.onSurface,
-                      fontWeight: FontWeight.w700,
+                    style: const TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w800,
+                      color: Colors.white,
                     ),
                   ),
                 ),
@@ -527,45 +631,53 @@ class _IncidentDetailsSheet extends StatelessWidget {
                 ),
               ],
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 4),
             Text(
-              'ID: ${incident.id}',
-              style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                color: AppTheme.outline,
-                fontFamily: 'monospace',
+              'LOG ID: ${incident.id}',
+              style: const TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w700,
+                color: AppTheme.onSurfaceVariant,
+                letterSpacing: 0.5,
               ),
             ),
-            const SizedBox(height: 18),
+            const SizedBox(height: 20),
+
             _DetailBlock(
-              label: 'Alert Details',
-              icon: Icons.notes,
+              label: 'Alert Description',
+              icon: Icons.notes_outlined,
               child: Text(
                 incident.description,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: AppTheme.onSurfaceVariant,
+                style: const TextStyle(
+                  fontSize: 14,
+                  color: Colors.white,
+                  height: 1.4,
                 ),
               ),
             ),
             const SizedBox(height: 12),
+
             _DetailBlock(
-              label: 'Camera',
+              label: 'Camera Node & Location',
               icon: Icons.videocam_outlined,
               child: Text(
-                '${incident.displayCamera} - ${incident.displayLocation}',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: AppTheme.onSurfaceVariant,
+                '${incident.displayCamera} • ${incident.displayLocation}',
+                style: const TextStyle(
+                  fontSize: 14,
+                  color: Colors.white,
                 ),
               ),
             ),
             const SizedBox(height: 12),
+
             _DetailBlock(
-              label: 'Timestamp',
-              icon: Icons.schedule,
+              label: 'Incident Timestamp',
+              icon: Icons.schedule_outlined,
               child: Text(
                 _formatDateTime(incident.timestamp),
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: AppTheme.onSurfaceVariant,
-                  fontFamily: 'monospace',
+                style: const TextStyle(
+                  fontSize: 14,
+                  color: Colors.white,
                 ),
               ),
             ),
@@ -595,8 +707,7 @@ class _SnapshotImage extends StatelessWidget {
           return Image.memory(
             bytes,
             fit: BoxFit.cover,
-            errorBuilder: (context, error, stackTrace) =>
-                const _MissingSnapshot(),
+            errorBuilder: (context, error, stackTrace) => const _MissingSnapshot(),
           );
         } catch (_) {
           return const _MissingSnapshot();
@@ -610,8 +721,8 @@ class _SnapshotImage extends StatelessWidget {
       loadingBuilder: (context, child, progress) {
         if (progress == null) return child;
         return Container(
-          color: Colors.black,
-          child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+          color: const Color(0xFF090F19),
+          child: const Center(child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.primary)),
         );
       },
       errorBuilder: (context, error, stackTrace) => const _MissingSnapshot(),
@@ -625,21 +736,22 @@ class _MissingSnapshot extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      color: Colors.black,
+      color: const Color(0xFF090F19),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
-        children: [
+        children: const [
           Icon(
             Icons.image_not_supported_outlined,
-            size: 42,
-            color: AppTheme.outline,
+            size: 38,
+            color: AppTheme.onSurfaceVariant,
           ),
-          const SizedBox(height: 8),
+          SizedBox(height: 8),
           Text(
-            'No snapshot available',
-            style: Theme.of(
-              context,
-            ).textTheme.labelSmall?.copyWith(color: AppTheme.outline),
+            'No snapshot thumbnail captured',
+            style: TextStyle(
+              fontSize: 12,
+              color: AppTheme.onSurfaceVariant,
+            ),
           ),
         ],
       ),
@@ -655,17 +767,19 @@ class _RoleChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: AppTheme.primaryContainer,
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: AppTheme.outlineVariant),
+        color: AppTheme.primary.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppTheme.primary.withOpacity(0.3)),
       ),
       child: Text(
         role,
-        style: Theme.of(context).textTheme.labelSmall?.copyWith(
-          color: AppTheme.onSurface,
-          fontWeight: FontWeight.w700,
+        style: const TextStyle(
+          fontSize: 10,
+          fontWeight: FontWeight.w800,
+          color: AppTheme.primary,
+          letterSpacing: 0.8,
         ),
       ),
     );
@@ -681,17 +795,19 @@ class _SeverityChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: color.withValues(alpha: 0.36)),
+        color: color.withOpacity(0.15),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withOpacity(0.35)),
       ),
       child: Text(
         severity,
-        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+        style: TextStyle(
+          fontSize: 10,
+          fontWeight: FontWeight.w900,
           color: color,
-          fontWeight: FontWeight.w800,
+          letterSpacing: 0.5,
         ),
       ),
     );
@@ -702,43 +818,55 @@ class _MetricTile extends StatelessWidget {
   final String label;
   final String value;
   final IconData icon;
+  final Color accentColor;
 
   const _MetricTile({
     required this.label,
     required this.value,
     required this.icon,
+    required this.accentColor,
   });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: AppTheme.surfaceContainer,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: AppTheme.outlineVariant),
+        color: AppTheme.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppTheme.outline, width: 1),
       ),
       child: Row(
         children: [
-          Icon(icon, color: AppTheme.tertiary, size: 20),
-          const SizedBox(width: 10),
-          Flexible(
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: accentColor.withOpacity(0.12),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(icon, color: accentColor, size: 20),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   label,
-                  style: Theme.of(
-                    context,
-                  ).textTheme.labelSmall?.copyWith(color: AppTheme.outline),
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: AppTheme.onSurfaceVariant,
+                  ),
                 ),
                 const SizedBox(height: 2),
                 Text(
                   value,
                   overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                    color: AppTheme.onSurface,
-                    fontWeight: FontWeight.w700,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.white,
                   ),
                 ),
               ],
@@ -761,16 +889,15 @@ class _MetaText extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, color: AppTheme.outline, size: 15),
+        Icon(icon, color: AppTheme.onSurfaceVariant, size: 14),
         const SizedBox(width: 4),
-        ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 210),
-          child: Text(
-            text,
-            overflow: TextOverflow.ellipsis,
-            style: Theme.of(
-              context,
-            ).textTheme.labelSmall?.copyWith(color: AppTheme.onSurfaceVariant),
+        Text(
+          text,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w500,
+            color: AppTheme.onSurfaceVariant,
           ),
         ),
       ],
@@ -792,29 +919,31 @@ class _DetailBlock extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppTheme.surfaceContainer,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: AppTheme.outlineVariant),
+        color: const Color(0xFF090F19),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppTheme.outline),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(icon, size: 16, color: AppTheme.tertiary),
+              Icon(icon, size: 16, color: AppTheme.primary),
               const SizedBox(width: 8),
               Text(
                 label,
-                style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  color: AppTheme.tertiary,
+                style: const TextStyle(
+                  fontSize: 11,
                   fontWeight: FontWeight.w800,
+                  color: AppTheme.primary,
+                  letterSpacing: 0.5,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 8),
           child,
         ],
       ),
@@ -839,32 +968,34 @@ class _StatusPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: AppTheme.surfaceContainer,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: AppTheme.outlineVariant),
+        color: AppTheme.surface,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppTheme.outline),
       ),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(icon, color: color, size: 36),
+          Icon(icon, color: color, size: 40),
           const SizedBox(height: 12),
           Text(
             title,
             textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-              color: AppTheme.onSurface,
-              fontWeight: FontWeight.w700,
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w800,
+              color: Colors.white,
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
           Text(
             message,
             textAlign: TextAlign.center,
-            style: Theme.of(
-              context,
-            ).textTheme.bodyMedium?.copyWith(color: AppTheme.onSurfaceVariant),
+            style: const TextStyle(
+              fontSize: 13,
+              color: AppTheme.onSurfaceVariant,
+            ),
           ),
         ],
       ),
@@ -875,14 +1006,14 @@ class _StatusPanel extends StatelessWidget {
 Color _severityColor(String severity) {
   switch (severity.toUpperCase()) {
     case 'CRITICAL':
-      return AppTheme.error;
+      return AppTheme.severityCritical;
     case 'HIGH':
-      return const Color(0xFFFFC266);
+      return AppTheme.severityHigh;
     case 'LOW':
-      return AppTheme.tertiary;
+      return AppTheme.severityLow;
     case 'MEDIUM':
     default:
-      return AppTheme.primary;
+      return AppTheme.severityMedium;
   }
 }
 
