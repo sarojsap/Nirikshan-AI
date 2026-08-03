@@ -22,13 +22,16 @@ app.use(express.urlencoded({ extended: true }));
 
 setupSwagger(app);
 
-app.get('/health', (req, res) => {
+const healthHandler = (req, res) => {
   res.json({
     status: 'ok',
     service: 'nirikshan-cloud',
     timestamp: new Date().toISOString(),
   });
-});
+};
+
+app.get('/health', healthHandler);
+app.get('/api/health', healthHandler);
 
 app.use('/api/auth', authRoutes);
 app.use('/api/incidents', incidentRoutes);
