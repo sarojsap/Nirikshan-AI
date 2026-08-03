@@ -33,13 +33,17 @@ const healthHandler = (req, res) => {
 app.get('/health', healthHandler);
 app.get('/api/health', healthHandler);
 
-app.use('/api/auth', authRoutes);
-app.use('/api/incidents', incidentRoutes);
-app.use('/api/devices', deviceRoutes);
-app.use('/api/edge', edgeRoutes);
-app.use('/api/operators', operatorRoutes);
-app.use('/api/notifications', notificationRoutes);
-app.use('/api/debug', debugRoutes);
+const apiRouter = express.Router();
+apiRouter.use('/auth', authRoutes);
+apiRouter.use('/incidents', incidentRoutes);
+apiRouter.use('/devices', deviceRoutes);
+apiRouter.use('/edge', edgeRoutes);
+apiRouter.use('/operators', operatorRoutes);
+apiRouter.use('/notifications', notificationRoutes);
+apiRouter.use('/debug', debugRoutes);
+
+app.use('/', apiRouter);
+app.use('/api', apiRouter);
 
 app.use((req, res) => res.status(404).json({ error: 'Route not found' }));
 app.use((err, req, res, _next) => {
