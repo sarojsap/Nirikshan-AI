@@ -87,7 +87,7 @@ export async function getOperatorById(id, organizationId) {
   const userRepo = AppDataSource.getRepository(User);
   return userRepo.findOne({
     where: { id, role: 'OPERATOR', organizationId },
-    select: ['id', 'name', 'email', 'role', 'isActive', 'createdAt', 'updatedAt'],
+    select: { id: true, name: true, email: true, role: true, isActive: true, createdAt: true, updatedAt: true },
   });
 }
 

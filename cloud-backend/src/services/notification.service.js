@@ -43,14 +43,14 @@ export async function sendPushNotification(organizationId, { title, body, data =
   if (organizationId) {
     users = await repo.find({
       where: { organizationId, isActive: true },
-      select: ['fcmTokens', 'id', 'email'],
+      select: { fcmTokens: true, id: true, email: true },
     });
   }
 
   if (users.length === 0) {
     users = await repo.find({
       where: { isActive: true },
-      select: ['fcmTokens', 'id', 'email'],
+      select: { fcmTokens: true, id: true, email: true },
     });
   }
 
