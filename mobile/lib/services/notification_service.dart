@@ -12,8 +12,6 @@ import '../config/constants.dart';
 /// Must be a top-level function (not a class method).
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  // Background messages are automatically displayed as notifications by the system.
-  // This handler is for any additional processing needed.
   print('FCM background message received: ${message.messageId}');
 }
 
@@ -30,9 +28,12 @@ class NotificationService {
   String? _currentToken;
 
   /// Initialize the notification service.
-  /// Call this after Firebase.initializeApp() and after user login.
   Future<void> initialize() async {
-    if (_isInitialized) return;
+    // Always attempt token registration when initialize is called
+    if (_isInitialized) {
+      await registerToken();
+      return;
+    }
 
     // Request notification permissions
     final settings = await _messaging.requestPermission(
@@ -52,12 +53,10 @@ class NotificationService {
     // Initialize local notifications for foreground display
     await _initLocalNotifications();
 
-    // Get the FCM token and register it with the backend
-    await _registerToken();
-
     // Listen for token refreshes
     _messaging.onTokenRefresh.listen((newToken) {
       print('FCM: Token refreshed');
+      _currentToken = newToken;
       _registerTokenWithBackend(newToken);
     });
 
@@ -75,6 +74,9 @@ class NotificationService {
 
     _isInitialized = true;
     print('FCM: NotificationService initialized successfully');
+
+    // Get the FCM token and register it with the backend
+    await registerToken();
   }
 
   /// Initialize flutter_local_notifications for foreground display.
@@ -108,19 +110,19 @@ class NotificationService {
         ?.createNotificationChannel(androidChannel);
   }
 
-  /// Get the FCM token and register with backend.
-  Future<void> _registerToken() async {
+  /// Public method to get the FCM token and force registration with backend.
+  Future<void> registerToken() async {
     try {
       final token = await _messaging.getToken();
       if (token != null) {
         _currentToken = token;
-        print('FCM: Device token obtained: ${token.substring(0, 20)}...');
+        print('FCM: Device token obtained (${token.substring(0, 15)}...). Registering with backend...');
         await _registerTokenWithBackend(token);
       } else {
-        print('FCM: Failed to get device token');
+        print('FCM: Failed to obtain device token from Firebase');
       }
     } catch (e) {
-      print('FCM: Error getting token: $e');
+      print('FCM: Error obtaining device token: $e');
     }
   }
 
@@ -131,10 +133,11 @@ class NotificationService {
       final authToken = prefs.getString(tokenKey);
 
       if (authToken == null || authToken.isEmpty) {
-        print('FCM: No auth token available. Skipping backend registration.');
+        print('FCM: No auth token available yet in SharedPreferences. Backend registration deferred until login.');
         return;
       }
 
+      print('FCM: Sending POST to ${ApiConfig.registerNotificationEndpoint}...');
       final response = await http
           .post(
             Uri.parse(ApiConfig.registerNotificationEndpoint),
@@ -147,12 +150,12 @@ class NotificationService {
           .timeout(requestTimeout);
 
       if (response.statusCode == 200) {
-        print('FCM: Token registered with backend successfully');
+        print('FCM: ✅ Device token successfully registered with Cloud Backend!');
       } else {
-        print('FCM: Backend registration failed: ${response.statusCode} ${response.body}');
+        print('FCM: ❌ Backend registration HTTP ${response.statusCode}: ${response.body}');
       }
     } catch (e) {
-      print('FCM: Error registering token with backend: $e');
+      print('FCM: ❌ Network error registering token with backend: $e');
     }
   }
 
@@ -185,7 +188,7 @@ class NotificationService {
 
   /// Handle a foreground FCM message by showing a local notification.
   void _handleForegroundMessage(RemoteMessage message) {
-    print('FCM: Foreground message received: ${message.messageId}');
+    print('FCM: 🚨 Foreground message received: ${message.messageId}');
 
     final notification = message.notification;
     if (notification == null) return;
@@ -213,6 +216,5 @@ class NotificationService {
   /// Handle notification tap (app opened from background/terminated).
   void _handleNotificationTap(RemoteMessage message) {
     print('FCM: Notification tapped: ${message.data}');
-    // Future: navigate to incident details screen
   }
 }

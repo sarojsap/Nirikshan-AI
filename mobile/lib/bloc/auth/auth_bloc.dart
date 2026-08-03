@@ -1,5 +1,7 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
+
 import '../../services/auth_service.dart';
+import '../../services/notification_service.dart';
 import 'auth_event.dart';
 import 'auth_state.dart';
 
@@ -26,6 +28,8 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
 
       if (result['success'] == true) {
         emit(AuthSuccess(token: result['token'], user: result['user']));
+        // Force register FCM token with Cloud backend once authenticated
+        NotificationService().initialize();
       } else {
         emit(AuthFailure(message: result['message'] ?? 'Login failed'));
       }
@@ -38,6 +42,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     LogoutRequested event,
     Emitter<AuthState> emit,
   ) async {
+    await NotificationService().unregister();
     await authService.logout();
     emit(const AuthUnauthenticated());
   }
@@ -47,7 +52,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     Emitter<AuthState> emit,
   ) async {
     if (event.isAuthenticated) {
-      // Handle authenticated state
+      NotificationService().initialize();
     } else {
       emit(const AuthUnauthenticated());
     }
@@ -63,6 +68,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
 
       if (token != null && token.isNotEmpty && user != null) {
         emit(AuthSuccess(token: token, user: user));
+        NotificationService().initialize();
       } else {
         emit(const AuthUnauthenticated());
       }
