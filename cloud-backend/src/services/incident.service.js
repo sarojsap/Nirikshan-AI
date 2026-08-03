@@ -16,22 +16,31 @@ export async function createIncident(data) {
     relations: { organization: true, edgeDevice: true },
   });
 
-  try {
-    getIO().to(`org:${data.organizationId}`).emit('new_incident', full);
-  } catch {
-    /* Socket may not be connected */
-  }
+  let fcmStatus = { sent: false };
 
   try {
     console.log(`[Incident FCM Push] Triggering push notification for incident #${full.id} (${full.type})...`);
-    await sendPushNotification(data.organizationId, {
+    const fcmResult = await sendPushNotification(data.organizationId, {
       title: `Incident: ${full.type}`,
       body: full.description || `${full.type} detected`,
       data: { incidentId: full.id, type: full.type, severity: full.severity },
     });
+    fcmStatus = {
+      sent: true,
+      successCount: fcmResult?.successCount || 0,
+      failureCount: fcmResult?.failureCount || 0,
+    };
     console.log(`[Incident FCM Push] Completed push notification trigger for incident #${full.id}.`);
   } catch (pushErr) {
+    fcmStatus = { sent: false, error: pushErr.message || String(pushErr) };
     console.error(`[Incident FCM Push Error] Failed to send push notification for incident #${full.id}:`, pushErr.stack || pushErr.message || pushErr);
+  }
+
+  try {
+    const payloadWithFcm = { ...full, fcmStatus };
+    getIO().to(`org:${data.organizationId}`).emit('new_incident', payloadWithFcm);
+  } catch {
+    /* Socket may not be connected */
   }
 
   return full;

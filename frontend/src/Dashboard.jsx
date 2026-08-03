@@ -350,6 +350,27 @@ export default function Dashboard({ token, user, onLogout, mode: initialMode, on
       socketRef.current.on('new_incident', (incident) => {
         playAlertSound();
         setCloudIncidents((prev) => [incident, ...prev.slice(0, 19)]);
+
+        console.group('%c 🚨 [NIRIKSHAN CLOUD ALERT] Live Incident Received', 'background: #0284c7; color: white; font-weight: bold; padding: 4px 8px; border-radius: 4px;');
+        console.log('%cType:', 'color: #38bdf8; font-weight: bold;', incident.type);
+        console.log('%cSeverity:', 'color: #f43f5e; font-weight: bold;', incident.severity);
+        console.log('%cDescription:', 'color: #cbd5e1;', incident.description || 'N/A');
+        console.log('%cCamera Node:', 'color: #cbd5e1;', incident.displayCamera || incident.cameraName || 'Office Camera');
+        console.log('%cTimestamp:', 'color: #cbd5e1;', incident.timestamp || new Date().toISOString());
+        if (incident.fcmStatus) {
+          if (incident.fcmStatus.sent) {
+            console.log(
+              `%c 📲 [FCM Push Status] Sent to ${incident.fcmStatus.successCount || 0} mobile device(s) (Failed: ${incident.fcmStatus.failureCount || 0})`,
+              'color: #22c55e; font-weight: bold; font-size: 12px;'
+            );
+          } else if (incident.fcmStatus.error) {
+            console.warn(
+              `%c 📲 [FCM Push Error] ${incident.fcmStatus.error}`,
+              'color: #ef4444; font-weight: bold; font-size: 12px;'
+            );
+          }
+        }
+        console.groupEnd();
       });
       const interval = setInterval(fetchCloudDevices, 30000);
       return () => clearInterval(interval);
