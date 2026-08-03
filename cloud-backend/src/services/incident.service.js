@@ -23,13 +23,15 @@ export async function createIncident(data) {
   }
 
   try {
+    console.log(`[Incident FCM Push] Triggering push notification for incident #${full.id} (${full.type})...`);
     await sendPushNotification(data.organizationId, {
       title: `Incident: ${full.type}`,
       body: full.description || `${full.type} detected`,
       data: { incidentId: full.id, type: full.type, severity: full.severity },
     });
-  } catch {
-    /* Push may fail */
+    console.log(`[Incident FCM Push] Completed push notification trigger for incident #${full.id}.`);
+  } catch (pushErr) {
+    console.error(`[Incident FCM Push Error] Failed to send push notification for incident #${full.id}:`, pushErr.stack || pushErr.message || pushErr);
   }
 
   return full;

@@ -12,7 +12,9 @@ export async function registerToken(userId, fcmToken) {
   if (!currentTokens.includes(fcmToken)) {
     const updated = [...currentTokens, fcmToken];
     await repo.update(userId, { fcmTokens: updated });
-    console.log(`[FCM] Registered token for user ${user.id} (${user.email}) - Total tokens: ${updated.length}`);
+    console.log(`[FCM Log ✅] Registered FCM device token for user ${user.id} (${user.email}) - Total active tokens: ${updated.length}`);
+  } else {
+    console.log(`[FCM Log ℹ️] FCM device token already registered for user ${user.id} (${user.email}).`);
   }
 }
 
@@ -25,28 +27,40 @@ export async function unregisterToken(userId, fcmToken) {
   const currentTokens = Array.isArray(user.fcmTokens) ? user.fcmTokens : [];
   const updated = currentTokens.filter(t => t !== fcmToken);
   await repo.update(userId, { fcmTokens: updated });
-  console.log(`[FCM] Unregistered token for user ${user.id} (${user.email})`);
+  console.log(`[FCM Log ℹ️] Unregistered FCM device token for user ${user.id} (${user.email}).`);
 }
 
 export async function sendPushNotification(organizationId, { title, body, data = {} }) {
+  console.log(`[FCM Log] Preparing push notification for incident: "${title}" (Org: ${organizationId || 'Global'})`);
+
   if (!messaging) {
-    console.warn('[FCM] Firebase messaging not configured — skipping push notification');
+    console.warn('[FCM Log ⚠️] Firebase Admin Messaging is not initialized or configured on Cloud Backend. Skipping FCM push.');
     return;
   }
 
   const repo = AppDataSource.getRepository(User);
-  const users = await repo.find({
-    where: { organizationId, isActive: true },
-    select: ['fcmTokens', 'id', 'email'],
-  });
+  let users = [];
+  if (organizationId) {
+    users = await repo.find({
+      where: { organizationId, isActive: true },
+      select: ['fcmTokens', 'id', 'email'],
+    });
+  }
+
+  if (users.length === 0) {
+    users = await repo.find({
+      where: { isActive: true },
+      select: ['fcmTokens', 'id', 'email'],
+    });
+  }
 
   const tokens = users.flatMap(u => u.fcmTokens || []).filter(Boolean);
   if (tokens.length === 0) {
-    console.log(`[FCM] No registered device tokens for organization ${organizationId}`);
+    console.warn(`[FCM Log ⚠️] No registered FCM device tokens found in database for Org ${organizationId || 'Global'}. Mobile devices must log in to register push tokens.`);
     return;
   }
 
-  console.log(`[FCM] Sending push notification to ${tokens.length} tokens (Org: ${organizationId}): "${title}"`);
+  console.log(`[FCM Log 🚀] Dispatching push notification to ${tokens.length} registered device token(s): "${title}"`);
 
   const message = {
     tokens,
@@ -56,19 +70,25 @@ export async function sendPushNotification(organizationId, { title, body, data =
 
   try {
     const response = await messaging.sendEachForMulticast(message);
-    console.log(`[FCM] Multicast result: ${response.successCount} succeeded, ${response.failureCount} failed.`);
+    console.log(`[FCM Log 📊] Multicast Dispatch Result: ${response.successCount} succeeded, ${response.failureCount} failed.`);
 
     const invalidTokens = [];
     response.responses.forEach((resp, idx) => {
-      if (
-        resp.error?.code === 'messaging/invalid-registration-token' ||
-        resp.error?.code === 'messaging/registration-token-not-registered'
-      ) {
-        invalidTokens.push(tokens[idx]);
+      if (!resp.success) {
+        console.error(`[FCM Log ❌] Token #${idx + 1} delivery failed (${tokens[idx].substring(0, 15)}...): Error Code=${resp.error?.code}, Message=${resp.error?.message}`);
+        if (
+          resp.error?.code === 'messaging/invalid-registration-token' ||
+          resp.error?.code === 'messaging/registration-token-not-registered'
+        ) {
+          invalidTokens.push(tokens[idx]);
+        }
+      } else {
+        console.log(`[FCM Log ✅] Token #${idx + 1} (${tokens[idx].substring(0, 15)}...) successfully sent to Google FCM.`);
       }
     });
 
     if (invalidTokens.length > 0) {
+      console.log(`[FCM Log 🧹] Cleaning up ${invalidTokens.length} expired/invalid FCM token(s)...`);
       for (const user of users) {
         const remaining = (user.fcmTokens || []).filter(t => !invalidTokens.includes(t));
         if (remaining.length !== (user.fcmTokens || []).length) {
@@ -79,6 +99,6 @@ export async function sendPushNotification(organizationId, { title, body, data =
 
     return response;
   } catch (err) {
-    console.error('[FCM] Multicast push error:', err.message);
+    console.error('[FCM Log 💥] Multicast FCM Push Exception:', err.stack || err.message || err);
   }
 }
