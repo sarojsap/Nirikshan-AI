@@ -1,10 +1,10 @@
 import { Router } from 'express';
-import { authenticate } from '../middleware/auth.middleware.js';
+import { verifyToken } from '../middlewares/auth.middleware.js';
 import * as notificationController from '../controllers/notification.controller.js';
 
 const router = Router();
 
-router.use(authenticate);
+router.use(verifyToken);
 
 router.post('/register', notificationController.registerToken);
 router.post('/unregister', notificationController.unregisterToken);
