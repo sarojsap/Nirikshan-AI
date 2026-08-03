@@ -209,7 +209,7 @@ export async function syncPendingIncidents() {
             snapshotUrl = cloudinaryRes.secure_url;
             console.log(`[Sync] Snapshot uploaded: ${snapshotUrl}`);
           } else {
-            console.error(`[Sync] Upload URL response invalid for ${incident.id}:`, JSON.stringify(uploadRes));
+            console.error(`[Sync] Upload URL response invalid for ${incident.id}: ${uploadRes?.body?.error || JSON.stringify(uploadRes)}`);
           }
         } catch (err) {
           console.error(`[Sync] Snapshot upload failed for ${incident.id}:`, err.message);
@@ -242,7 +242,7 @@ export async function syncPendingIncidents() {
             clipUrl = cloudinaryRes.secure_url;
             console.log(`[Sync] Clip uploaded: ${clipUrl}`);
           } else {
-            console.error(`[Sync] Upload URL response invalid for ${incident.id}:`, JSON.stringify(uploadRes));
+            console.error(`[Sync] Upload URL response invalid for ${incident.id}: ${uploadRes?.body?.error || JSON.stringify(uploadRes)}`);
           }
         } catch (err) {
           console.error(`[Sync] Clip upload failed for ${incident.id}:`, err.message);
