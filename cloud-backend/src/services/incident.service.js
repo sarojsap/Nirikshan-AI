@@ -37,8 +37,9 @@ export async function createIncident(data) {
 
 export async function getIncidentById(id, organizationId) {
   const repo = AppDataSource.getRepository(Incident);
+  const whereClause = organizationId ? { id, organizationId } : { id };
   const incident = await repo.findOne({
-    where: { id, organizationId },
+    where: whereClause,
     relations: { edgeDevice: true },
   });
   if (!incident) return null;
@@ -52,8 +53,11 @@ export async function listIncidents(
   const repo = AppDataSource.getRepository(Incident);
   const query = repo
     .createQueryBuilder('incident')
-    .where('incident.organizationId = :orgId', { orgId: organizationId })
     .leftJoinAndSelect('incident.edgeDevice', 'edgeDevice');
+
+  if (organizationId) {
+    query.andWhere('incident.organizationId = :orgId', { orgId: organizationId });
+  }
 
   if (type) query.andWhere('incident.type = :type', { type });
   if (severity) query.andWhere('incident.severity = :severity', { severity });
@@ -80,25 +84,34 @@ export async function listIncidents(
 export async function getDashboardSummary(organizationId) {
   const repo = AppDataSource.getRepository(Incident);
 
-  const total = await repo.count({ where: { organizationId } });
-  const bySeverity = await repo
+  const total = organizationId
+    ? await repo.count({ where: { organizationId } })
+    : await repo.count();
+
+  const severityQuery = repo
     .createQueryBuilder('i')
     .select('i.severity', 'severity')
     .addSelect('COUNT(*)', 'count')
-    .where('i.organizationId = :orgId', { orgId: organizationId })
-    .groupBy('i.severity')
-    .getRawMany();
+    .groupBy('i.severity');
 
-  const byType = await repo
+  if (organizationId) {
+    severityQuery.where('i.organizationId = :orgId', { orgId: organizationId });
+  }
+  const bySeverity = await severityQuery.getRawMany();
+
+  const typeQuery = repo
     .createQueryBuilder('i')
     .select('i.type', 'type')
     .addSelect('COUNT(*)', 'count')
-    .where('i.organizationId = :orgId', { orgId: organizationId })
-    .groupBy('i.type')
-    .getRawMany();
+    .groupBy('i.type');
+
+  if (organizationId) {
+    typeQuery.where('i.organizationId = :orgId', { orgId: organizationId });
+  }
+  const byType = await typeQuery.getRawMany();
 
   const recent = await repo.find({
-    where: { organizationId },
+    where: organizationId ? { organizationId } : {},
     order: { timestamp: 'DESC' },
     take: 5,
     relations: { edgeDevice: true },
