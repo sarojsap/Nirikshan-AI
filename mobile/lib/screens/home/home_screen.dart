@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:video_player/video_player.dart';
 
 import '../../bloc/auth/bloc.dart';
 import '../../config/theme.dart';
@@ -376,7 +377,6 @@ class _Header extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // User & Role Header Row
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
@@ -420,7 +420,6 @@ class _Header extends StatelessWidget {
         ),
         const SizedBox(height: 20),
 
-        // Quick Metrics Tiles Row
         Row(
           children: [
             Expanded(
@@ -481,6 +480,7 @@ class _IncidentCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final severityColor = _severityColor(incident.severity);
+    final hasVideo = incident.resolvedVideoUrl != null;
 
     return Container(
       decoration: BoxDecoration(
@@ -504,12 +504,45 @@ class _IncidentCard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              ClipRRect(
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(19)),
-                child: AspectRatio(
-                  aspectRatio: 16 / 9,
-                  child: _SnapshotImage(url: incident.resolvedImageUrl),
-                ),
+              Stack(
+                children: [
+                  ClipRRect(
+                    borderRadius: const BorderRadius.vertical(top: Radius.circular(19)),
+                    child: AspectRatio(
+                      aspectRatio: 16 / 9,
+                      child: _SnapshotImage(url: incident.resolvedImageUrl),
+                    ),
+                  ),
+                  if (hasVideo)
+                    Positioned(
+                      top: 12,
+                      left: 12,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withOpacity(0.75),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: AppTheme.primary.withOpacity(0.5)),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: const [
+                            Icon(Icons.play_circle_fill, color: AppTheme.primary, size: 14),
+                            SizedBox(width: 4),
+                            Text(
+                              'VIDEO CLIP',
+                              style: TextStyle(
+                                fontSize: 9,
+                                fontWeight: FontWeight.w800,
+                                color: Colors.white,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                ],
               ),
               Padding(
                 padding: const EdgeInsets.all(16),
@@ -572,20 +605,34 @@ class _IncidentCard extends StatelessWidget {
   }
 }
 
-class _IncidentDetailsSheet extends StatelessWidget {
+class _IncidentDetailsSheet extends StatefulWidget {
   final Incident incident;
 
   const _IncidentDetailsSheet({required this.incident});
 
   @override
+  State<_IncidentDetailsSheet> createState() => _IncidentDetailsSheetState();
+}
+
+class _IncidentDetailsSheetState extends State<_IncidentDetailsSheet> {
+  bool _showVideo = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _showVideo = false;
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final severityColor = _severityColor(incident.severity);
+    final severityColor = _severityColor(widget.incident.severity);
+    final videoUrl = widget.incident.resolvedVideoUrl;
 
     return DraggableScrollableSheet(
       expand: false,
-      initialChildSize: 0.88,
+      initialChildSize: 0.90,
       minChildSize: 0.5,
-      maxChildSize: 0.95,
+      maxChildSize: 0.96,
       builder: (context, scrollController) {
         return ListView(
           controller: scrollController,
@@ -603,21 +650,97 @@ class _IncidentDetailsSheet extends StatelessWidget {
             ),
             const SizedBox(height: 20),
 
-            // High-Res Image Preview
-            ClipRRect(
-              borderRadius: BorderRadius.circular(16),
-              child: AspectRatio(
-                aspectRatio: 16 / 9,
-                child: _SnapshotImage(url: incident.resolvedImageUrl),
+            // Tab Switcher if Video Clip Available
+            if (videoUrl != null) ...[
+              Container(
+                decoration: BoxDecoration(
+                  color: const Color(0xFF090F19),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: AppTheme.outline),
+                ),
+                padding: const EdgeInsets.all(4),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () => setState(() => _showVideo = true),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          decoration: BoxDecoration(
+                            color: _showVideo ? AppTheme.primary : Colors.transparent,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.play_circle_fill, size: 16, color: _showVideo ? Colors.white : AppTheme.onSurfaceVariant),
+                              const SizedBox(width: 6),
+                              Text(
+                                'Recorded Video',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  color: _showVideo ? Colors.white : AppTheme.onSurfaceVariant,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () => setState(() => _showVideo = false),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          decoration: BoxDecoration(
+                            color: !_showVideo ? AppTheme.primary : Colors.transparent,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.image_outlined, size: 16, color: !_showVideo ? Colors.white : AppTheme.onSurfaceVariant),
+                              const SizedBox(width: 6),
+                              Text(
+                                'Snapshot Frame',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  color: !_showVideo ? Colors.white : AppTheme.onSurfaceVariant,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
+              const SizedBox(height: 16),
+            ],
+
+            // Video Player or Snapshot View
+            if (videoUrl != null && _showVideo)
+              _IncidentVideoPlayer(videoUrl: videoUrl)
+            else
+              ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: AspectRatio(
+                  aspectRatio: 16 / 9,
+                  child: _SnapshotImage(url: widget.incident.resolvedImageUrl),
+                ),
+              ),
             const SizedBox(height: 20),
 
             Row(
               children: [
                 Expanded(
                   child: Text(
-                    incident.displayType,
+                    widget.incident.displayType,
                     style: const TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.w800,
@@ -626,14 +749,14 @@ class _IncidentDetailsSheet extends StatelessWidget {
                   ),
                 ),
                 _SeverityChip(
-                  severity: incident.severity,
+                  severity: widget.incident.severity,
                   color: severityColor,
                 ),
               ],
             ),
             const SizedBox(height: 4),
             Text(
-              'LOG ID: ${incident.id}',
+              'LOG ID: ${widget.incident.id}',
               style: const TextStyle(
                 fontSize: 10,
                 fontWeight: FontWeight.w700,
@@ -647,7 +770,7 @@ class _IncidentDetailsSheet extends StatelessWidget {
               label: 'Alert Description',
               icon: Icons.notes_outlined,
               child: Text(
-                incident.description,
+                widget.incident.description,
                 style: const TextStyle(
                   fontSize: 14,
                   color: Colors.white,
@@ -661,7 +784,7 @@ class _IncidentDetailsSheet extends StatelessWidget {
               label: 'Camera Node & Location',
               icon: Icons.videocam_outlined,
               child: Text(
-                '${incident.displayCamera} • ${incident.displayLocation}',
+                '${widget.incident.displayCamera} • ${widget.incident.displayLocation}',
                 style: const TextStyle(
                   fontSize: 14,
                   color: Colors.white,
@@ -674,7 +797,7 @@ class _IncidentDetailsSheet extends StatelessWidget {
               label: 'Incident Timestamp',
               icon: Icons.schedule_outlined,
               child: Text(
-                _formatDateTime(incident.timestamp),
+                _formatDateTime(widget.incident.timestamp),
                 style: const TextStyle(
                   fontSize: 14,
                   color: Colors.white,
@@ -686,6 +809,633 @@ class _IncidentDetailsSheet extends StatelessWidget {
       },
     );
   }
+}
+
+class _IncidentVideoPlayer extends StatefulWidget {
+  final String videoUrl;
+
+  const _IncidentVideoPlayer({required this.videoUrl});
+
+  @override
+  State<_IncidentVideoPlayer> createState() => _IncidentVideoPlayerState();
+}
+
+class _IncidentVideoPlayerState extends State<_IncidentVideoPlayer> {
+  VideoPlayerController? _controller;
+  bool _isInitialized = false;
+  bool _hasError = false;
+  String _errorMessage = '';
+
+  double _currentSpeed = 1.0;
+  final List<double> _speeds = const [0.5, 1.0, 1.25, 1.5, 2.0];
+
+  String get _effectiveUrl {
+    var url = widget.videoUrl;
+    // Substitute localhost / 127.0.0.1 for Android Emulator (10.0.2.2)
+    if (url.contains('localhost')) {
+      url = url.replaceAll('localhost', '10.0.2.2');
+    } else if (url.contains('127.0.0.1')) {
+      url = url.replaceAll('127.0.0.1', '10.0.2.2');
+    }
+    // Cloudinary ExoPlayer extension safety
+    if (url.contains('res.cloudinary.com') &&
+        !url.contains('.mp4') &&
+        !url.contains('.m3u8') &&
+        !url.contains('.mov')) {
+      final queryIndex = url.indexOf('?');
+      if (queryIndex != -1) {
+        url = '${url.substring(0, queryIndex)}.mp4${url.substring(queryIndex)}';
+      } else {
+        url = '$url.mp4';
+      }
+    }
+    return url;
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _initVideo();
+  }
+
+  @override
+  void didUpdateWidget(covariant _IncidentVideoPlayer oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.videoUrl != widget.videoUrl) {
+      _initVideo();
+    }
+  }
+
+  void _initVideo() {
+    _controller?.dispose();
+
+    setState(() {
+      _hasError = false;
+      _isInitialized = false;
+      _errorMessage = '';
+      _currentSpeed = 1.0;
+    });
+
+    final url = _effectiveUrl;
+    print('[VideoPlayer] Loading native stream: $url');
+
+    final controller = VideoPlayerController.networkUrl(
+      Uri.parse(url),
+      httpHeaders: const {
+        'User-Agent': 'Mozilla/5.0 (Linux; Android 10; Mobile) AppleWebKit/537.36 (KHTML, like Gecko)',
+      },
+    );
+
+    _controller = controller;
+
+    controller.initialize().then((_) {
+      if (mounted && _controller == controller) {
+        setState(() {
+          _isInitialized = true;
+        });
+        controller.addListener(() {
+          if (mounted) setState(() {});
+        });
+        controller.play();
+        controller.setLooping(true);
+      }
+    }).catchError((error) {
+      print('[VideoPlayer] ExoPlayer network error ($url): $error');
+      if (mounted && _controller == controller) {
+        setState(() {
+          _hasError = true;
+          _errorMessage = error.toString();
+        });
+      }
+    });
+  }
+
+  void _seekRelative(int seconds) {
+    if (_controller == null || !_isInitialized) return;
+    final currentPos = _controller!.value.position;
+    final targetPos = currentPos + Duration(seconds: seconds);
+    final maxDuration = _controller!.value.duration;
+
+    if (targetPos < Duration.zero) {
+      _controller!.seekTo(Duration.zero);
+    } else if (targetPos > maxDuration) {
+      _controller!.seekTo(maxDuration);
+    } else {
+      _controller!.seekTo(targetPos);
+    }
+  }
+
+  void _cycleSpeed() {
+    if (_controller == null || !_isInitialized) return;
+    final currentIndex = _speeds.indexOf(_currentSpeed);
+    final nextIndex = (currentIndex + 1) % _speeds.length;
+    final nextSpeed = _speeds[nextIndex];
+    setState(() {
+      _currentSpeed = nextSpeed;
+      _controller!.setPlaybackSpeed(nextSpeed);
+    });
+  }
+
+  void _openFullScreenPlayer(BuildContext context) {
+    if (_controller == null || !_isInitialized) return;
+
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => _FullScreenVideoViewer(
+          controller: _controller!,
+          effectiveUrl: _effectiveUrl,
+        ),
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller?.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_hasError) {
+      return Container(
+        height: 200,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: const Color(0xFF090F19),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppTheme.outline),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.video_library_outlined, color: AppTheme.onSurfaceVariant, size: 32),
+            const SizedBox(height: 8),
+            const Text(
+              'Unable to stream video clip',
+              style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              _effectiveUrl,
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 10, fontFamily: 'monospace', color: AppTheme.onSurfaceVariant),
+            ),
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              onPressed: _initVideo,
+              style: OutlinedButton.styleFrom(
+                side: const BorderSide(color: AppTheme.primary),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              ),
+              icon: const Icon(Icons.refresh, size: 16, color: AppTheme.primary),
+              label: const Text('Retry Stream', style: TextStyle(fontSize: 12, color: AppTheme.primary)),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (!_isInitialized || _controller == null) {
+      return Container(
+        height: 200,
+        decoration: BoxDecoration(
+          color: const Color(0xFF090F19),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppTheme.outline),
+        ),
+        child: const Center(
+          child: CircularProgressIndicator(color: AppTheme.primary, strokeWidth: 2.5),
+        ),
+      );
+    }
+
+    final isPlaying = _controller!.value.isPlaying;
+    final position = _controller!.value.position;
+    final duration = _controller!.value.duration;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.black,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppTheme.primary.withOpacity(0.4), width: 1.5),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(15),
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            AspectRatio(
+              aspectRatio: _controller!.value.aspectRatio > 0 ? _controller!.value.aspectRatio : 16 / 9,
+              child: VideoPlayer(_controller!),
+            ),
+
+            // Top Action Bar (Speed & Fullscreen)
+            Positioned(
+              top: 8,
+              left: 10,
+              right: 10,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  // Playback Speed Pill Button
+                  GestureDetector(
+                    onTap: _cycleSpeed,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.7),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: AppTheme.primary.withOpacity(0.4)),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.speed, size: 12, color: AppTheme.primary),
+                          const SizedBox(width: 4),
+                          Text(
+                            '${_currentSpeed}x',
+                            style: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w800,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  // Fullscreen Button
+                  GestureDetector(
+                    onTap: () => _openFullScreenPlayer(context),
+                    child: Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.7),
+                        shape: BoxShape.circle,
+                        border: Border.all(color: AppTheme.primary.withOpacity(0.4)),
+                      ),
+                      child: const Icon(
+                        Icons.fullscreen,
+                        color: Colors.white,
+                        size: 18,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // Center Controls Overlay (-5s, Play/Pause, +5s)
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                // -5s Seek Backward
+                GestureDetector(
+                  onTap: () => _seekRelative(-5),
+                  child: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.6),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.replay_5, color: Colors.white, size: 26),
+                  ),
+                ),
+                const SizedBox(width: 20),
+
+                // Play / Pause Button
+                GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      isPlaying ? _controller!.pause() : _controller!.play();
+                    });
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: const BoxDecoration(
+                      color: AppTheme.primary,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(color: AppTheme.primary, blurRadius: 10, spreadRadius: 1),
+                      ],
+                    ),
+                    child: Icon(
+                      isPlaying ? Icons.pause : Icons.play_arrow,
+                      color: Colors.white,
+                      size: 28,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 20),
+
+                // +5s Seek Forward
+                GestureDetector(
+                  onTap: () => _seekRelative(5),
+                  child: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.6),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.forward_5, color: Colors.white, size: 26),
+                  ),
+                ),
+              ],
+            ),
+
+            // Bottom Progress Bar & Timestamps
+            Positioned(
+              bottom: 0,
+              left: 0,
+              right: 0,
+              child: Container(
+                padding: const EdgeInsets.fromLTRB(10, 4, 10, 4),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [Colors.transparent, Colors.black.withOpacity(0.8)],
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                  ),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    VideoProgressIndicator(
+                      _controller!,
+                      allowScrubbing: true,
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      colors: const VideoProgressColors(
+                        playedColor: AppTheme.primary,
+                        bufferedColor: Colors.white24,
+                        backgroundColor: Colors.white10,
+                      ),
+                    ),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          '${_formatDuration(position)} / ${_formatDuration(duration)}',
+                          style: const TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white70,
+                            fontFamily: 'monospace',
+                          ),
+                        ),
+                        const Text(
+                          'LIVE STREAM',
+                          style: TextStyle(
+                            fontSize: 8,
+                            fontWeight: FontWeight.w900,
+                            color: AppTheme.primary,
+                            letterSpacing: 0.8,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _FullScreenVideoViewer extends StatefulWidget {
+  final VideoPlayerController controller;
+  final String effectiveUrl;
+
+  const _FullScreenVideoViewer({
+    required this.controller,
+    required this.effectiveUrl,
+  });
+
+  @override
+  State<_FullScreenVideoViewer> createState() => _FullScreenVideoViewerState();
+}
+
+class _FullScreenVideoViewerState extends State<_FullScreenVideoViewer> {
+  late double _currentSpeed;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentSpeed = widget.controller.value.playbackSpeed;
+    widget.controller.addListener(_updateState);
+  }
+
+  @override
+  void dispose() {
+    widget.controller.removeListener(_updateState);
+    super.dispose();
+  }
+
+  void _updateState() {
+    if (mounted) setState(() {});
+  }
+
+  void _seekRelative(int seconds) {
+    final currentPos = widget.controller.value.position;
+    final targetPos = currentPos + Duration(seconds: seconds);
+    final maxDuration = widget.controller.value.duration;
+
+    if (targetPos < Duration.zero) {
+      widget.controller.seekTo(Duration.zero);
+    } else if (targetPos > maxDuration) {
+      widget.controller.seekTo(maxDuration);
+    } else {
+      widget.controller.seekTo(targetPos);
+    }
+  }
+
+  void _changeSpeed(double speed) {
+    setState(() {
+      _currentSpeed = speed;
+      widget.controller.setPlaybackSpeed(speed);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isPlaying = widget.controller.value.isPlaying;
+    final position = widget.controller.value.position;
+    final duration = widget.controller.value.duration;
+
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: SafeArea(
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            Center(
+              child: AspectRatio(
+                aspectRatio: widget.controller.value.aspectRatio > 0 ? widget.controller.value.aspectRatio : 16 / 9,
+                child: VideoPlayer(widget.controller),
+              ),
+            ),
+
+            // Top Bar (Close & Speed Dropdown)
+            Positioned(
+              top: 16,
+              left: 16,
+              right: 16,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.close, color: Colors.white, size: 28),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                  PopupMenuButton<double>(
+                    initialValue: _currentSpeed,
+                    onSelected: _changeSpeed,
+                    color: AppTheme.surface,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.75),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: AppTheme.primary.withOpacity(0.5)),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.speed, size: 14, color: AppTheme.primary),
+                          const SizedBox(width: 6),
+                          Text(
+                            '${_currentSpeed}x',
+                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
+                          ),
+                        ],
+                      ),
+                    ),
+                    itemBuilder: (context) => [0.5, 1.0, 1.25, 1.5, 2.0].map((speed) {
+                      return PopupMenuItem<double>(
+                        value: speed,
+                        child: Text(
+                          '${speed}x',
+                          style: TextStyle(
+                            color: _currentSpeed == speed ? AppTheme.primary : Colors.white,
+                            fontWeight: _currentSpeed == speed ? FontWeight.bold : FontWeight.normal,
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ],
+              ),
+            ),
+
+            // Center Controls (-5s, Play/Pause, +5s)
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                GestureDetector(
+                  onTap: () => _seekRelative(-5),
+                  child: Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.65),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.replay_5, color: Colors.white, size: 36),
+                  ),
+                ),
+                const SizedBox(width: 32),
+                GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      isPlaying ? widget.controller.pause() : widget.controller.play();
+                    });
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: const BoxDecoration(
+                      color: AppTheme.primary,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(color: AppTheme.primary, blurRadius: 16, spreadRadius: 2),
+                      ],
+                    ),
+                    child: Icon(
+                      isPlaying ? Icons.pause : Icons.play_arrow,
+                      color: Colors.white,
+                      size: 38,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 32),
+                GestureDetector(
+                  onTap: () => _seekRelative(5),
+                  child: Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.65),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.forward_5, color: Colors.white, size: 36),
+                  ),
+                ),
+              ],
+            ),
+
+            // Bottom Bar (Progress & Timestamps)
+            Positioned(
+              bottom: 20,
+              left: 20,
+              right: 20,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  VideoProgressIndicator(
+                    widget.controller,
+                    allowScrubbing: true,
+                    colors: const VideoProgressColors(
+                      playedColor: AppTheme.primary,
+                      bufferedColor: Colors.white24,
+                      backgroundColor: Colors.white10,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        '${_formatDuration(position)} / ${_formatDuration(duration)}',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                          fontFamily: 'monospace',
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.fullscreen_exit, color: Colors.white, size: 26),
+                        onPressed: () => Navigator.pop(context),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+String _formatDuration(Duration duration) {
+  final minutes = duration.inMinutes.remainder(60).toString().padLeft(2, '0');
+  final seconds = duration.inSeconds.remainder(60).toString().padLeft(2, '0');
+  return '$minutes:$seconds';
 }
 
 class _SnapshotImage extends StatelessWidget {
