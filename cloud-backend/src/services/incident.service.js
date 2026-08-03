@@ -29,6 +29,8 @@ export async function createIncident(data) {
       sent: true,
       successCount: fcmResult?.successCount || 0,
       failureCount: fcmResult?.failureCount || 0,
+      totalTokens: fcmResult?.totalTokens ?? (fcmResult?.successCount ?? 0) + (fcmResult?.failureCount ?? 0),
+      reason: fcmResult?.reason,
     };
     console.log(`[Incident FCM Push] Completed push notification trigger for incident #${full.id}.`);
   } catch (pushErr) {

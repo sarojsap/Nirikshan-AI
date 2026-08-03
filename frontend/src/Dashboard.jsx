@@ -358,7 +358,12 @@ export default function Dashboard({ token, user, onLogout, mode: initialMode, on
         console.log('%cCamera Node:', 'color: #cbd5e1;', incident.displayCamera || incident.cameraName || 'Office Camera');
         console.log('%cTimestamp:', 'color: #cbd5e1;', incident.timestamp || new Date().toISOString());
         if (incident.fcmStatus) {
-          if (incident.fcmStatus.sent) {
+          if (incident.fcmStatus.reason) {
+            console.warn(
+              `%c 📲 [FCM Push Status] 0 Registered Mobile Devices: ${incident.fcmStatus.reason}. Please sign out & log back in on your mobile app to register your FCM device token.`,
+              'color: #f59e0b; font-weight: bold; font-size: 12px;'
+            );
+          } else if (incident.fcmStatus.sent) {
             console.log(
               `%c 📲 [FCM Push Status] Sent to ${incident.fcmStatus.successCount || 0} mobile device(s) (Failed: ${incident.fcmStatus.failureCount || 0})`,
               'color: #22c55e; font-weight: bold; font-size: 12px;'
