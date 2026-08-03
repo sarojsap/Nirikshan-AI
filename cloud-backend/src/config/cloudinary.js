@@ -1,12 +1,23 @@
 import { v2 as cloudinary } from 'cloudinary';
 
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
-});
+function ensureConfigured() {
+  const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
+  const apiKey = process.env.CLOUDINARY_API_KEY;
+  const apiSecret = process.env.CLOUDINARY_API_SECRET;
+
+  if (!cloudName || !apiKey || !apiSecret) {
+    throw new Error(`Cloudinary missing configuration: CLOUDINARY_CLOUD_NAME=${cloudName ? 'set' : 'missing'}, CLOUDINARY_API_KEY=${apiKey ? 'set' : 'missing'}, CLOUDINARY_API_SECRET=${apiSecret ? 'set' : 'missing'}`);
+  }
+
+  cloudinary.config({
+    cloud_name: cloudName,
+    api_key: apiKey,
+    api_secret: apiSecret,
+  });
+}
 
 export function generateUploadSignature(publicId) {
+  ensureConfigured();
   const timestamp = Math.round(Date.now() / 1000);
   const signature = cloudinary.utils.api_sign_request(
     { public_id: publicId, timestamp },
@@ -16,6 +27,7 @@ export function generateUploadSignature(publicId) {
 }
 
 export function getUploadUrl(resourceType) {
+  ensureConfigured();
   const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
   return `https://api.cloudinary.com/v1_1/${cloudName}/${resourceType}/upload`;
 }
@@ -23,5 +35,3 @@ export function getUploadUrl(resourceType) {
 export function generatePublicId(organizationId, deviceId, incidentId, type) {
   return `nirikshan/organizations/${organizationId}/devices/${deviceId}/incidents/${incidentId}/${type}`;
 }
-
-
