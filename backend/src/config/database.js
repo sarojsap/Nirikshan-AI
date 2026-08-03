@@ -29,6 +29,7 @@ if (useSQLite) {
     enableWAL: true,
   };
 } else {
+  const useSSL = process.env.DB_SSL === 'true';
   config = {
     type: 'postgres',
     host: process.env.DB_HOST,
@@ -36,6 +37,7 @@ if (useSQLite) {
     username: process.env.DB_USER,
     password: process.env.DB_PASSWORD,
     database: process.env.DB_NAME,
+    ssl: useSSL ? { rejectUnauthorized: false } : false,
     synchronize: true,
     logging: false,
     entities: [User, Camera, Incident],
