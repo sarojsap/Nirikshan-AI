@@ -11,6 +11,19 @@ function initializeFirebase() {
   }
 
   const serviceAccountPath = process.env.FIREBASE_SERVICE_ACCOUNT_PATH;
+  const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
+
+  if (serviceAccountJson) {
+    try {
+      const serviceAccount = JSON.parse(serviceAccountJson);
+      initializeApp({ credential: cert(serviceAccount) });
+      messaging = getMessaging();
+      console.log('Firebase initialized from JSON string in env');
+      return;
+    } catch (err) {
+      console.warn('Firebase JSON string in env invalid:', err.message);
+    }
+  }
 
   if (serviceAccountPath && existsSync(serviceAccountPath)) {
     try {

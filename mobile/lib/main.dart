@@ -12,6 +12,17 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
 
+  // Print FCM token for testing
+  try {
+    final fcmToken = await FirebaseMessaging.instance.getToken();
+    print('====================================');
+    print('FCM TOKEN FOR TESTING:');
+    print(fcmToken);
+    print('====================================');
+  } catch (e) {
+    print('Failed to get FCM token: $e');
+  }
+
   // Register the background message handler (must be top-level)
   FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
 

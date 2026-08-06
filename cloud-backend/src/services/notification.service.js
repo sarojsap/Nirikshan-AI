@@ -66,6 +66,15 @@ export async function sendPushNotification(organizationId, { title, body, data =
     tokens,
     notification: { title, body },
     data: Object.fromEntries(Object.entries(data).map(([k, v]) => [k, String(v)])),
+    android: {
+      priority: 'high',
+      notification: {
+        channelId: 'nirikshan_alerts',
+        priority: 'high',
+        defaultSound: true,
+        defaultVibrateTimings: true,
+      },
+    },
   };
 
   try {
