@@ -219,7 +219,7 @@ export default function Login({ onAuthSuccess, onModeSelect, currentMode = 'edge
               {/* Email Input */}
               <div className="flex flex-col gap-1.5 text-left">
                 <label className="text-[10px] font-bold uppercase tracking-wider text-soc-textMuted" htmlFor="email">
-                  Email
+                  Email Address
                 </label>
                 <div className="relative flex items-center">
                   <span className="material-symbols-outlined absolute left-4 text-soc-textMuted pointer-events-none text-base">mail</span>
