@@ -1,6 +1,6 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 
-import '../../config/theme.dart';
 import '../../models/incident.dart';
 import '../../models/user.dart';
 import 'home_screen.dart';
@@ -32,183 +32,237 @@ class DashboardTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final latestIncidents = incidents.take(5).toList();
-    final role = user.role.toUpperCase();
 
     return RefreshIndicator(
       onRefresh: () async => onRefresh(),
-      color: AppTheme.primary,
-      backgroundColor: AppTheme.surface,
+      color: const Color(0xFF75593F),
+      backgroundColor: const Color(0xFFECEEDF),
       child: CustomScrollView(
-        physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
+        physics: const BouncingScrollPhysics(
+            parent: AlwaysScrollableScrollPhysics()),
         slivers: [
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+              padding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // User Greeting Header
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  // ─── Greeting & Identity ───
+                  Row(
                     children: [
-                      Text(
-                        'Hello, ${user.name}',
-                        style: const TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.w800,
-                          color: Colors.white,
+                      // Avatar
+                      Container(
+                        width: 48,
+                        height: 48,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFCFAB8D),
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: Center(
+                          child: Text(
+                            user.name.isNotEmpty
+                                ? user.name[0].toUpperCase()
+                                : '?',
+                            style: const TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF593F28),
+                            ),
+                          ),
                         ),
                       ),
-                      const SizedBox(height: 2),
-                      Row(
-                        children: [
-                          Container(
-                            width: 7,
-                            height: 7,
-                            decoration: BoxDecoration(
-                              color: AppTheme.severityLow,
-                              shape: BoxShape.circle,
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Welcome back,',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w400,
+                                color: const Color(0xFF4F453D),
+                              ),
                             ),
-                          ),
-                          SizedBox(width: 6),
-                          Text(
-                            'Surveillance System Active',
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w500,
-                              color: AppTheme.severityLow,
+                            Text(
+                              user.name,
+                              style: const TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFF1A1D14),
+                                letterSpacing: -0.3,
+                              ),
                             ),
+                          ],
+                        ),
+                      ),
+                      // Status indicator
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFECEEDF),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: const Color(0xFFD3C4B9),
                           ),
-                        ],
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-
-                  // 4 Stat KPI Cards Grid
-                  GridView.count(
-                    crossAxisCount: 2,
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    crossAxisSpacing: 12,
-                    mainAxisSpacing: 12,
-                    childAspectRatio: 1.6,
-                    children: [
-                      _KpiTile(
-                        label: 'Total Incidents',
-                        value: incidents.length.toString(),
-                        subtitle: 'Recorded log entries',
-                        icon: Icons.shield_outlined,
-                        accentColor: AppTheme.primary,
-                      ),
-                      _KpiTile(
-                        label: 'Camera Nodes',
-                        value: '2 Active',
-                        subtitle: 'Office & School feeds',
-                        icon: Icons.videocam_outlined,
-                        accentColor: AppTheme.secondary,
-                      ),
-                      _KpiTile(
-                        label: 'Threat Level',
-                        value: incidents.any((i) => i.severity.toUpperCase() == 'CRITICAL') ? 'ELEVATED' : 'NOMINAL',
-                        subtitle: 'Real-time telemetry',
-                        icon: Icons.radar_outlined,
-                        accentColor: incidents.any((i) => i.severity.toUpperCase() == 'CRITICAL')
-                            ? AppTheme.severityCritical
-                            : AppTheme.severityLow,
-                      ),
-                      _KpiTile(
-                        label: 'Last Synced',
-                        value: lastUpdated == null ? '--:--' : formatClock(lastUpdated!),
-                        subtitle: 'Cloud auto-sync',
-                        icon: Icons.schedule,
-                        accentColor: AppTheme.onSurfaceVariant,
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              width: 7,
+                              height: 7,
+                              decoration: const BoxDecoration(
+                                color: Color(0xFF2E7D5B),
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              'Online',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: const Color(0xFF2E7D5B),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ],
                   ),
                   const SizedBox(height: 24),
 
-                  // Section Header: Top 5 Recent Feed
+
+
+                  // ─── Metrics Row ───
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _MetricCard(
+                          label: 'Incidents',
+                          value: incidents.length.toString(),
+                          icon: Icons.shield_outlined,
+                          color: const Color(0xFF75593F),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _MetricCard(
+                          label: 'Cameras',
+                          value: '2',
+                          icon: Icons.videocam_outlined,
+                          color: const Color(0xFF44636B),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _MetricCard(
+                          label: 'Synced',
+                          value: lastUpdated == null
+                              ? '--:--'
+                              : formatClock(lastUpdated!),
+                          icon: Icons.sync_outlined,
+                          color: const Color(0xFF6B5C4B),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 28),
+
+                  // ─── Recent Incidents Header ───
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: const [
-                          Text(
-                            'Latest 5 Incidents',
-                            style: TextStyle(
-                              fontSize: 17,
-                              fontWeight: FontWeight.w800,
-                              color: Colors.white,
-                              letterSpacing: 0.3,
-                            ),
-                          ),
-                          SizedBox(height: 2),
-                          Text(
-                            'Top priority real-time events',
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: AppTheme.onSurfaceVariant,
-                            ),
-                          ),
-                        ],
+                      const Text(
+                        'Recent Events',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF1A1D14),
+                          letterSpacing: -0.2,
+                        ),
                       ),
-                      TextButton.icon(
-                        onPressed: onViewAllTap,
-                        icon: const Icon(Icons.arrow_forward, size: 14, color: AppTheme.primary),
-                        label: const Text(
-                          'View All',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                            color: AppTheme.primary,
+                      GestureDetector(
+                        onTap: onViewAllTap,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 14, vertical: 7),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFCFAB8D)
+                                .withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(9999),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: const [
+                              Text(
+                                'View All',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: Color(0xFF75593F),
+                                ),
+                              ),
+                              SizedBox(width: 4),
+                              Icon(Icons.arrow_forward_rounded,
+                                  size: 14, color: Color(0xFF75593F)),
+                            ],
                           ),
                         ),
                       ),
                     ],
                   ),
+                  const SizedBox(height: 14),
                 ],
               ),
             ),
           ),
 
+          // ─── Error State ───
           if (error != null)
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+                padding: const EdgeInsets.fromLTRB(24, 0, 24, 16),
                 child: StatusPanel(
                   icon: Icons.error_outline,
-                  title: 'Sync Error',
+                  title: 'Connection Error',
                   message: error!,
-                  color: AppTheme.error,
+                  color: const Color(0xFFBA1A1A),
                 ),
               ),
             ),
 
+          // ─── Loading State ───
           if (isLoading)
             const SliverFillRemaining(
               hasScrollBody: false,
               child: Center(
-                child: CircularProgressIndicator(color: AppTheme.primary),
+                child: CircularProgressIndicator(
+                  color: Color(0xFFCFAB8D),
+                ),
               ),
             )
+          // ─── Empty State ───
           else if (latestIncidents.isEmpty)
             SliverFillRemaining(
               hasScrollBody: false,
               child: Padding(
-                padding: const EdgeInsets.all(20),
+                padding: const EdgeInsets.all(24),
                 child: StatusPanel(
                   icon: Icons.verified_user_outlined,
                   title: 'All Clear',
-                  message: 'No security threats detected on monitored camera nodes.',
-                  color: AppTheme.severityLow,
+                  message:
+                      'No security events detected across monitored feeds.',
+                  color: const Color(0xFF2E7D5B),
                 ),
               ),
             )
+          // ─── Incident List ───
           else
             SliverPadding(
-              padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+              padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
               sliver: SliverList.separated(
                 itemBuilder: (context, index) {
                   final incident = latestIncidents[index];
@@ -217,38 +271,9 @@ class DashboardTab extends StatelessWidget {
                     onTap: () => onIncidentTap(incident),
                   );
                 },
-                separatorBuilder: (context, index) => const SizedBox(height: 14),
+                separatorBuilder: (context, index) =>
+                    const SizedBox(height: 14),
                 itemCount: latestIncidents.length,
-              ),
-            ),
-
-          // Footer Shortcut Button to full Incidents tab
-          if (incidents.length > 5)
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 0, 20, 28),
-                child: SizedBox(
-                  width: double.infinity,
-                  height: 48,
-                  child: OutlinedButton.icon(
-                    onPressed: onViewAllTap,
-                    style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: AppTheme.primary),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                    ),
-                    icon: const Icon(Icons.list_alt_rounded, color: AppTheme.primary, size: 18),
-                    label: Text(
-                      'View All ${incidents.length} Incidents in Full Feed',
-                      style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        color: AppTheme.primary,
-                      ),
-                    ),
-                  ),
-                ),
               ),
             ),
         ],
@@ -257,73 +282,68 @@ class DashboardTab extends StatelessWidget {
   }
 }
 
-class _KpiTile extends StatelessWidget {
+class _MetricCard extends StatelessWidget {
   final String label;
   final String value;
-  final String subtitle;
   final IconData icon;
-  final Color accentColor;
+  final Color color;
 
-  const _KpiTile({
+  const _MetricCard({
     required this.label,
     required this.value,
-    required this.subtitle,
     required this.icon,
-    required this.accentColor,
+    required this.color,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: AppTheme.surface,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: AppTheme.outline),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                label,
-                style: const TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                  color: AppTheme.onSurfaceVariant,
-                ),
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(20),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: const Color(0xFFECEEDF).withValues(alpha: 0.8),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: const Color(0xFFCFAB8D).withValues(alpha: 0.2),
+              width: 0.5,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF75593F).withValues(alpha: 0.04),
+                blurRadius: 20,
+                offset: const Offset(0, 4),
               ),
-              Icon(icon, color: accentColor, size: 18),
             ],
           ),
-          Column(
+          child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              Icon(icon, color: color, size: 20),
+              const SizedBox(height: 10),
               Text(
                 value,
-                overflow: TextOverflow.ellipsis,
                 style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w900,
-                  color: accentColor == AppTheme.onSurfaceVariant ? Colors.white : accentColor,
+                  fontSize: 20,
+                  fontWeight: FontWeight.w700,
+                  color: const Color(0xFF1A1D14),
+                  letterSpacing: -0.5,
                 ),
               ),
               const SizedBox(height: 2),
               Text(
-                subtitle,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+                label,
                 style: const TextStyle(
-                  fontSize: 9,
-                  color: AppTheme.onSurfaceVariant,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w500,
+                  color: Color(0xFF81756C),
                 ),
               ),
             ],
           ),
-        ],
+        ),
       ),
     );
   }

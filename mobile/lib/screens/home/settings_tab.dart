@@ -1,7 +1,7 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 
 import '../../config/constants.dart';
-import '../../config/theme.dart';
 import '../../models/user.dart';
 
 class SettingsTab extends StatefulWidget {
@@ -23,203 +23,246 @@ class _SettingsTabState extends State<SettingsTab> {
 
   @override
   Widget build(BuildContext context) {
-    final role = widget.user.role.toUpperCase();
-
     return Scaffold(
-      backgroundColor: AppTheme.background,
+      backgroundColor: Colors.transparent,
       body: SafeArea(
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
+          physics: const BouncingScrollPhysics(),
+          padding: const EdgeInsets.fromLTRB(24, 20, 24, 40),
           children: [
-            // Title
+            // ─── Page Title ───
             const Text(
-              'Settings & Controls',
+              'Settings',
               style: TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.w800,
-                color: Colors.white,
-              ),
-            ),
-            const SizedBox(height: 2),
-            const Text(
-              'Manage application preferences & device connections',
-              style: TextStyle(
-                fontSize: 12,
-                color: AppTheme.onSurfaceVariant,
+                fontSize: 24,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF1A1D14),
+                letterSpacing: -0.3,
               ),
             ),
             const SizedBox(height: 24),
 
-            // Profile Card Container
-            Container(
-              padding: const EdgeInsets.all(18),
-              decoration: BoxDecoration(
-                color: AppTheme.surface,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: AppTheme.outline),
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    width: 52,
-                    height: 52,
-                    decoration: BoxDecoration(
-                      color: AppTheme.primary.withOpacity(0.15),
-                      shape: BoxShape.circle,
-                      border: Border.all(color: AppTheme.primary.withOpacity(0.4)),
+            // ─── Profile Card ───
+            ClipRRect(
+              borderRadius: BorderRadius.circular(24),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
+                child: Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFECEEDF).withValues(alpha: 0.85),
+                    borderRadius: BorderRadius.circular(24),
+                    border: Border.all(
+                      color: const Color(0xFFCFAB8D).withValues(alpha: 0.25),
+                      width: 0.5,
                     ),
-                    child: const Center(
-                      child: Icon(Icons.person_outline, color: AppTheme.primary, size: 28),
-                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF75593F).withValues(alpha: 0.05),
+                        blurRadius: 30,
+                        offset: const Offset(0, 8),
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          widget.user.name,
-                          style: const TextStyle(
-                            fontSize: 17,
-                            fontWeight: FontWeight.w800,
-                            color: Colors.white,
-                          ),
+                  child: Row(
+                    children: [
+                      // Avatar
+                      Container(
+                        width: 56,
+                        height: 56,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFCFAB8D),
+                          borderRadius: BorderRadius.circular(18),
                         ),
-                        const SizedBox(height: 2),
-                        Text(
-                          widget.user.email,
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: AppTheme.onSurfaceVariant,
-                          ),
-                        ),
-                        const SizedBox(height: 6),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                          decoration: BoxDecoration(
-                            color: AppTheme.primary.withOpacity(0.12),
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(color: AppTheme.primary.withOpacity(0.3)),
-                          ),
+                        child: Center(
                           child: Text(
-                            role,
+                            widget.user.name.isNotEmpty
+                                ? widget.user.name[0].toUpperCase()
+                                : '?',
                             style: const TextStyle(
-                              fontSize: 9,
-                              fontWeight: FontWeight.w800,
-                              color: AppTheme.primary,
-                              letterSpacing: 0.8,
+                              fontSize: 24,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF593F28),
                             ),
                           ),
                         ),
-                      ],
-                    ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              widget.user.name,
+                              style: const TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFF1A1D14),
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              widget.user.email,
+                              style: const TextStyle(
+                                fontSize: 13,
+                                color: Color(0xFF81756C),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      // Role badge
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 5),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFCFAB8D).withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(9999),
+                        ),
+                        child: Text(
+                          widget.user.role.toUpperCase(),
+                          style: const TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF75593F),
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 24),
-
-            // Section 1: Notifications & Telemetry
-            const _SectionHeader(title: 'PREFERENCES & NOTIFICATIONS'),
-            const SizedBox(height: 10),
-            Container(
-              decoration: BoxDecoration(
-                color: AppTheme.surface,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: AppTheme.outline),
-              ),
-              child: Column(
-                children: [
-                  SwitchListTile(
-                    activeColor: AppTheme.primary,
-                    title: const Text('Push Notifications', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Colors.white)),
-                    subtitle: const Text('Real-time alerts for critical security events', style: TextStyle(fontSize: 11, color: AppTheme.onSurfaceVariant)),
-                    value: _pushNotificationsEnabled,
-                    onChanged: (val) => setState(() => _pushNotificationsEnabled = val),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 24),
-
-            // Section 2: Infrastructure & Backend Target
-            const _SectionHeader(title: 'CLOUD INFRASTRUCTURE'),
-            const SizedBox(height: 10),
-            Container(
-              decoration: BoxDecoration(
-                color: AppTheme.surface,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: AppTheme.outline),
-              ),
-              child: Column(
-                children: const [
-                  _SettingTile(
-                    icon: Icons.cloud_done_outlined,
-                    title: 'Cloud Backend Origin',
-                    value: 'Railway Production Cloud',
-                    subtitle: apiOrigin,
-                  ),
-                  Divider(height: 1, color: AppTheme.outline),
-                  _SettingTile(
-                    icon: Icons.security_outlined,
-                    title: 'TLS / SSL Security',
-                    value: 'Encrypted HTTPS / WSS',
-                    subtitle: 'Secure end-to-end communication',
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 24),
-
-            // Section 3: App Information
-            const _SectionHeader(title: 'SYSTEM INFORMATION'),
-            const SizedBox(height: 10),
-            Container(
-              decoration: BoxDecoration(
-                color: AppTheme.surface,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: AppTheme.outline),
-              ),
-              child: Column(
-                children: const [
-                  _SettingTile(
-                    icon: Icons.info_outline,
-                    title: 'Application Version',
-                    value: 'v1.0.0 (Build 1)',
-                    subtitle: 'Nirikshan AI Surveillance System',
-                  ),
-                  Divider(height: 1, color: AppTheme.outline),
-                  _SettingTile(
-                    icon: Icons.memory_outlined,
-                    title: 'YOLO Detection Engine',
-                    value: 'Edge AI v2.4 (Ultra-Low Latency)',
-                    subtitle: 'Real-time object & anomaly detection',
-                  ),
-                ],
+                ),
               ),
             ),
             const SizedBox(height: 28),
 
-            // Logout Action Button
-            SizedBox(
-              width: double.infinity,
-              height: 50,
-              child: ElevatedButton.icon(
-                onPressed: widget.onLogout,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppTheme.error.withOpacity(0.15),
-                  foregroundColor: AppTheme.error,
-                  side: const BorderSide(color: AppTheme.error, width: 1),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
+            // ─── Preferences Section ───
+            _sectionLabel('PREFERENCES'),
+            const SizedBox(height: 10),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(20),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFECEEDF).withValues(alpha: 0.8),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: const Color(0xFFD3C4B9).withValues(alpha: 0.4),
+                      width: 0.5,
+                    ),
+                  ),
+                  child: SwitchListTile(
+                    activeTrackColor: const Color(0xFFCFAB8D),
+                    activeThumbColor: Colors.white,
+                    inactiveTrackColor: const Color(0xFFD9DBCD),
+                    inactiveThumbColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 20, vertical: 4),
+                    title: const Text(
+                      'Push Notifications',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF1A1D14),
+                      ),
+                    ),
+                    subtitle: const Text(
+                      'Alerts for critical security events',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Color(0xFF81756C),
+                      ),
+                    ),
+                    value: _pushNotificationsEnabled,
+                    onChanged: (val) =>
+                        setState(() => _pushNotificationsEnabled = val),
                   ),
                 ),
-                icon: const Icon(Icons.logout_rounded, size: 18),
-                label: const Text(
-                  'Sign Out of Command Center',
+              ),
+            ),
+            const SizedBox(height: 28),
+
+            // ─── Infrastructure Section ───
+            _sectionLabel('INFRASTRUCTURE'),
+            const SizedBox(height: 10),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(20),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFECEEDF).withValues(alpha: 0.8),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: const Color(0xFFD3C4B9).withValues(alpha: 0.4),
+                      width: 0.5,
+                    ),
+                  ),
+                  child: Column(
+                    children: [
+                      _InfoTile(
+                        icon: Icons.cloud_outlined,
+                        title: 'Cloud Backend',
+                        value: 'AWS EC2',
+                        subtitle: apiOrigin,
+                      ),
+                      Divider(
+                        height: 1,
+                        indent: 60,
+                        color: const Color(0xFFD3C4B9).withValues(alpha: 0.5),
+                      ),
+                      const _InfoTile(
+                        icon: Icons.lock_outline_rounded,
+                        title: 'Encryption',
+                        value: 'TLS / WSS',
+                        subtitle: 'End-to-end secure communication',
+                      ),
+                      Divider(
+                        height: 1,
+                        indent: 60,
+                        color: const Color(0xFFD3C4B9).withValues(alpha: 0.5),
+                      ),
+                      const _InfoTile(
+                        icon: Icons.memory_outlined,
+                        title: 'AI Engine',
+                        value: 'YOLO v2.4',
+                        subtitle: 'Real-time object & anomaly detection',
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 36),
+
+            // ─── Sign Out ───
+            SizedBox(
+              width: double.infinity,
+              height: 52,
+              child: ElevatedButton(
+                onPressed: widget.onLogout,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor:
+                      const Color(0xFFBA1A1A).withValues(alpha: 0.08),
+                  foregroundColor: const Color(0xFFBA1A1A),
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    side: BorderSide(
+                      color: const Color(0xFFBA1A1A).withValues(alpha: 0.2),
+                      width: 0.5,
+                    ),
+                  ),
+                ),
+                child: const Text(
+                  'Sign Out',
                   style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w800,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
               ),
@@ -229,34 +272,27 @@ class _SettingsTabState extends State<SettingsTab> {
       ),
     );
   }
-}
 
-class _SectionHeader extends StatelessWidget {
-  final String title;
-
-  const _SectionHeader({required this.title});
-
-  @override
-  Widget build(BuildContext context) {
+  Widget _sectionLabel(String title) {
     return Text(
       title,
       style: const TextStyle(
-        fontSize: 10,
-        fontWeight: FontWeight.w800,
-        color: AppTheme.onSurfaceVariant,
-        letterSpacing: 0.8,
+        fontSize: 11,
+        fontWeight: FontWeight.w600,
+        color: Color(0xFF81756C),
+        letterSpacing: 1.5,
       ),
     );
   }
 }
 
-class _SettingTile extends StatelessWidget {
+class _InfoTile extends StatelessWidget {
   final IconData icon;
   final String title;
   final String value;
   final String subtitle;
 
-  const _SettingTile({
+  const _InfoTile({
     required this.icon,
     required this.title,
     required this.value,
@@ -266,10 +302,18 @@ class _SettingTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
       child: Row(
         children: [
-          Icon(icon, color: AppTheme.primary, size: 20),
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: const Color(0xFFCFAB8D).withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(11),
+            ),
+            child: Icon(icon, color: const Color(0xFF75593F), size: 18),
+          ),
           const SizedBox(width: 14),
           Expanded(
             child: Column(
@@ -278,17 +322,17 @@ class _SettingTile extends StatelessWidget {
                 Text(
                   title,
                   style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.white,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF1A1D14),
                   ),
                 ),
-                const SizedBox(height: 2),
+                const SizedBox(height: 1),
                 Text(
                   subtitle,
                   style: const TextStyle(
-                    fontSize: 10,
-                    color: AppTheme.onSurfaceVariant,
+                    fontSize: 11,
+                    color: Color(0xFF81756C),
                   ),
                 ),
               ],
@@ -297,9 +341,9 @@ class _SettingTile extends StatelessWidget {
           Text(
             value,
             style: const TextStyle(
-              fontSize: 11,
+              fontSize: 12,
               fontWeight: FontWeight.w600,
-              color: AppTheme.onSurfaceVariant,
+              color: Color(0xFF75593F),
             ),
           ),
         ],

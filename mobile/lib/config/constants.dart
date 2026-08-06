@@ -1,6 +1,6 @@
 // API Configuration — points to production cloud backend
-const String apiBaseUrl = 'https://cloud-backend-production-4a8f.up.railway.app/api';
-const String apiOrigin = 'https://cloud-backend-production-4a8f.up.railway.app';
+const String apiBaseUrl = 'http://3.108.234.117/api';
+const String apiOrigin = 'http://3.108.234.117';
 
 const String loginEndpoint = '$apiBaseUrl/auth/login';
 const String logoutEndpoint = '$apiBaseUrl/auth/logout';

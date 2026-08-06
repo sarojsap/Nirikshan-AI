@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -66,6 +67,7 @@ class _HomeScreenState extends State<HomeScreen> {
     super.dispose();
   }
 
+  // ignore: unused_element
   void _setDeviceFilter({String? organizationId, String? deviceId}) {
     setState(() {
       _organizationId = organizationId;
@@ -110,97 +112,41 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  void _showDeviceSelector() {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: AppTheme.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (context) {
-        return Padding(
-          padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: AppTheme.outlineVariant,
-                  borderRadius: BorderRadius.circular(4),
-                ),
-              ),
-              const SizedBox(height: 20),
-              const Text(
-                'Select Edge Device',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w800,
-                  color: Colors.white,
-                ),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                'Filter live security events by camera node.',
-                style: TextStyle(
-                  fontSize: 13,
-                  color: AppTheme.onSurfaceVariant,
-                ),
-              ),
-              const SizedBox(height: 24),
-              SizedBox(
-                width: double.infinity,
-                height: 48,
-                child: ElevatedButton.icon(
-                  onPressed: () {
-                    _setDeviceFilter(organizationId: null, deviceId: null);
-                    Navigator.pop(context);
-                  },
-                  icon: const Icon(Icons.devices, size: 18),
-                  label: const Text('Show All Edge Devices'),
-                ),
-              ),
-              const SizedBox(height: 12),
-              SizedBox(
-                width: double.infinity,
-                height: 48,
-                child: OutlinedButton(
-                  onPressed: () => Navigator.pop(context),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: AppTheme.onSurfaceVariant,
-                    side: const BorderSide(color: AppTheme.outline),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                  ),
-                  child: const Text('Cancel'),
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
   Future<void> _handleLogout() async {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: AppTheme.surface,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('Sign Out', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
-        content: const Text('Are you sure you want to log out of Command Center?', style: TextStyle(color: AppTheme.onSurfaceVariant)),
+        backgroundColor: const Color(0xFFF9FBEB),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        title: const Text(
+          'Sign Out',
+          style: TextStyle(
+            fontWeight: FontWeight.w700,
+            color: Color(0xFF1A1D14),
+          ),
+        ),
+        content: const Text(
+          'Are you sure you want to sign out?',
+          style: TextStyle(color: Color(0xFF4F453D)),
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel', style: TextStyle(color: AppTheme.onSurfaceVariant)),
+            child: const Text(
+              'Cancel',
+              style: TextStyle(color: Color(0xFF81756C)),
+            ),
           ),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.error),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFBA1A1A),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Logout'),
+            child: const Text('Sign Out'),
           ),
         ],
       ),
@@ -217,9 +163,9 @@ class _HomeScreenState extends State<HomeScreen> {
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: AppTheme.surface,
+      backgroundColor: const Color(0xFFF9FBEB),
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
       builder: (context) {
         return _IncidentDetailsSheet(incident: incident);
@@ -230,126 +176,270 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppTheme.background,
-      appBar: AppBar(
-        automaticallyImplyLeading: false,
-        backgroundColor: AppTheme.background,
-        elevation: 0,
-        title: Row(
-          children: [
-            Container(
-              width: 34,
-              height: 34,
-              padding: const EdgeInsets.all(6),
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: AppTheme.surface,
-                border: Border.all(color: AppTheme.primary.withOpacity(0.3)),
-              ),
-              child: Image.asset(
-                'assets/logo.png',
-                fit: BoxFit.contain,
-                errorBuilder: (context, error, stackTrace) => const Icon(Icons.shield, color: AppTheme.primary, size: 18),
-              ),
-            ),
-            const SizedBox(width: 10),
-            const Text(
-              'NIRIKSHAN AI',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w900,
-                color: Colors.white,
-                letterSpacing: 1.2,
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          IconButton(
-            tooltip: 'Refresh Feed',
-            icon: _isRefreshing
-                ? const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.primary),
-                  )
-                : const Icon(Icons.refresh, color: AppTheme.onSurfaceVariant, size: 22),
-            onPressed: _isRefreshing ? null : () => _loadIncidents(),
+      backgroundColor: const Color(0xFFBBDCE5),
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Color(0xFFBBDCE5),
+              Color(0xFFCDD9D0),
+              Color(0xFFD9DBCD),
+            ],
+            stops: [0.0, 0.5, 1.0],
           ),
-          const SizedBox(width: 8),
-        ],
-      ),
-      body: SafeArea(
-        child: IndexedStack(
-          index: _currentTabIndex,
-          children: [
-            // Tab 0: Dashboard (Top 5 Incidents)
-            DashboardTab(
-              user: widget.user,
-              incidents: _incidents,
-              isLoading: _isLoading,
-              isRefreshing: _isRefreshing,
-              error: _error,
-              lastUpdated: _lastUpdated,
-              onRefresh: _loadIncidents,
-              onViewAllTap: () => setState(() => _currentTabIndex = 1),
-              onIncidentTap: _showIncidentDetails,
-            ),
+        ),
+        child: SafeArea(
+          child: Column(
+            children: [
+              // ─── Top App Bar ───
+              Padding(
+                padding: const EdgeInsets.fromLTRB(24, 12, 24, 4),
+                child: Row(
+                  children: [
+                    // Officer profile avatar circle (Stitch style)
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: const Color(0xFFD3C4B9),
+                          width: 1.0,
+                        ),
+                      ),
+                      child: ClipOval(
+                        child: Image.network(
+                          'https://lh3.googleusercontent.com/aida-public/AB6AXuAodZ47OvyrSS8LRNYSV2Py9eu5rsh8YaIutnflvOJY5Icezt1oHqkAdaQXj1RpFLs8xxiuJ6gj2XVqFh7rXe_taLAyDFXzLeifP9hSPFAzrvr8WP_bOpz1PKvnRrlT3Ji9b1OfKdN--SHSCYgod2E9xTbLIdAfNg91Z9yabcM6gV_RoHjFf-_d0pDhkF5dC5MddZowbW5VtxhClz_zaTkgBSJ0038WQuPHDcNP5riSwrHvZoHKo0VH',
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) =>
+                              Container(
+                            color: const Color(0xFFCFAB8D),
+                            child: Center(
+                              child: Text(
+                                widget.user.name.isNotEmpty
+                                    ? widget.user.name[0].toUpperCase()
+                                    : 'U',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF593F28),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    const Text(
+                      'Nirikshan AI',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF1A1D14),
+                        letterSpacing: -0.5,
+                      ),
+                    ),
+                    const Spacer(),
+                    // Refresh
+                    GestureDetector(
+                      onTap: _isRefreshing ? null : () => _loadIncidents(),
+                      child: Container(
+                        width: 36,
+                        height: 36,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFECEEDF)
+                              .withValues(alpha: 0.7),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: _isRefreshing
+                            ? const Padding(
+                                padding: EdgeInsets.all(9),
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 1.5,
+                                  color: Color(0xFF75593F),
+                                ),
+                              )
+                            : const Icon(Icons.refresh_rounded,
+                                color: Color(0xFF81756C), size: 20),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
 
-            // Tab 1: Incidents (Full Filtered Feed)
-            IncidentsTab(
-              incidents: _incidents,
-              isLoading: _isLoading,
-              error: _error,
-              onRefresh: _loadIncidents,
-              onIncidentTap: _showIncidentDetails,
-            ),
-
-            // Tab 2: Settings (Configuration & Profile)
-            SettingsTab(
-              user: widget.user,
-              onLogout: _handleLogout,
-            ),
-          ],
+              // ─── Tab Content ───
+              Expanded(
+                child: IndexedStack(
+                  index: _currentTabIndex,
+                  children: [
+                    DashboardTab(
+                      user: widget.user,
+                      incidents: _incidents,
+                      isLoading: _isLoading,
+                      isRefreshing: _isRefreshing,
+                      error: _error,
+                      lastUpdated: _lastUpdated,
+                      onRefresh: _loadIncidents,
+                      onViewAllTap: () =>
+                          setState(() => _currentTabIndex = 1),
+                      onIncidentTap: _showIncidentDetails,
+                    ),
+                    IncidentsTab(
+                      incidents: _incidents,
+                      isLoading: _isLoading,
+                      error: _error,
+                      onRefresh: _loadIncidents,
+                      onIncidentTap: _showIncidentDetails,
+                    ),
+                    SettingsTab(
+                      user: widget.user,
+                      onLogout: _handleLogout,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
-      bottomNavigationBar: Container(
+
+      // ─── Floating Glass Bottom Navigation ───
+      extendBody: true,
+      bottomNavigationBar: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(22),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 28, sigmaY: 28),
+            child: Container(
+              height: 70,
+              decoration: BoxDecoration(
+                color: const Color(0xFFECEEDF).withValues(alpha: 0.82),
+                borderRadius: BorderRadius.circular(22),
+                border: Border.all(
+                  color: const Color(0xFFCFAB8D).withValues(alpha: 0.2),
+                  width: 0.5,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF75593F).withValues(alpha: 0.08),
+                    blurRadius: 30,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: [
+                  _NavItem(
+                    icon: Icons.dashboard_outlined,
+                    activeIcon: Icons.dashboard_rounded,
+                    label: 'Command',
+                    isActive: _currentTabIndex == 0,
+                    onTap: () => setState(() => _currentTabIndex = 0),
+                  ),
+                  _NavItem(
+                    icon: Icons.shield_outlined,
+                    activeIcon: Icons.shield_rounded,
+                    label: 'Incidents',
+                    isActive: _currentTabIndex == 1,
+                    badgeCount: _incidents.length,
+                    onTap: () => setState(() => _currentTabIndex = 1),
+                  ),
+                  _NavItem(
+                    icon: Icons.settings_outlined,
+                    activeIcon: Icons.settings_rounded,
+                    label: 'Settings',
+                    isActive: _currentTabIndex == 2,
+                    onTap: () => setState(() => _currentTabIndex = 2),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Floating Nav Item ───
+class _NavItem extends StatelessWidget {
+  final IconData icon;
+  final IconData activeIcon;
+  final String label;
+  final bool isActive;
+  final int badgeCount;
+  final VoidCallback onTap;
+
+  const _NavItem({
+    required this.icon,
+    required this.activeIcon,
+    required this.label,
+    required this.isActive,
+    this.badgeCount = 0,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.easeOutCubic,
+        padding: EdgeInsets.symmetric(
+          horizontal: isActive ? 20 : 16,
+          vertical: 8,
+        ),
         decoration: BoxDecoration(
-          color: AppTheme.surface,
-          border: Border(top: BorderSide(color: AppTheme.outline.withOpacity(0.5), width: 1)),
+          color: isActive
+              ? const Color(0xFFCFAB8D)
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(16),
         ),
-        child: BottomNavigationBar(
-          currentIndex: _currentTabIndex,
-          onTap: (index) => setState(() => _currentTabIndex = index),
-          backgroundColor: AppTheme.surface,
-          selectedItemColor: AppTheme.primary,
-          unselectedItemColor: AppTheme.onSurfaceVariant,
-          selectedFontSize: 11,
-          unselectedFontSize: 11,
-          type: BottomNavigationBarType.fixed,
-          elevation: 0,
-          items: [
-            const BottomNavigationBarItem(
-              icon: Icon(Icons.dashboard_outlined),
-              activeIcon: Icon(Icons.dashboard),
-              label: 'Dashboard',
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Icon(
+                  isActive ? activeIcon : icon,
+                  size: 22,
+                  color: isActive
+                      ? const Color(0xFF593F28)
+                      : const Color(0xFF81756C),
+                ),
+                if (badgeCount > 0 && !isActive)
+                  Positioned(
+                    top: -4,
+                    right: -6,
+                    child: Container(
+                      width: 8,
+                      height: 8,
+                      decoration: const BoxDecoration(
+                        color: Color(0xFFBA1A1A),
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                  ),
+              ],
             ),
-            BottomNavigationBarItem(
-              icon: _incidents.isNotEmpty
-                  ? Badge(
-                      label: Text(_incidents.length.toString()),
-                      backgroundColor: AppTheme.primary,
-                      textColor: Colors.white,
-                      child: const Icon(Icons.shield_outlined),
-                    )
-                  : const Icon(Icons.shield_outlined),
-              activeIcon: const Icon(Icons.shield),
-              label: 'Incidents',
-            ),
-            const BottomNavigationBarItem(
-              icon: Icon(Icons.settings_outlined),
-              activeIcon: Icon(Icons.settings),
-              label: 'Settings',
+            const SizedBox(height: 3),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
+                color: isActive
+                    ? const Color(0xFF593F28)
+                    : const Color(0xFF81756C),
+                letterSpacing: 0.3,
+              ),
             ),
           ],
         ),
@@ -357,6 +447,10 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 }
+
+// ═══════════════════════════════════════════════════════════════
+// Shared Widgets — Redesigned for Earth & Atmosphere palette
+// ═══════════════════════════════════════════════════════════════
 
 class IncidentCard extends StatelessWidget {
   final Incident incident;
@@ -368,89 +462,98 @@ class IncidentCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final severityColor = severityColorOf(incident.severity);
 
-    return Container(
-      decoration: BoxDecoration(
-        color: AppTheme.surface,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppTheme.outline, width: 1),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.2),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Material(
-        color: Colors.transparent,
-        borderRadius: BorderRadius.circular(20),
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              ClipRRect(
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(19)),
-                child: AspectRatio(
-                  aspectRatio: 16 / 9,
-                  child: SnapshotImage(url: incident.resolvedImageUrl),
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            incident.displayType,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w800,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ),
-                        SeverityChip(
-                          severity: incident.severity,
-                          color: severityColor,
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      incident.description,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w400,
-                        color: AppTheme.onSurfaceVariant,
-                        height: 1.4,
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-                    Row(
-                      children: [
-                        MetaText(
-                          icon: Icons.videocam_outlined,
-                          text: incident.displayCamera,
-                        ),
-                        const Spacer(),
-                        MetaText(
-                          icon: Icons.schedule_outlined,
-                          text: formatDateTime(incident.timestamp),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(24),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+        child: Container(
+          decoration: BoxDecoration(
+            color: const Color(0xFFECEEDF).withValues(alpha: 0.85),
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(
+              color: const Color(0xFFCFAB8D).withValues(alpha: 0.2),
+              width: 0.5,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF75593F).withValues(alpha: 0.04),
+                blurRadius: 20,
+                offset: const Offset(0, 4),
               ),
             ],
+          ),
+          child: Material(
+            color: Colors.transparent,
+            borderRadius: BorderRadius.circular(24),
+            child: InkWell(
+              onTap: onTap,
+              borderRadius: BorderRadius.circular(24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  ClipRRect(
+                    borderRadius:
+                        const BorderRadius.vertical(top: Radius.circular(23)),
+                    child: AspectRatio(
+                      aspectRatio: 16 / 9,
+                      child: SnapshotImage(url: incident.resolvedImageUrl),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                incident.displayType,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xFF1A1D14),
+                                ),
+                              ),
+                            ),
+                            SeverityChip(
+                              severity: incident.severity,
+                              color: severityColor,
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          incident.description,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            color: Color(0xFF4F453D),
+                            height: 1.4,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            MetaText(
+                              icon: Icons.videocam_outlined,
+                              text: incident.displayCamera,
+                            ),
+                            const Spacer(),
+                            MetaText(
+                              icon: Icons.schedule_outlined,
+                              text: formatDateTime(incident.timestamp),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
         ),
       ),
@@ -489,27 +592,26 @@ class _IncidentDetailsSheetState extends State<_IncidentDetailsSheet> {
       builder: (context, scrollController) {
         return ListView(
           controller: scrollController,
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+          padding: const EdgeInsets.fromLTRB(24, 16, 24, 36),
           children: [
             Center(
               child: Container(
                 width: 36,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: AppTheme.outlineVariant,
+                  color: const Color(0xFFD3C4B9),
                   borderRadius: BorderRadius.circular(4),
                 ),
               ),
             ),
             const SizedBox(height: 20),
 
-            // Tab Switcher if Video Clip Available
+            // Tab Switcher
             if (videoUrl != null) ...[
               Container(
                 decoration: BoxDecoration(
-                  color: const Color(0xFF090F19),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: AppTheme.outline),
+                  color: const Color(0xFFE7E9DB),
+                  borderRadius: BorderRadius.circular(14),
                 ),
                 padding: const EdgeInsets.all(4),
                 child: Row(
@@ -521,20 +623,28 @@ class _IncidentDetailsSheetState extends State<_IncidentDetailsSheet> {
                           duration: const Duration(milliseconds: 200),
                           padding: const EdgeInsets.symmetric(vertical: 10),
                           decoration: BoxDecoration(
-                            color: _showVideo ? AppTheme.primary : Colors.transparent,
-                            borderRadius: BorderRadius.circular(12),
+                            color: _showVideo
+                                ? const Color(0xFFCFAB8D)
+                                : Colors.transparent,
+                            borderRadius: BorderRadius.circular(10),
                           ),
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Icon(Icons.play_circle_fill, size: 16, color: _showVideo ? Colors.white : AppTheme.onSurfaceVariant),
+                              Icon(Icons.play_circle_fill,
+                                  size: 16,
+                                  color: _showVideo
+                                      ? const Color(0xFF593F28)
+                                      : const Color(0xFF81756C)),
                               const SizedBox(width: 6),
                               Text(
-                                'Recorded Video',
+                                'Video',
                                 style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w700,
-                                  color: _showVideo ? Colors.white : AppTheme.onSurfaceVariant,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: _showVideo
+                                      ? const Color(0xFF593F28)
+                                      : const Color(0xFF81756C),
                                 ),
                               ),
                             ],
@@ -549,20 +659,28 @@ class _IncidentDetailsSheetState extends State<_IncidentDetailsSheet> {
                           duration: const Duration(milliseconds: 200),
                           padding: const EdgeInsets.symmetric(vertical: 10),
                           decoration: BoxDecoration(
-                            color: !_showVideo ? AppTheme.primary : Colors.transparent,
-                            borderRadius: BorderRadius.circular(12),
+                            color: !_showVideo
+                                ? const Color(0xFFCFAB8D)
+                                : Colors.transparent,
+                            borderRadius: BorderRadius.circular(10),
                           ),
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Icon(Icons.image_outlined, size: 16, color: !_showVideo ? Colors.white : AppTheme.onSurfaceVariant),
+                              Icon(Icons.image_outlined,
+                                  size: 16,
+                                  color: !_showVideo
+                                      ? const Color(0xFF593F28)
+                                      : const Color(0xFF81756C)),
                               const SizedBox(width: 6),
                               Text(
-                                'Snapshot Frame',
+                                'Snapshot',
                                 style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w700,
-                                  color: !_showVideo ? Colors.white : AppTheme.onSurfaceVariant,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: !_showVideo
+                                      ? const Color(0xFF593F28)
+                                      : const Color(0xFF81756C),
                                 ),
                               ),
                             ],
@@ -576,12 +694,12 @@ class _IncidentDetailsSheetState extends State<_IncidentDetailsSheet> {
               const SizedBox(height: 16),
             ],
 
-            // Video Player or Snapshot View
+            // Media
             if (videoUrl != null && _showVideo)
               _IncidentVideoPlayer(videoUrl: videoUrl)
             else
               ClipRRect(
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(20),
                 child: AspectRatio(
                   aspectRatio: 16 / 9,
                   child: SnapshotImage(url: widget.incident.resolvedImageUrl),
@@ -596,8 +714,8 @@ class _IncidentDetailsSheetState extends State<_IncidentDetailsSheet> {
                     widget.incident.displayType,
                     style: const TextStyle(
                       fontSize: 20,
-                      fontWeight: FontWeight.w800,
-                      color: Colors.white,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF1A1D14),
                     ),
                   ),
                 ),
@@ -609,24 +727,24 @@ class _IncidentDetailsSheetState extends State<_IncidentDetailsSheet> {
             ),
             const SizedBox(height: 4),
             Text(
-              'LOG ID: ${widget.incident.id}',
+              'ID: ${widget.incident.id}',
               style: const TextStyle(
                 fontSize: 10,
-                fontWeight: FontWeight.w700,
-                color: AppTheme.onSurfaceVariant,
+                fontWeight: FontWeight.w500,
+                color: Color(0xFF81756C),
                 letterSpacing: 0.5,
               ),
             ),
             const SizedBox(height: 20),
 
             DetailBlock(
-              label: 'Alert Description',
+              label: 'Description',
               icon: Icons.notes_outlined,
               child: Text(
                 widget.incident.description,
                 style: const TextStyle(
                   fontSize: 14,
-                  color: Colors.white,
+                  color: Color(0xFF1A1D14),
                   height: 1.4,
                 ),
               ),
@@ -634,26 +752,26 @@ class _IncidentDetailsSheetState extends State<_IncidentDetailsSheet> {
             const SizedBox(height: 12),
 
             DetailBlock(
-              label: 'Camera Node & Location',
+              label: 'Camera & Location',
               icon: Icons.videocam_outlined,
               child: Text(
                 '${widget.incident.displayCamera} • ${widget.incident.displayLocation}',
                 style: const TextStyle(
                   fontSize: 14,
-                  color: Colors.white,
+                  color: Color(0xFF1A1D14),
                 ),
               ),
             ),
             const SizedBox(height: 12),
 
             DetailBlock(
-              label: 'Incident Timestamp',
+              label: 'Timestamp',
               icon: Icons.schedule_outlined,
               child: Text(
                 formatDateTime(widget.incident.timestamp),
                 style: const TextStyle(
                   fontSize: 14,
-                  color: Colors.white,
+                  color: Color(0xFF1A1D14),
                 ),
               ),
             ),
@@ -677,7 +795,6 @@ class _IncidentVideoPlayerState extends State<_IncidentVideoPlayer> {
   VideoPlayerController? _controller;
   bool _isInitialized = false;
   bool _hasError = false;
-  String _errorMessage = '';
 
   double _currentSpeed = 1.0;
   final List<double> _speeds = const [0.5, 1.0, 1.25, 1.5, 2.0];
@@ -695,7 +812,8 @@ class _IncidentVideoPlayerState extends State<_IncidentVideoPlayer> {
         !url.contains('.mov')) {
       final queryIndex = url.indexOf('?');
       if (queryIndex != -1) {
-        url = '${url.substring(0, queryIndex)}.mp4${url.substring(queryIndex)}';
+        url =
+            '${url.substring(0, queryIndex)}.mp4${url.substring(queryIndex)}';
       } else {
         url = '$url.mp4';
       }
@@ -723,7 +841,6 @@ class _IncidentVideoPlayerState extends State<_IncidentVideoPlayer> {
     setState(() {
       _hasError = false;
       _isInitialized = false;
-      _errorMessage = '';
       _currentSpeed = 1.0;
     });
 
@@ -731,7 +848,8 @@ class _IncidentVideoPlayerState extends State<_IncidentVideoPlayer> {
     final controller = VideoPlayerController.networkUrl(
       Uri.parse(url),
       httpHeaders: const {
-        'User-Agent': 'Mozilla/5.0 (Linux; Android 10; Mobile) AppleWebKit/537.36 (KHTML, like Gecko)',
+        'User-Agent':
+            'Mozilla/5.0 (Linux; Android 10; Mobile) AppleWebKit/537.36 (KHTML, like Gecko)',
       },
     );
 
@@ -752,7 +870,6 @@ class _IncidentVideoPlayerState extends State<_IncidentVideoPlayer> {
       if (mounted && _controller == controller) {
         setState(() {
           _hasError = true;
-          _errorMessage = error.toString();
         });
       }
     });
@@ -810,37 +927,42 @@ class _IncidentVideoPlayerState extends State<_IncidentVideoPlayer> {
         height: 200,
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: const Color(0xFF090F19),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: AppTheme.outline),
+          color: const Color(0xFFE7E9DB),
+          borderRadius: BorderRadius.circular(20),
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.video_library_outlined, color: AppTheme.onSurfaceVariant, size: 32),
+            const Icon(Icons.video_library_outlined,
+                color: Color(0xFF81756C), size: 32),
             const SizedBox(height: 8),
             const Text(
-              'Unable to stream video clip',
-              style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              _effectiveUrl,
-              textAlign: TextAlign.center,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontSize: 10, fontFamily: 'monospace', color: AppTheme.onSurfaceVariant),
+              'Unable to load video',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF1A1D14),
+              ),
             ),
             const SizedBox(height: 12),
-            OutlinedButton.icon(
-              onPressed: _initVideo,
-              style: OutlinedButton.styleFrom(
-                side: const BorderSide(color: AppTheme.primary),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            GestureDetector(
+              onTap: _initVideo,
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFCFAB8D),
+                  borderRadius: BorderRadius.circular(9999),
+                ),
+                child: const Text(
+                  'Retry',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF593F28),
+                  ),
+                ),
               ),
-              icon: const Icon(Icons.refresh, size: 16, color: AppTheme.primary),
-              label: const Text('Retry Stream', style: TextStyle(fontSize: 12, color: AppTheme.primary)),
             ),
           ],
         ),
@@ -851,12 +973,14 @@ class _IncidentVideoPlayerState extends State<_IncidentVideoPlayer> {
       return Container(
         height: 200,
         decoration: BoxDecoration(
-          color: const Color(0xFF090F19),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: AppTheme.outline),
+          color: const Color(0xFFE7E9DB),
+          borderRadius: BorderRadius.circular(20),
         ),
         child: const Center(
-          child: CircularProgressIndicator(color: AppTheme.primary, strokeWidth: 2.5),
+          child: CircularProgressIndicator(
+            color: Color(0xFFCFAB8D),
+            strokeWidth: 2.0,
+          ),
         ),
       );
     }
@@ -868,18 +992,20 @@ class _IncidentVideoPlayerState extends State<_IncidentVideoPlayer> {
     return Container(
       decoration: BoxDecoration(
         color: Colors.black,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppTheme.primary.withOpacity(0.4), width: 1.5),
+        borderRadius: BorderRadius.circular(20),
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(15),
+        borderRadius: BorderRadius.circular(20),
         child: Stack(
           alignment: Alignment.center,
           children: [
             AspectRatio(
-              aspectRatio: _controller!.value.aspectRatio > 0 ? _controller!.value.aspectRatio : 16 / 9,
+              aspectRatio: _controller!.value.aspectRatio > 0
+                  ? _controller!.value.aspectRatio
+                  : 16 / 9,
               child: VideoPlayer(_controller!),
             ),
+            // Speed & Fullscreen
             Positioned(
               top: 8,
               left: 10,
@@ -890,25 +1016,19 @@ class _IncidentVideoPlayerState extends State<_IncidentVideoPlayer> {
                   GestureDetector(
                     onTap: _cycleSpeed,
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
-                        color: Colors.black.withOpacity(0.7),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: AppTheme.primary.withOpacity(0.4)),
+                        color: Colors.black54,
+                        borderRadius: BorderRadius.circular(9999),
                       ),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.speed, size: 12, color: AppTheme.primary),
-                          const SizedBox(width: 4),
-                          Text(
-                            '${_currentSpeed}x',
-                            style: const TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w800,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ],
+                      child: Text(
+                        '${_currentSpeed}x',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                        ),
                       ),
                     ),
                   ),
@@ -917,9 +1037,8 @@ class _IncidentVideoPlayerState extends State<_IncidentVideoPlayer> {
                     child: Container(
                       padding: const EdgeInsets.all(6),
                       decoration: BoxDecoration(
-                        color: Colors.black.withOpacity(0.7),
+                        color: Colors.black54,
                         shape: BoxShape.circle,
-                        border: Border.all(color: AppTheme.primary.withOpacity(0.4)),
                       ),
                       child: const Icon(
                         Icons.fullscreen,
@@ -931,6 +1050,7 @@ class _IncidentVideoPlayerState extends State<_IncidentVideoPlayer> {
                 ],
               ),
             ),
+            // Play controls
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -939,31 +1059,31 @@ class _IncidentVideoPlayerState extends State<_IncidentVideoPlayer> {
                   child: Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: Colors.black.withOpacity(0.6),
+                      color: Colors.black45,
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(Icons.replay_5, color: Colors.white, size: 26),
+                    child: const Icon(Icons.replay_5,
+                        color: Colors.white, size: 26),
                   ),
                 ),
                 const SizedBox(width: 20),
                 GestureDetector(
                   onTap: () {
                     setState(() {
-                      isPlaying ? _controller!.pause() : _controller!.play();
+                      isPlaying
+                          ? _controller!.pause()
+                          : _controller!.play();
                     });
                   },
                   child: Container(
                     padding: const EdgeInsets.all(10),
                     decoration: const BoxDecoration(
-                      color: AppTheme.primary,
+                      color: Color(0xFFCFAB8D),
                       shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(color: AppTheme.primary, blurRadius: 10, spreadRadius: 1),
-                      ],
                     ),
                     child: Icon(
                       isPlaying ? Icons.pause : Icons.play_arrow,
-                      color: Colors.white,
+                      color: const Color(0xFF593F28),
                       size: 28,
                     ),
                   ),
@@ -974,23 +1094,25 @@ class _IncidentVideoPlayerState extends State<_IncidentVideoPlayer> {
                   child: Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: Colors.black.withOpacity(0.6),
+                      color: Colors.black45,
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(Icons.forward_5, color: Colors.white, size: 26),
+                    child: const Icon(Icons.forward_5,
+                        color: Colors.white, size: 26),
                   ),
                 ),
               ],
             ),
+            // Progress bar
             Positioned(
               bottom: 0,
               left: 0,
               right: 0,
               child: Container(
-                padding: const EdgeInsets.fromLTRB(10, 4, 10, 4),
-                decoration: BoxDecoration(
+                padding: const EdgeInsets.fromLTRB(10, 4, 10, 6),
+                decoration: const BoxDecoration(
                   gradient: LinearGradient(
-                    colors: [Colors.transparent, Colors.black.withOpacity(0.8)],
+                    colors: [Colors.transparent, Colors.black54],
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
                   ),
@@ -1003,7 +1125,7 @@ class _IncidentVideoPlayerState extends State<_IncidentVideoPlayer> {
                       allowScrubbing: true,
                       padding: const EdgeInsets.symmetric(vertical: 4),
                       colors: const VideoProgressColors(
-                        playedColor: AppTheme.primary,
+                        playedColor: Color(0xFFCFAB8D),
                         bufferedColor: Colors.white24,
                         backgroundColor: Colors.white10,
                       ),
@@ -1015,18 +1137,9 @@ class _IncidentVideoPlayerState extends State<_IncidentVideoPlayer> {
                           '${formatDuration(position)} / ${formatDuration(duration)}',
                           style: const TextStyle(
                             fontSize: 10,
-                            fontWeight: FontWeight.w700,
+                            fontWeight: FontWeight.w600,
                             color: Colors.white70,
                             fontFamily: 'monospace',
-                          ),
-                        ),
-                        const Text(
-                          'LIVE STREAM',
-                          style: TextStyle(
-                            fontSize: 8,
-                            fontWeight: FontWeight.w900,
-                            color: AppTheme.primary,
-                            letterSpacing: 0.8,
                           ),
                         ),
                       ],
@@ -1110,7 +1223,9 @@ class _FullScreenVideoViewerState extends State<_FullScreenVideoViewer> {
           children: [
             Center(
               child: AspectRatio(
-                aspectRatio: widget.controller.value.aspectRatio > 0 ? widget.controller.value.aspectRatio : 16 / 9,
+                aspectRatio: widget.controller.value.aspectRatio > 0
+                    ? widget.controller.value.aspectRatio
+                    : 16 / 9,
                 child: VideoPlayer(widget.controller),
               ),
             ),
@@ -1128,34 +1243,38 @@ class _FullScreenVideoViewerState extends State<_FullScreenVideoViewer> {
                   PopupMenuButton<double>(
                     initialValue: _currentSpeed,
                     onSelected: _changeSpeed,
-                    color: AppTheme.surface,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    color: const Color(0xFFF9FBEB),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16)),
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 6),
                       decoration: BoxDecoration(
-                        color: Colors.black.withOpacity(0.75),
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: AppTheme.primary.withOpacity(0.5)),
+                        color: Colors.black54,
+                        borderRadius: BorderRadius.circular(9999),
                       ),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.speed, size: 14, color: AppTheme.primary),
-                          const SizedBox(width: 6),
-                          Text(
-                            '${_currentSpeed}x',
-                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
-                          ),
-                        ],
+                      child: Text(
+                        '${_currentSpeed}x',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                        ),
                       ),
                     ),
-                    itemBuilder: (context) => [0.5, 1.0, 1.25, 1.5, 2.0].map((speed) {
+                    itemBuilder: (context) =>
+                        [0.5, 1.0, 1.25, 1.5, 2.0].map((speed) {
                       return PopupMenuItem<double>(
                         value: speed,
                         child: Text(
                           '${speed}x',
                           style: TextStyle(
-                            color: _currentSpeed == speed ? AppTheme.primary : Colors.white,
-                            fontWeight: _currentSpeed == speed ? FontWeight.bold : FontWeight.normal,
+                            color: _currentSpeed == speed
+                                ? const Color(0xFF75593F)
+                                : const Color(0xFF1A1D14),
+                            fontWeight: _currentSpeed == speed
+                                ? FontWeight.w700
+                                : FontWeight.w400,
                           ),
                         ),
                       );
@@ -1172,31 +1291,31 @@ class _FullScreenVideoViewerState extends State<_FullScreenVideoViewer> {
                   child: Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: Colors.black.withOpacity(0.65),
+                      color: Colors.black45,
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(Icons.replay_5, color: Colors.white, size: 36),
+                    child:
+                        const Icon(Icons.replay_5, color: Colors.white, size: 36),
                   ),
                 ),
                 const SizedBox(width: 32),
                 GestureDetector(
                   onTap: () {
                     setState(() {
-                      isPlaying ? widget.controller.pause() : widget.controller.play();
+                      isPlaying
+                          ? widget.controller.pause()
+                          : widget.controller.play();
                     });
                   },
                   child: Container(
                     padding: const EdgeInsets.all(16),
                     decoration: const BoxDecoration(
-                      color: AppTheme.primary,
+                      color: Color(0xFFCFAB8D),
                       shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(color: AppTheme.primary, blurRadius: 16, spreadRadius: 2),
-                      ],
                     ),
                     child: Icon(
                       isPlaying ? Icons.pause : Icons.play_arrow,
-                      color: Colors.white,
+                      color: const Color(0xFF593F28),
                       size: 38,
                     ),
                   ),
@@ -1207,10 +1326,11 @@ class _FullScreenVideoViewerState extends State<_FullScreenVideoViewer> {
                   child: Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: Colors.black.withOpacity(0.65),
+                      color: Colors.black45,
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(Icons.forward_5, color: Colors.white, size: 36),
+                    child: const Icon(Icons.forward_5,
+                        color: Colors.white, size: 36),
                   ),
                 ),
               ],
@@ -1226,7 +1346,7 @@ class _FullScreenVideoViewerState extends State<_FullScreenVideoViewer> {
                     widget.controller,
                     allowScrubbing: true,
                     colors: const VideoProgressColors(
-                      playedColor: AppTheme.primary,
+                      playedColor: Color(0xFFCFAB8D),
                       bufferedColor: Colors.white24,
                       backgroundColor: Colors.white10,
                     ),
@@ -1239,13 +1359,14 @@ class _FullScreenVideoViewerState extends State<_FullScreenVideoViewer> {
                         '${formatDuration(position)} / ${formatDuration(duration)}',
                         style: const TextStyle(
                           fontSize: 12,
-                          fontWeight: FontWeight.w700,
+                          fontWeight: FontWeight.w600,
                           color: Colors.white,
                           fontFamily: 'monospace',
                         ),
                       ),
                       IconButton(
-                        icon: const Icon(Icons.fullscreen_exit, color: Colors.white, size: 26),
+                        icon: const Icon(Icons.fullscreen_exit,
+                            color: Colors.white, size: 26),
                         onPressed: () => Navigator.pop(context),
                       ),
                     ],
@@ -1279,7 +1400,8 @@ class SnapshotImage extends StatelessWidget {
           return Image.memory(
             bytes,
             fit: BoxFit.cover,
-            errorBuilder: (context, error, stackTrace) => const MissingSnapshot(),
+            errorBuilder: (context, error, stackTrace) =>
+                const MissingSnapshot(),
           );
         } catch (_) {
           return const MissingSnapshot();
@@ -1293,8 +1415,13 @@ class SnapshotImage extends StatelessWidget {
       loadingBuilder: (context, child, progress) {
         if (progress == null) return child;
         return Container(
-          color: const Color(0xFF090F19),
-          child: const Center(child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.primary)),
+          color: const Color(0xFFE7E9DB),
+          child: const Center(
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              color: Color(0xFFCFAB8D),
+            ),
+          ),
         );
       },
       errorBuilder: (context, error, stackTrace) => const MissingSnapshot(),
@@ -1308,21 +1435,21 @@ class MissingSnapshot extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      color: const Color(0xFF090F19),
-      child: Column(
+      color: const Color(0xFFE7E9DB),
+      child: const Column(
         mainAxisAlignment: MainAxisAlignment.center,
-        children: const [
+        children: [
           Icon(
             Icons.image_not_supported_outlined,
-            size: 38,
-            color: AppTheme.onSurfaceVariant,
+            size: 32,
+            color: Color(0xFF81756C),
           ),
-          SizedBox(height: 8),
+          SizedBox(height: 6),
           Text(
-            'No snapshot thumbnail captured',
+            'No snapshot available',
             style: TextStyle(
-              fontSize: 12,
-              color: AppTheme.onSurfaceVariant,
+              fontSize: 11,
+              color: Color(0xFF81756C),
             ),
           ),
         ],
@@ -1342,17 +1469,17 @@ class SeverityChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.15),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color.withOpacity(0.35)),
+        border: Border.all(color: color.withValues(alpha: 0.25)),
       ),
       child: Text(
         severity,
         style: TextStyle(
           fontSize: 10,
-          fontWeight: FontWeight.w900,
+          fontWeight: FontWeight.w700,
           color: color,
-          letterSpacing: 0.5,
+          letterSpacing: 0.3,
         ),
       ),
     );
@@ -1370,7 +1497,7 @@ class MetaText extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, color: AppTheme.onSurfaceVariant, size: 14),
+        Icon(icon, color: const Color(0xFF81756C), size: 14),
         const SizedBox(width: 4),
         Text(
           text,
@@ -1378,7 +1505,7 @@ class MetaText extends StatelessWidget {
           style: const TextStyle(
             fontSize: 12,
             fontWeight: FontWeight.w500,
-            color: AppTheme.onSurfaceVariant,
+            color: Color(0xFF81756C),
           ),
         ),
       ],
@@ -1403,24 +1530,23 @@ class DetailBlock extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFF090F19),
+        color: const Color(0xFFE7E9DB),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppTheme.outline),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(icon, size: 16, color: AppTheme.primary),
+              Icon(icon, size: 16, color: const Color(0xFF75593F)),
               const SizedBox(width: 8),
               Text(
                 label,
                 style: const TextStyle(
                   fontSize: 11,
-                  fontWeight: FontWeight.w800,
-                  color: AppTheme.primary,
-                  letterSpacing: 0.5,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF75593F),
+                  letterSpacing: 0.3,
                 ),
               ),
             ],
@@ -1453,31 +1579,34 @@ class StatusPanel extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: AppTheme.surface,
+        color: const Color(0xFFECEEDF).withValues(alpha: 0.8),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppTheme.outline),
+        border: Border.all(
+          color: const Color(0xFFD3C4B9).withValues(alpha: 0.4),
+          width: 0.5,
+        ),
       ),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(icon, color: color, size: 40),
+          Icon(icon, color: color, size: 36),
           const SizedBox(height: 12),
           Text(
             title,
             textAlign: TextAlign.center,
             style: const TextStyle(
               fontSize: 16,
-              fontWeight: FontWeight.w800,
-              color: Colors.white,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF1A1D14),
             ),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 4),
           Text(
             message,
             textAlign: TextAlign.center,
             style: const TextStyle(
               fontSize: 13,
-              color: AppTheme.onSurfaceVariant,
+              color: Color(0xFF81756C),
             ),
           ),
         ],

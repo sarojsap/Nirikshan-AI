@@ -43,3 +43,7 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Stitch reference files
+/stitch_reference/
+/stitch_nirikshan_ai_enterprise_mobile.zip

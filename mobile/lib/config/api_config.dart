@@ -1,5 +1,7 @@
+import 'constants.dart';
+
 class ApiConfig {
-  static const String baseUrl = 'https://cloud-backend-production-4a8f.up.railway.app/api';
+  static const String baseUrl = apiBaseUrl;
 
   static String get loginEndpoint => '$baseUrl/auth/login';
   static String get logoutEndpoint => '$baseUrl/auth/logout';

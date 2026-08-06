@@ -1,6 +1,6 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 
-import '../../config/theme.dart';
 import '../../models/incident.dart';
 import 'home_screen.dart';
 
@@ -25,10 +25,10 @@ class IncidentsTab extends StatefulWidget {
 }
 
 class _IncidentsTabState extends State<IncidentsTab> {
-  String _dateFilter = 'ALL'; // ALL, TODAY, PAST_7_DAYS, CUSTOM
+  String _dateFilter = 'ALL';
   DateTimeRange? _customDateRange;
-  String _severityFilter = 'ALL'; // ALL, CRITICAL, HIGH, MEDIUM, LOW
-  String _typeFilter = 'ALL'; // ALL, CROWD, INTRUSION, SMOKE
+  String _severityFilter = 'ALL';
+  String _typeFilter = 'ALL';
   String _searchQuery = '';
 
   final TextEditingController _searchController = TextEditingController();
@@ -63,29 +63,33 @@ class _IncidentsTabState extends State<IncidentsTab> {
     final now = DateTime.now();
 
     return widget.incidents.where((incident) {
-      // 1. Search Query Filter
       if (_searchQuery.isNotEmpty) {
         final query = _searchQuery.toLowerCase();
         final matchesType = incident.type.toLowerCase().contains(query);
-        final matchesDesc = incident.description.toLowerCase().contains(query);
-        final matchesCamera = incident.displayCamera.toLowerCase().contains(query);
-        final matchesLocation = incident.displayLocation.toLowerCase().contains(query);
-        if (!matchesType && !matchesDesc && !matchesCamera && !matchesLocation) {
+        final matchesDesc =
+            incident.description.toLowerCase().contains(query);
+        final matchesCamera =
+            incident.displayCamera.toLowerCase().contains(query);
+        final matchesLocation =
+            incident.displayLocation.toLowerCase().contains(query);
+        if (!matchesType &&
+            !matchesDesc &&
+            !matchesCamera &&
+            !matchesLocation) {
           return false;
         }
       }
 
-      // 2. Severity Filter
-      if (_severityFilter != 'ALL' && incident.severity.toUpperCase() != _severityFilter) {
+      if (_severityFilter != 'ALL' &&
+          incident.severity.toUpperCase() != _severityFilter) {
         return false;
       }
 
-      // 3. Type Filter
-      if (_typeFilter != 'ALL' && !incident.type.toUpperCase().contains(_typeFilter)) {
+      if (_typeFilter != 'ALL' &&
+          !incident.type.toUpperCase().contains(_typeFilter)) {
         return false;
       }
 
-      // 4. Date Range Filter
       final timestamp = incident.timestamp.toLocal();
       if (_dateFilter == 'TODAY') {
         final isToday = timestamp.year == now.year &&
@@ -97,287 +101,14 @@ class _IncidentsTabState extends State<IncidentsTab> {
         if (timestamp.isBefore(sevenDaysAgo)) return false;
       } else if (_dateFilter == 'CUSTOM' && _customDateRange != null) {
         if (timestamp.isBefore(_customDateRange!.start) ||
-            timestamp.isAfter(_customDateRange!.end.add(const Duration(days: 1)))) {
+            timestamp.isAfter(
+                _customDateRange!.end.add(const Duration(days: 1)))) {
           return false;
         }
       }
 
       return true;
     }).toList();
-  }
-
-  Future<void> _pickCustomDateRange() async {
-    final picked = await showDateRangePicker(
-      context: context,
-      firstDate: DateTime(2025, 1, 1),
-      lastDate: DateTime.now().add(const Duration(days: 1)),
-      initialDateRange: _customDateRange ??
-          DateTimeRange(
-            start: DateTime.now().subtract(const Duration(days: 3)),
-            end: DateTime.now(),
-          ),
-      builder: (context, child) {
-        return Theme(
-          data: ThemeData.dark().copyWith(
-            colorScheme: const ColorScheme.dark(
-              primary: AppTheme.primary,
-              onPrimary: Colors.white,
-              surface: AppTheme.surface,
-              onSurface: Colors.white,
-            ),
-          ),
-          child: child!,
-        );
-      },
-    );
-
-    if (picked != null) {
-      setState(() {
-        _dateFilter = 'CUSTOM';
-        _customDateRange = picked;
-      });
-    }
-  }
-
-  void _openFilterBottomSheet() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: AppTheme.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setSheetState) {
-            final tempFilteredCount = _filteredIncidents.length;
-
-            return DraggableScrollableSheet(
-              expand: false,
-              initialChildSize: 0.78,
-              minChildSize: 0.4,
-              maxChildSize: 0.90,
-              builder: (context, scrollController) {
-                return ListView(
-                  controller: scrollController,
-                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
-                  children: [
-                    Center(
-                      child: Container(
-                        width: 40,
-                        height: 4,
-                        decoration: BoxDecoration(
-                          color: AppTheme.outlineVariant,
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-
-                    // Sheet Header
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Row(
-                          children: const [
-                            Icon(Icons.tune_rounded, color: AppTheme.primary, size: 20),
-                            SizedBox(width: 8),
-                            Text(
-                              'Filter Security Logs',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w800,
-                                color: Colors.white,
-                              ),
-                            ),
-                          ],
-                        ),
-                        if (_activeFilterCount > 0)
-                          TextButton(
-                            onPressed: () {
-                              _resetFilters();
-                              setSheetState(() {});
-                            },
-                            child: const Text(
-                              'Clear All',
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w700,
-                                color: AppTheme.error,
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
-                    const SizedBox(height: 20),
-
-                    // 1. Date Range Section
-                    const _FilterSectionTitle(title: 'DATE RANGE'),
-                    const SizedBox(height: 10),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        _ChoicePill(
-                          label: 'All Time',
-                          isSelected: _dateFilter == 'ALL',
-                          onTap: () {
-                            setState(() => _dateFilter = 'ALL');
-                            setSheetState(() {});
-                          },
-                        ),
-                        _ChoicePill(
-                          label: 'Today',
-                          isSelected: _dateFilter == 'TODAY',
-                          onTap: () {
-                            setState(() => _dateFilter = 'TODAY');
-                            setSheetState(() {});
-                          },
-                        ),
-                        _ChoicePill(
-                          label: 'Past 7 Days',
-                          isSelected: _dateFilter == 'PAST_7_DAYS',
-                          onTap: () {
-                            setState(() => _dateFilter = 'PAST_7_DAYS');
-                            setSheetState(() {});
-                          },
-                        ),
-                        _ChoicePill(
-                          label: _customDateRange != null
-                              ? '${_customDateRange!.start.month}/${_customDateRange!.start.day} - ${_customDateRange!.end.month}/${_customDateRange!.end.day}'
-                              : 'Custom Range...',
-                          isSelected: _dateFilter == 'CUSTOM',
-                          onTap: () async {
-                            await _pickCustomDateRange();
-                            setSheetState(() {});
-                          },
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 20),
-
-                    // 2. Severity Section
-                    const _FilterSectionTitle(title: 'SEVERITY LEVEL'),
-                    const SizedBox(height: 10),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        _ChoicePill(
-                          label: 'All Severities',
-                          isSelected: _severityFilter == 'ALL',
-                          onTap: () {
-                            setState(() => _severityFilter = 'ALL');
-                            setSheetState(() {});
-                          },
-                        ),
-                        _ChoicePill(
-                          label: 'CRITICAL',
-                          activeColor: AppTheme.severityCritical,
-                          isSelected: _severityFilter == 'CRITICAL',
-                          onTap: () {
-                            setState(() => _severityFilter = 'CRITICAL');
-                            setSheetState(() {});
-                          },
-                        ),
-                        _ChoicePill(
-                          label: 'HIGH',
-                          activeColor: AppTheme.severityHigh,
-                          isSelected: _severityFilter == 'HIGH',
-                          onTap: () {
-                            setState(() => _severityFilter = 'HIGH');
-                            setSheetState(() {});
-                          },
-                        ),
-                        _ChoicePill(
-                          label: 'MEDIUM',
-                          activeColor: AppTheme.severityMedium,
-                          isSelected: _severityFilter == 'MEDIUM',
-                          onTap: () {
-                            setState(() => _severityFilter = 'MEDIUM');
-                            setSheetState(() {});
-                          },
-                        ),
-                        _ChoicePill(
-                          label: 'LOW',
-                          activeColor: AppTheme.severityLow,
-                          isSelected: _severityFilter == 'LOW',
-                          onTap: () {
-                            setState(() => _severityFilter = 'LOW');
-                            setSheetState(() {});
-                          },
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 20),
-
-                    // 3. Alert Type Section
-                    const _FilterSectionTitle(title: 'ALERT TYPE'),
-                    const SizedBox(height: 10),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        _ChoicePill(
-                          label: 'All Types',
-                          isSelected: _typeFilter == 'ALL',
-                          onTap: () {
-                            setState(() => _typeFilter = 'ALL');
-                            setSheetState(() {});
-                          },
-                        ),
-                        _ChoicePill(
-                          label: 'CROWD',
-                          isSelected: _typeFilter == 'CROWD',
-                          onTap: () {
-                            setState(() => _typeFilter = 'CROWD');
-                            setSheetState(() {});
-                          },
-                        ),
-                        _ChoicePill(
-                          label: 'INTRUSION',
-                          isSelected: _typeFilter == 'INTRUSION',
-                          onTap: () {
-                            setState(() => _typeFilter = 'INTRUSION');
-                            setSheetState(() {});
-                          },
-                        ),
-                        _ChoicePill(
-                          label: 'SMOKE',
-                          isSelected: _typeFilter == 'SMOKE',
-                          onTap: () {
-                            setState(() => _typeFilter = 'SMOKE');
-                            setSheetState(() {});
-                          },
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 32),
-
-                    // Apply Button
-                    SizedBox(
-                      width: double.infinity,
-                      height: 50,
-                      child: ElevatedButton.icon(
-                        onPressed: () => Navigator.pop(context),
-                        icon: const Icon(Icons.check_circle_outline, size: 20),
-                        label: Text(
-                          'Show $tempFilteredCount Filtered Events',
-                          style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                );
-              },
-            );
-          },
-        );
-      },
-    );
   }
 
   @override
@@ -387,235 +118,307 @@ class _IncidentsTabState extends State<IncidentsTab> {
 
     return RefreshIndicator(
       onRefresh: () async => widget.onRefresh(),
-      color: AppTheme.primary,
-      backgroundColor: AppTheme.surface,
+      color: const Color(0xFF75593F),
+      backgroundColor: const Color(0xFFECEEDF),
       child: CustomScrollView(
-        physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
+        physics: const BouncingScrollPhysics(
+            parent: AlwaysScrollableScrollPhysics()),
         slivers: [
+          // ─── Header & Search ───
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
+              padding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Title Header
-                  const Text(
-                    'Incident Management',
-                    style: TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.w800,
-                      color: Colors.white,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  const Text(
-                    'Filter & investigate security log history',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: AppTheme.onSurfaceVariant,
-                    ),
+                  // Title row
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'Incidents',
+                        style: TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF1A1D14),
+                          letterSpacing: -0.3,
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 5),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFCFAB8D)
+                              .withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(9999),
+                        ),
+                        child: Text(
+                          '${filtered.length}',
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF75593F),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 16),
 
-                  // Search Bar + Material 3 Filter Action Button Row
+                  // Search bar
                   Row(
                     children: [
                       Expanded(
-                        child: TextField(
-                          controller: _searchController,
-                          onChanged: (val) => setState(() => _searchQuery = val),
-                          style: const TextStyle(color: Colors.white, fontSize: 14),
-                          decoration: InputDecoration(
-                            hintText: 'Search camera or threat...',
-                            prefixIcon: const Icon(Icons.search, color: AppTheme.primary, size: 20),
-                            suffixIcon: _searchQuery.isNotEmpty
-                                ? IconButton(
-                                    icon: const Icon(Icons.clear, color: AppTheme.onSurfaceVariant, size: 18),
-                                    onPressed: () {
-                                      _searchController.clear();
-                                      setState(() => _searchQuery = '');
-                                    },
-                                  )
-                                : null,
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(16),
+                          child: BackdropFilter(
+                            filter:
+                                ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+                            child: TextField(
+                              controller: _searchController,
+                              onChanged: (val) =>
+                                  setState(() => _searchQuery = val),
+                              style: const TextStyle(
+                                color: Color(0xFF1A1D14),
+                                fontSize: 14,
+                              ),
+                              decoration: InputDecoration(
+                                hintText: 'Search incidents...',
+                                hintStyle: const TextStyle(
+                                    color: Color(0xFF9A8E84)),
+                                filled: true,
+                                fillColor: const Color(0xFFECEEDF)
+                                    .withValues(alpha: 0.8),
+                                prefixIcon: const Icon(
+                                  Icons.search_rounded,
+                                  color: Color(0xFF81756C),
+                                  size: 20,
+                                ),
+                                suffixIcon: _searchQuery.isNotEmpty
+                                    ? IconButton(
+                                        icon: const Icon(Icons.clear,
+                                            color: Color(0xFF81756C),
+                                            size: 18),
+                                        onPressed: () {
+                                          _searchController.clear();
+                                          setState(
+                                              () => _searchQuery = '');
+                                        },
+                                      )
+                                    : null,
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius:
+                                      BorderRadius.circular(16),
+                                  borderSide: BorderSide(
+                                    color: const Color(0xFFD3C4B9)
+                                        .withValues(alpha: 0.5),
+                                    width: 0.5,
+                                  ),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius:
+                                      BorderRadius.circular(16),
+                                  borderSide: const BorderSide(
+                                    color: Color(0xFFCFAB8D),
+                                    width: 1.5,
+                                  ),
+                                ),
+                                contentPadding:
+                                    const EdgeInsets.symmetric(
+                                        horizontal: 16, vertical: 12),
+                              ),
+                            ),
                           ),
                         ),
                       ),
                       const SizedBox(width: 10),
 
-                      // Material 3 Filter Button with Badge
+                      // Filter button
                       GestureDetector(
                         onTap: _openFilterBottomSheet,
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 200),
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+                        child: Container(
+                          width: 48,
+                          height: 48,
                           decoration: BoxDecoration(
-                            color: activeCount > 0 ? AppTheme.primary : AppTheme.surface,
+                            color: activeCount > 0
+                                ? const Color(0xFFCFAB8D)
+                                : const Color(0xFFECEEDF)
+                                    .withValues(alpha: 0.8),
                             borderRadius: BorderRadius.circular(16),
                             border: Border.all(
-                              color: activeCount > 0 ? AppTheme.primary : AppTheme.outline,
+                              color: activeCount > 0
+                                  ? const Color(0xFFCFAB8D)
+                                  : const Color(0xFFD3C4B9)
+                                      .withValues(alpha: 0.5),
+                              width: 0.5,
                             ),
-                            boxShadow: activeCount > 0
-                                ? [
-                                    BoxShadow(
-                                      color: AppTheme.primary.withOpacity(0.3),
-                                      blurRadius: 8,
-                                      offset: const Offset(0, 2),
-                                    ),
-                                  ]
-                                : null,
                           ),
-                          child: Row(
+                          child: Stack(
+                            alignment: Alignment.center,
                             children: [
                               Icon(
                                 Icons.tune_rounded,
-                                size: 18,
-                                color: activeCount > 0 ? Colors.white : AppTheme.primary,
+                                size: 20,
+                                color: activeCount > 0
+                                    ? const Color(0xFF593F28)
+                                    : const Color(0xFF81756C),
                               ),
-                              const SizedBox(width: 6),
-                              Text(
-                                'Filter',
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w700,
-                                  color: activeCount > 0 ? Colors.white : AppTheme.primary,
-                                ),
-                              ),
-                              if (activeCount > 0) ...[
-                                const SizedBox(width: 6),
-                                Container(
-                                  padding: const EdgeInsets.all(5),
-                                  decoration: const BoxDecoration(
-                                    color: Colors.white,
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: Text(
-                                    activeCount.toString(),
-                                    style: const TextStyle(
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.w900,
-                                      color: AppTheme.primary,
+                              if (activeCount > 0)
+                                Positioned(
+                                  top: 8,
+                                  right: 8,
+                                  child: Container(
+                                    width: 8,
+                                    height: 8,
+                                    decoration: const BoxDecoration(
+                                      color: Color(0xFF593F28),
+                                      shape: BoxShape.circle,
                                     ),
                                   ),
                                 ),
-                              ],
                             ],
                           ),
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 14),
 
-                  // Active Filter Summary Pills Row (if filters are active)
-                  if (activeCount > 0)
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: AppTheme.surface,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: AppTheme.primary.withOpacity(0.3)),
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.filter_alt, size: 14, color: AppTheme.primary),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: SingleChildScrollView(
-                              scrollDirection: Axis.horizontal,
-                              child: Row(
-                                children: [
-                                  if (_dateFilter != 'ALL')
-                                    _ActivePillTag(text: 'Date: $_dateFilter'),
-                                  if (_severityFilter != 'ALL')
-                                    _ActivePillTag(text: 'Severity: $_severityFilter'),
-                                  if (_typeFilter != 'ALL')
-                                    _ActivePillTag(text: 'Type: $_typeFilter'),
-                                  if (_searchQuery.isNotEmpty)
-                                    _ActivePillTag(text: 'Search: "$_searchQuery"'),
-                                ],
-                              ),
-                            ),
-                          ),
-                          GestureDetector(
-                            onTap: _resetFilters,
-                            child: const Padding(
-                              padding: EdgeInsets.only(left: 6),
-                              child: Icon(Icons.close, size: 16, color: AppTheme.error),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-
-                  const SizedBox(height: 12),
-
-                  // Counter Bar
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'Showing ${filtered.length} of ${widget.incidents.length} Events',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                          color: AppTheme.onSurfaceVariant,
+                  // Quick filter chips
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    physics: const BouncingScrollPhysics(),
+                    child: Row(
+                      children: [
+                        _FilterChip(
+                          label: 'All',
+                          isSelected: _severityFilter == 'ALL',
+                          onTap: () =>
+                              setState(() => _severityFilter = 'ALL'),
                         ),
-                      ),
-                    ],
+                        const SizedBox(width: 8),
+                        _FilterChip(
+                          label: 'Critical',
+                          isSelected: _severityFilter == 'CRITICAL',
+                          activeColor: const Color(0xFFBA1A1A),
+                          onTap: () => setState(
+                              () => _severityFilter = 'CRITICAL'),
+                        ),
+                        const SizedBox(width: 8),
+                        _FilterChip(
+                          label: 'High',
+                          isSelected: _severityFilter == 'HIGH',
+                          activeColor: const Color(0xFFCC5500),
+                          onTap: () =>
+                              setState(() => _severityFilter = 'HIGH'),
+                        ),
+                        const SizedBox(width: 8),
+                        _FilterChip(
+                          label: 'Crowd',
+                          isSelected: _typeFilter == 'CROWD',
+                          onTap: () => setState(() => _typeFilter =
+                              _typeFilter == 'CROWD' ? 'ALL' : 'CROWD'),
+                        ),
+                      ],
+                    ),
                   ),
+                  const SizedBox(height: 16),
                 ],
               ),
             ),
           ),
 
-          if (widget.error != null)
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
-                child: StatusPanel(
-                  icon: Icons.error_outline,
-                  title: 'Sync Error',
-                  message: widget.error!,
-                  color: AppTheme.error,
-                ),
-              ),
-            ),
-
+          // ─── Loading State ───
           if (widget.isLoading)
             const SliverFillRemaining(
               hasScrollBody: false,
               child: Center(
-                child: CircularProgressIndicator(color: AppTheme.primary),
-              ),
-            )
-          else if (filtered.isEmpty)
-            SliverFillRemaining(
-              hasScrollBody: false,
-              child: Padding(
-                padding: const EdgeInsets.all(20),
-                child: StatusPanel(
-                  icon: Icons.filter_alt_off_outlined,
-                  title: 'No Matching Events',
-                  message: activeCount > 0
-                      ? 'No security incidents match your current filter settings.'
-                      : 'No security threats detected on camera nodes.',
-                  color: AppTheme.onSurfaceVariant,
+                child: CircularProgressIndicator(
+                  color: Color(0xFFCFAB8D),
                 ),
               ),
             )
+          // ─── Empty State ───
+          else if (filtered.isEmpty)
+            SliverFillRemaining(
+              hasScrollBody: false,
+              child: Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(32),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Container(
+                        width: 64,
+                        height: 64,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFECEEDF),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: const Icon(
+                          Icons.shield_outlined,
+                          color: Color(0xFF81756C),
+                          size: 28,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      const Text(
+                        'No incidents found',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF1A1D14),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      const Text(
+                        'Try adjusting your search or filters',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Color(0xFF81756C),
+                        ),
+                      ),
+                      if (activeCount > 0) ...[
+                        const SizedBox(height: 20),
+                        GestureDetector(
+                          onTap: _resetFilters,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 20, vertical: 10),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFCFAB8D),
+                              borderRadius: BorderRadius.circular(9999),
+                            ),
+                            child: const Text(
+                              'Reset Filters',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFF593F28),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+            )
+          // ─── Incident List ───
           else
             SliverPadding(
-              padding: const EdgeInsets.fromLTRB(20, 0, 20, 28),
+              padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
               sliver: SliverList.separated(
                 itemBuilder: (context, index) {
                   final incident = filtered[index];
-                  return IncidentCard(
+                  return _IncidentEventCard(
                     incident: incident,
                     onTap: () => widget.onIncidentTap(incident),
                   );
                 },
-                separatorBuilder: (context, index) => const SizedBox(height: 14),
+                separatorBuilder: (context, index) =>
+                    const SizedBox(height: 14),
                 itemCount: filtered.length,
               ),
             ),
@@ -623,61 +426,112 @@ class _IncidentsTabState extends State<IncidentsTab> {
       ),
     );
   }
-}
 
-class _FilterSectionTitle extends StatelessWidget {
-  final String title;
-
-  const _FilterSectionTitle({required this.title});
-
-  @override
-  Widget build(BuildContext context) {
-    return Text(
-      title,
-      style: const TextStyle(
-        fontSize: 11,
-        fontWeight: FontWeight.w800,
-        color: AppTheme.primary,
-        letterSpacing: 0.8,
+  void _openFilterBottomSheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: const Color(0xFFF9FBEB),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            return Padding(
+              padding: const EdgeInsets.fromLTRB(24, 16, 24, 36),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 36,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFD3C4B9),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  const Text(
+                    'Filter Incidents',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF1A1D14),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 50,
+                    child: ElevatedButton(
+                      onPressed: () => Navigator.pop(context),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFCFAB8D),
+                        foregroundColor: const Color(0xFF593F28),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                      ),
+                      child: const Text(
+                        'Apply Filters',
+                        style: TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
     );
   }
 }
 
-class _ChoicePill extends StatelessWidget {
+class _FilterChip extends StatelessWidget {
   final String label;
   final bool isSelected;
-  final Color activeColor;
+  final Color? activeColor;
   final VoidCallback onTap;
 
-  const _ChoicePill({
+  const _FilterChip({
     required this.label,
     required this.isSelected,
-    this.activeColor = AppTheme.primary,
+    this.activeColor,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
+    final color = activeColor ?? const Color(0xFF75593F);
+
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
-          color: isSelected ? activeColor : const Color(0xFF090F19),
-          borderRadius: BorderRadius.circular(16),
+          color: isSelected
+              ? color.withValues(alpha: 0.12)
+              : const Color(0xFFECEEDF).withValues(alpha: 0.8),
+          borderRadius: BorderRadius.circular(9999),
           border: Border.all(
-            color: isSelected ? activeColor : AppTheme.outline,
-            width: 1,
+            color: isSelected
+                ? color.withValues(alpha: 0.3)
+                : const Color(0xFFD3C4B9).withValues(alpha: 0.5),
+            width: isSelected ? 1.0 : 0.5,
           ),
         ),
         child: Text(
           label,
           style: TextStyle(
-            fontSize: 12,
-            fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-            color: isSelected ? Colors.white : AppTheme.onSurfaceVariant,
+            fontSize: 13,
+            fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+            color: isSelected ? color : const Color(0xFF81756C),
           ),
         ),
       ),
@@ -685,27 +539,115 @@ class _ChoicePill extends StatelessWidget {
   }
 }
 
-class _ActivePillTag extends StatelessWidget {
-  final String text;
+class _IncidentEventCard extends StatelessWidget {
+  final Incident incident;
+  final VoidCallback onTap;
 
-  const _ActivePillTag({required this.text});
+  const _IncidentEventCard({
+    required this.incident,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(right: 6),
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(
-        color: AppTheme.primary.withOpacity(0.15),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: AppTheme.primary.withOpacity(0.3)),
-      ),
-      child: Text(
-        text,
-        style: const TextStyle(
-          fontSize: 10,
-          fontWeight: FontWeight.w700,
-          color: AppTheme.primary,
+    final severityColor = severityColorOf(incident.severity);
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(24),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+        child: Container(
+          decoration: BoxDecoration(
+            color: const Color(0xFFECEEDF).withValues(alpha: 0.85),
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(
+              color: const Color(0xFFCFAB8D).withValues(alpha: 0.2),
+              width: 0.5,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF75593F).withValues(alpha: 0.04),
+                blurRadius: 20,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Material(
+            color: Colors.transparent,
+            borderRadius: BorderRadius.circular(24),
+            child: InkWell(
+              onTap: onTap,
+              borderRadius: BorderRadius.circular(24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Image
+                  ClipRRect(
+                    borderRadius: const BorderRadius.vertical(
+                        top: Radius.circular(23)),
+                    child: AspectRatio(
+                      aspectRatio: 16 / 9,
+                      child:
+                          SnapshotImage(url: incident.resolvedImageUrl),
+                    ),
+                  ),
+                  // Content
+                  Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                incident.displayType,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xFF1A1D14),
+                                ),
+                              ),
+                            ),
+                            SeverityChip(
+                              severity: incident.severity,
+                              color: severityColor,
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          incident.description,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            color: Color(0xFF4F453D),
+                            height: 1.4,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            MetaText(
+                              icon: Icons.videocam_outlined,
+                              text: incident.displayCamera,
+                            ),
+                            const Spacer(),
+                            MetaText(
+                              icon: Icons.schedule_outlined,
+                              text: formatDateTime(incident.timestamp),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
         ),
       ),
     );
