@@ -7,7 +7,7 @@ export async function forgotPassword(req, res) {
     const { email } = req.body;
     if (!email) return res.status(400).json({ error: 'Email is required!' });
     await authService.forgotPassword(email);
-    res.json({ message: 'If the email exists, a reset link has been sent.' });
+    res.json({ message: 'If the email exists, a verification OTP code has been sent.' });
   } catch (err) {
     res.status(500).json({ error: 'Something went wrong. Please try again later.' });
   }
@@ -15,11 +15,13 @@ export async function forgotPassword(req, res) {
 
 export async function resetPassword(req, res) {
   try {
-    const { token, password } = req.body;
-    if (!token || !password) return res.status(400).json({ error: 'Token and new password are required!' });
-    if (password.length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters!' });
-    await authService.resetPassword(token, password);
-    res.json({ message: 'Password reset successful!' });
+    const { email, otp, token, password, newPassword } = req.body;
+    const verificationCode = otp || token;
+    const targetPassword = password || newPassword;
+    if (!email || !verificationCode || !targetPassword) return res.status(400).json({ error: 'Email, verification OTP code, and new password are required!' });
+    if (targetPassword.length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters!' });
+    await authService.resetPassword(email, verificationCode, targetPassword);
+    res.json({ message: 'Password reset successful! You can now sign in.' });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }

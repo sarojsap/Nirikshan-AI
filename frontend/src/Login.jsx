@@ -3,9 +3,12 @@ import { API, CLOUD_API } from './config';
 
 export default function Login({ onAuthSuccess, onModeSelect, currentMode = 'edge', onRegisterDevice }) {
   const [isLogin, setIsLogin] = useState(true);
+  const [forgotStep, setForgotStep] = useState(null); // null | 'request' | 'reset'
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [otp, setOtp] = useState('');
+  const [newPassword, setNewPassword] = useState('');
   const [role, setRole] = useState('OPERATOR');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -75,13 +78,68 @@ export default function Login({ onAuthSuccess, onModeSelect, currentMode = 'edge
     }
   };
 
+  const handleForgotPasswordRequest = async (e) => {
+    e.preventDefault();
+    setError('');
+    setSuccess('');
+    setLoading(true);
+    const authApi = currentMode === 'cloud' ? CLOUD_API : API;
+    try {
+      const res = await fetch(`${authApi.AUTH}/forgot-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to send verification OTP code.');
+      setSuccess('Verification OTP sent! Please check your email.');
+      setForgotStep('reset');
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResetPassword = async (e) => {
+    e.preventDefault();
+    setError('');
+    setSuccess('');
+    setLoading(true);
+    const authApi = currentMode === 'cloud' ? CLOUD_API : API;
+    try {
+      const res = await fetch(`${authApi.AUTH}/reset-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, otp, newPassword }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to reset password.');
+      setSuccess('Password reset successfully! You can now log in.');
+      setOtp('');
+      setNewPassword('');
+      setTimeout(() => {
+        setForgotStep(null);
+        setIsLogin(true);
+        setSuccess('Password reset successfully! Please sign in with your new password.');
+      }, 1800);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleToggle = () => {
     setIsLogin(!isLogin);
+    setForgotStep(null);
     setError('');
     setSuccess('');
     setName('');
     setEmail('');
     setPassword('');
+    setOtp('');
+    setNewPassword('');
     setRole('OPERATOR');
   };
 
@@ -122,12 +180,14 @@ export default function Login({ onAuthSuccess, onModeSelect, currentMode = 'edge
                 <span className="text-lg font-extrabold text-soc-textPrimary tracking-wider uppercase font-sans">Nirikshan AI</span>
               </div>
               <h2 className="text-xl font-bold text-soc-textPrimary tracking-tight mb-2">
-                {isLogin ? 'Welcome Back' : 'Get Started'}
+                {forgotStep === 'request' && 'Forgot Password'}
+                {forgotStep === 'reset' && 'Enter Verification OTP'}
+                {!forgotStep && (isLogin ? 'Welcome Back' : 'Get Started')}
               </h2>
               <p className="text-soc-textMuted text-xs font-medium">
-                {isLogin
-                  ? 'Sign in to access your surveillance dashboard'
-                  : 'Register a new account to monitor secure areas'}
+                {forgotStep === 'request' && 'Enter your email address to receive a 6-digit verification code'}
+                {forgotStep === 'reset' && 'Enter the 6-digit code sent to your email and choose a new password'}
+                {!forgotStep && (isLogin ? 'Sign in to access your surveillance dashboard' : 'Register a new account to monitor secure areas')}
               </p>
               <div className="flex items-center justify-center gap-2 mt-4">
                 {onModeSelect && (
@@ -194,117 +254,214 @@ export default function Login({ onAuthSuccess, onModeSelect, currentMode = 'edge
               </div>
             )}
 
-            <form onSubmit={handleSubmit} className="flex flex-col gap-5">
-              {/* Full Name Input (Only for Register) */}
-              {!isLogin && (
+            {forgotStep === 'request' ? (
+              <form onSubmit={handleForgotPasswordRequest} className="flex flex-col gap-5">
                 <div className="flex flex-col gap-1.5 text-left">
-                  <label className="text-[10px] font-bold uppercase tracking-wider text-soc-textMuted" htmlFor="name">
-                    Full Name
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-soc-textMuted" htmlFor="reset-email">
+                    Email Address
                   </label>
                   <div className="relative flex items-center">
-                    <span className="material-symbols-outlined absolute left-4 text-soc-textMuted pointer-events-none text-base">person</span>
+                    <span className="material-symbols-outlined absolute left-4 text-soc-textMuted pointer-events-none text-base">mail</span>
                     <input
-                      id="name"
-                      type="text"
+                      id="reset-email"
+                      type="email"
                       className="w-full pl-11 pr-4 py-3 bg-soc-card border border-soc-border rounded-xl text-xs text-soc-textPrimary placeholder-[#64748b] focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 transition-all font-sans"
-                      placeholder="Enter your full name"
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
+                      placeholder="name@example.com"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
                       required
                     />
                   </div>
                 </div>
-              )}
-
-              {/* Email Input */}
-              <div className="flex flex-col gap-1.5 text-left">
-                <label className="text-[10px] font-bold uppercase tracking-wider text-soc-textMuted" htmlFor="email">
-                  Email Address
-                </label>
-                <div className="relative flex items-center">
-                  <span className="material-symbols-outlined absolute left-4 text-soc-textMuted pointer-events-none text-base">mail</span>
-                  <input
-                    id="email"
-                    type="email"
-                    className="w-full pl-11 pr-4 py-3 bg-soc-card border border-soc-border rounded-xl text-xs text-soc-textPrimary placeholder-[#64748b] focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 transition-all font-sans"
-                    placeholder="name@example.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    required
-                  />
-                </div>
-              </div>
-
-              {/* Password Input */}
-              <div className="flex flex-col gap-1.5 text-left">
-                <label className="text-[10px] font-bold uppercase tracking-wider text-soc-textMuted" htmlFor="password">
-                  Password
-                </label>
-                <div className="relative flex items-center">
-                  <span className="material-symbols-outlined absolute left-4 text-soc-textMuted pointer-events-none text-base">lock</span>
-                  <input
-                    id="password"
-                    type="password"
-                    className="w-full pl-11 pr-4 py-3 bg-soc-card border border-soc-border rounded-xl text-xs text-soc-textPrimary placeholder-[#64748b] focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 transition-all font-sans"
-                    placeholder="••••••••"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                  />
-                </div>
-              </div>
-
-              {/* Role Select (Only for Register) */}
-              {!isLogin && (
+                <button
+                  type="submit"
+                  className="w-full py-3.5 bg-primary hover:bg-primary-hover active:bg-primary-dark disabled:opacity-60 text-white font-bold text-xs uppercase tracking-wider rounded-xl transition-all flex justify-center items-center cursor-pointer shadow-sm"
+                  disabled={loading}
+                >
+                  {loading ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> : 'Send OTP Code'}
+                </button>
+              </form>
+            ) : forgotStep === 'reset' ? (
+              <form onSubmit={handleResetPassword} className="flex flex-col gap-5">
                 <div className="flex flex-col gap-1.5 text-left">
-                  <label className="text-[10px] font-bold uppercase tracking-wider text-soc-textMuted" htmlFor="role">
-                    Role
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-soc-textMuted" htmlFor="otp">
+                    6-Digit Verification Code
                   </label>
                   <div className="relative flex items-center">
-                    <span className="material-symbols-outlined absolute left-4 text-soc-textMuted pointer-events-none text-base">manage_accounts</span>
-                    <select
-                      id="role"
-                      className="w-full pl-11 pr-10 py-3 bg-soc-card border border-soc-border rounded-xl text-xs text-soc-textPrimary focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 transition-all font-sans appearance-none cursor-pointer font-semibold"
-                      value={role}
-                      onChange={(e) => setRole(e.target.value)}
-                    >
-                      <option className="bg-[#090f19] text-white" value="OPERATOR">Operator</option>
-                      <option className="bg-[#090f19] text-white" value="ADMIN">Administrator</option>
-                    </select>
-                    <span className="absolute right-4 text-soc-textMuted pointer-events-none text-xs">▼</span>
+                    <span className="material-symbols-outlined absolute left-4 text-soc-textMuted pointer-events-none text-base">pin</span>
+                    <input
+                      id="otp"
+                      type="text"
+                      maxLength={6}
+                      className="w-full pl-11 pr-4 py-3 bg-soc-card border border-soc-border rounded-xl text-sm font-bold text-soc-textPrimary tracking-[0.3em] placeholder-[#64748b] focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 transition-all font-mono uppercase"
+                      placeholder="XXXXXX"
+                      value={otp}
+                      onChange={(e) => setOtp(e.target.value)}
+                      required
+                    />
                   </div>
                 </div>
-              )}
-
-              {/* Submit Button */}
-              <button
-                type="submit"
-                className="w-full py-3.5 bg-primary hover:bg-primary-hover active:bg-primary-dark disabled:opacity-60 text-white font-bold text-xs uppercase tracking-wider rounded-xl transition-all flex justify-center items-center cursor-pointer shadow-sm"
-                disabled={loading}
-              >
-                {loading ? (
-                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                ) : isLogin ? (
-                  'Sign In'
-                ) : (
-                  'Create Account'
+                <div className="flex flex-col gap-1.5 text-left">
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-soc-textMuted" htmlFor="new-password">
+                    New Password
+                  </label>
+                  <div className="relative flex items-center">
+                    <span className="material-symbols-outlined absolute left-4 text-soc-textMuted pointer-events-none text-base">lock</span>
+                    <input
+                      id="new-password"
+                      type="password"
+                      className="w-full pl-11 pr-4 py-3 bg-soc-card border border-soc-border rounded-xl text-xs text-soc-textPrimary placeholder-[#64748b] focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 transition-all font-sans"
+                      placeholder="At least 6 characters"
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      required
+                    />
+                  </div>
+                </div>
+                <button
+                  type="submit"
+                  className="w-full py-3.5 bg-primary hover:bg-primary-hover active:bg-primary-dark disabled:opacity-60 text-white font-bold text-xs uppercase tracking-wider rounded-xl transition-all flex justify-center items-center cursor-pointer shadow-sm"
+                  disabled={loading}
+                >
+                  {loading ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> : 'Reset Password'}
+                </button>
+              </form>
+            ) : (
+              <form onSubmit={handleSubmit} className="flex flex-col gap-5">
+                {/* Full Name Input (Only for Register) */}
+                {!isLogin && (
+                  <div className="flex flex-col gap-1.5 text-left">
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-soc-textMuted" htmlFor="name">
+                      Full Name
+                    </label>
+                    <div className="relative flex items-center">
+                      <span className="material-symbols-outlined absolute left-4 text-soc-textMuted pointer-events-none text-base">person</span>
+                      <input
+                        id="name"
+                        type="text"
+                        className="w-full pl-11 pr-4 py-3 bg-soc-card border border-soc-border rounded-xl text-xs text-soc-textPrimary placeholder-[#64748b] focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 transition-all font-sans"
+                        placeholder="Enter your full name"
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                        required
+                      />
+                    </div>
+                  </div>
                 )}
-              </button>
-            </form>
+
+                {/* Email Input */}
+                <div className="flex flex-col gap-1.5 text-left">
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-soc-textMuted" htmlFor="email">
+                    Email Address
+                  </label>
+                  <div className="relative flex items-center">
+                    <span className="material-symbols-outlined absolute left-4 text-soc-textMuted pointer-events-none text-base">mail</span>
+                    <input
+                      id="email"
+                      type="email"
+                      className="w-full pl-11 pr-4 py-3 bg-soc-card border border-soc-border rounded-xl text-xs text-soc-textPrimary placeholder-[#64748b] focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 transition-all font-sans"
+                      placeholder="name@example.com"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      required
+                    />
+                  </div>
+                </div>
+
+                {/* Password Input */}
+                <div className="flex flex-col gap-1.5 text-left">
+                  <div className="flex justify-between items-center">
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-soc-textMuted" htmlFor="password">
+                      Password
+                    </label>
+                    {isLogin && (
+                      <button
+                        type="button"
+                        onClick={() => { setForgotStep('request'); setError(''); setSuccess(''); }}
+                        className="text-[10px] text-primary hover:text-primary-hover font-bold hover:underline cursor-pointer transition-colors"
+                      >
+                        Forgot password?
+                      </button>
+                    )}
+                  </div>
+                  <div className="relative flex items-center">
+                    <span className="material-symbols-outlined absolute left-4 text-soc-textMuted pointer-events-none text-base">lock</span>
+                    <input
+                      id="password"
+                      type="password"
+                      className="w-full pl-11 pr-4 py-3 bg-soc-card border border-soc-border rounded-xl text-xs text-soc-textPrimary placeholder-[#64748b] focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 transition-all font-sans"
+                      placeholder="••••••••"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      required
+                    />
+                  </div>
+                </div>
+
+                {/* Role Select (Only for Register) */}
+                {!isLogin && (
+                  <div className="flex flex-col gap-1.5 text-left">
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-soc-textMuted" htmlFor="role">
+                      Role
+                    </label>
+                    <div className="relative flex items-center">
+                      <span className="material-symbols-outlined absolute left-4 text-soc-textMuted pointer-events-none text-base">manage_accounts</span>
+                      <select
+                        id="role"
+                        className="w-full pl-11 pr-10 py-3 bg-soc-card border border-soc-border rounded-xl text-xs text-soc-textPrimary focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 transition-all font-sans appearance-none cursor-pointer font-semibold"
+                        value={role}
+                        onChange={(e) => setRole(e.target.value)}
+                      >
+                        <option className="bg-[#090f19] text-white" value="OPERATOR">Operator</option>
+                        <option className="bg-[#090f19] text-white" value="ADMIN">Administrator</option>
+                      </select>
+                      <span className="absolute right-4 text-soc-textMuted pointer-events-none text-xs">▼</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Submit Button */}
+                <button
+                  type="submit"
+                  className="w-full py-3.5 bg-primary hover:bg-primary-hover active:bg-primary-dark disabled:opacity-60 text-white font-bold text-xs uppercase tracking-wider rounded-xl transition-all flex justify-center items-center cursor-pointer shadow-sm"
+                  disabled={loading}
+                >
+                  {loading ? (
+                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                  ) : isLogin ? (
+                    'Sign In'
+                  ) : (
+                    'Create Account'
+                  )}
+                </button>
+              </form>
+            )}
 
             <div className="text-center mt-6">
-              <span className="text-xs text-soc-textMuted">
-                {isLogin
-                  ? "Don't have an account yet?"
-                  : 'Already have an account?'}
-              </span>
-              <button
-                onClick={handleToggle}
-                className="text-xs font-bold text-primary hover:text-primary-hover transition-colors ml-1.5 cursor-pointer"
-                type="button"
-              >
-                {isLogin ? 'Sign Up' : 'Sign In'}
-              </button>
+              {forgotStep ? (
+                <button
+                  onClick={() => { setForgotStep(null); setError(''); setSuccess(''); }}
+                  className="text-xs font-bold text-soc-textMuted hover:text-white transition-colors cursor-pointer flex items-center justify-center gap-1.5 mx-auto"
+                  type="button"
+                >
+                  <span>← Back to Sign In</span>
+                </button>
+              ) : (
+                <>
+                  <span className="text-xs text-soc-textMuted">
+                    {isLogin
+                      ? "Don't have an account yet?"
+                      : 'Already have an account?'}
+                  </span>
+                  <button
+                    onClick={handleToggle}
+                    className="text-xs font-bold text-primary hover:text-primary-hover transition-colors ml-1.5 cursor-pointer"
+                    type="button"
+                  >
+                    {isLogin ? 'Sign Up' : 'Sign In'}
+                  </button>
+                </>
+              )}
             </div>
           </>
         )}

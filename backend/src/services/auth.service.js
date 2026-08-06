@@ -59,8 +59,8 @@ export const forgotPassword = async email => {
     return;
   }
 
-  const rawToken = crypto.randomBytes(32).toString('hex');
-  const hashedToken = crypto.createHash('sha256').update(rawToken).digest('hex');
+  const otp = Math.floor(100000 + Math.random() * 900000).toString();
+  const hashedToken = crypto.createHash('sha256').update(otp).digest('hex');
 
   const expiry = new Date();
   expiry.setMinutes(expiry.getMinutes() + 15);
@@ -69,25 +69,26 @@ export const forgotPassword = async email => {
   user.resetTokenExpiry = expiry;
   await userRepository.save(user);
 
-  const resetLink = `${process.env.CLIENT_URL}/reset-password?token=${rawToken}&email=${email}`;
+  console.log(`\n[DEV] Password reset OTP for ${email}: ${otp}\n`);
 
-  console.log(`\n[DEV] Password reset link: ${resetLink}`);
-  console.log(`[DEV] Raw token for API: ${rawToken}\n`);
-
-  await sendPasswordResetEmail(email, resetLink);
+  await sendPasswordResetEmail(email, otp);
 };
 
-export const resetPassword = async (token, newPassword) => {
+export const resetPassword = async (email, otp, newPassword) => {
   const userRepository = AppDataSource.getRepository(User);
 
-  const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
+  const hashedToken = crypto.createHash('sha256').update(otp).digest('hex');
 
   const user = await userRepository.findOne({
-    where: { resetToken: hashedToken },
+    where: { email, resetToken: hashedToken },
   });
 
-  if (!user || !user.resetTokenExpiry || user.resetTokenExpiry < new Date()) {
-    throw new Error('Invalid or expired reset token!');
+  if (!user) {
+    throw new Error('Invalid verification OTP code or incorrect email!');
+  }
+
+  if (!user.resetTokenExpiry || user.resetTokenExpiry < new Date()) {
+    throw new Error('Verification OTP code has expired. Please request a new one.');
   }
 
   const salt = await bcrypt.genSalt(10);

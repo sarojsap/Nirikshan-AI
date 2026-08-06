@@ -137,8 +137,8 @@ export async function forgotPassword(email) {
   const user = await userRepo.findOne({ where: { email } });
   if (!user) return;
 
-  const rawToken = crypto.randomBytes(32).toString('hex');
-  const hashedToken = crypto.createHash('sha256').update(rawToken).digest('hex');
+  const otp = Math.floor(100000 + Math.random() * 900000).toString();
+  const hashedToken = crypto.createHash('sha256').update(otp).digest('hex');
 
   const expiry = new Date();
   expiry.setMinutes(expiry.getMinutes() + 15);
@@ -147,21 +147,21 @@ export async function forgotPassword(email) {
   user.resetTokenExpiry = expiry;
   await userRepo.save(user);
 
-  const resetLink = `${process.env.CLIENT_URL || 'http://localhost:5173'}/reset-password?token=${rawToken}&email=${email}`;
-
-  console.log(`\n[DEV] Password reset link: ${resetLink}`);
-  console.log(`[DEV] Raw token for API: ${rawToken}\n`);
-
-  await sendPasswordResetEmail(email, resetLink);
+  console.log(`\n[DEV] Cloud password reset OTP for ${email}: ${otp}\n`);
+  await sendPasswordResetEmail(email, otp);
 }
 
-export async function resetPassword(token, newPassword) {
+export async function resetPassword(email, otp, newPassword) {
   const userRepo = AppDataSource.getRepository(User);
-  const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
+  const hashedToken = crypto.createHash('sha256').update(otp).digest('hex');
 
-  const user = await userRepo.findOne({ where: { resetToken: hashedToken } });
-  if (!user || !user.resetTokenExpiry || user.resetTokenExpiry < new Date()) {
-    throw new Error('Invalid or expired reset token!');
+  const user = await userRepo.findOne({ where: { email, resetToken: hashedToken } });
+  if (!user) {
+    throw new Error('Invalid verification OTP code or incorrect email!');
+  }
+
+  if (!user.resetTokenExpiry || user.resetTokenExpiry < new Date()) {
+    throw new Error('Verification OTP code has expired. Please request a new one.');
   }
 
   user.passwordHash = await bcrypt.hash(newPassword, SALT_ROUNDS);
