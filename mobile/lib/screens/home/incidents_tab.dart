@@ -428,6 +428,11 @@ class _IncidentsTabState extends State<IncidentsTab> {
   }
 
   void _openFilterBottomSheet() {
+    String tempDateFilter = _dateFilter;
+    DateTimeRange? tempCustomDateRange = _customDateRange;
+    String tempSeverityFilter = _severityFilter;
+    String tempTypeFilter = _typeFilter;
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -439,50 +444,289 @@ class _IncidentsTabState extends State<IncidentsTab> {
         return StatefulBuilder(
           builder: (context, setSheetState) {
             return Padding(
-              padding: const EdgeInsets.fromLTRB(24, 16, 24, 36),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Center(
-                    child: Container(
-                      width: 36,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFD3C4B9),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  const Text(
-                    'Filter Incidents',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
-                      color: Color(0xFF1A1D14),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 50,
-                    child: ElevatedButton(
-                      onPressed: () => Navigator.pop(context),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFFCFAB8D),
-                        foregroundColor: const Color(0xFF593F28),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
+              padding: EdgeInsets.only(
+                left: 24,
+                right: 24,
+                top: 16,
+                bottom: MediaQuery.of(context).viewInsets.bottom + 36,
+              ),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 36,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFD3C4B9),
+                          borderRadius: BorderRadius.circular(4),
                         ),
                       ),
-                      child: const Text(
-                        'Apply Filters',
-                        style: TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Filter Incidents',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF1A1D14),
+                          ),
+                        ),
+                        TextButton(
+                          onPressed: () {
+                            setSheetState(() {
+                              tempDateFilter = 'ALL';
+                              tempCustomDateRange = null;
+                              tempSeverityFilter = 'ALL';
+                              tempTypeFilter = 'ALL';
+                            });
+                          },
+                          child: const Text(
+                            'Reset All',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF75593F),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+
+                    // ─── 1. Date & Timeframe Filter ───
+                    const Text(
+                      'Date & Timeframe',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF4F453D),
                       ),
                     ),
-                  ),
-                ],
+                    const SizedBox(height: 10),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        _FilterChip(
+                          label: 'All Time',
+                          isSelected: tempDateFilter == 'ALL',
+                          onTap: () => setSheetState(() => tempDateFilter = 'ALL'),
+                        ),
+                        _FilterChip(
+                          label: 'Today',
+                          isSelected: tempDateFilter == 'TODAY',
+                          onTap: () => setSheetState(() => tempDateFilter = 'TODAY'),
+                        ),
+                        _FilterChip(
+                          label: 'Past 7 Days',
+                          isSelected: tempDateFilter == 'PAST_7_DAYS',
+                          onTap: () => setSheetState(() => tempDateFilter = 'PAST_7_DAYS'),
+                        ),
+                        _FilterChip(
+                          label: 'Custom Range',
+                          isSelected: tempDateFilter == 'CUSTOM',
+                          onTap: () => setSheetState(() => tempDateFilter = 'CUSTOM'),
+                        ),
+                      ],
+                    ),
+
+                    if (tempDateFilter == 'CUSTOM') ...[
+                      const SizedBox(height: 12),
+                      InkWell(
+                        onTap: () async {
+                          final picked = await showDateRangePicker(
+                            context: context,
+                            firstDate: DateTime(2020),
+                            lastDate: DateTime.now().add(const Duration(days: 365)),
+                            initialDateRange: tempCustomDateRange ??
+                                DateTimeRange(
+                                  start: DateTime.now().subtract(const Duration(days: 7)),
+                                  end: DateTime.now(),
+                                ),
+                            builder: (context, child) {
+                              return Theme(
+                                data: Theme.of(context).copyWith(
+                                  colorScheme: const ColorScheme.light(
+                                    primary: Color(0xFF75593F),
+                                    onPrimary: Colors.white,
+                                    surface: Color(0xFFF9FBEB),
+                                    onSurface: Color(0xFF1A1D14),
+                                  ),
+                                ),
+                                child: child!,
+                              );
+                            },
+                          );
+                          if (picked != null) {
+                            setSheetState(() => tempCustomDateRange = picked);
+                          }
+                        },
+                        borderRadius: BorderRadius.circular(14),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFECEEDF).withValues(alpha: 0.8),
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(
+                              color: const Color(0xFFCFAB8D).withValues(alpha: 0.5),
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.calendar_today_rounded, size: 18, color: Color(0xFF75593F)),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Text(
+                                  tempCustomDateRange == null
+                                      ? 'Select Date Range'
+                                      : '${tempCustomDateRange!.start.toString().split(' ')[0]}  →  ${tempCustomDateRange!.end.toString().split(' ')[0]}',
+                                  style: const TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                    color: Color(0xFF1A1D14),
+                                  ),
+                                ),
+                              ),
+                              const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: Color(0xFF81756C)),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+
+                    const SizedBox(height: 20),
+
+                    // ─── 2. Severity Level Filter ───
+                    const Text(
+                      'Severity Level',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF4F453D),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        _FilterChip(
+                          label: 'All Severities',
+                          isSelected: tempSeverityFilter == 'ALL',
+                          onTap: () => setSheetState(() => tempSeverityFilter = 'ALL'),
+                        ),
+                        _FilterChip(
+                          label: 'Critical',
+                          isSelected: tempSeverityFilter == 'CRITICAL',
+                          activeColor: const Color(0xFFBA1A1A),
+                          onTap: () => setSheetState(() => tempSeverityFilter = 'CRITICAL'),
+                        ),
+                        _FilterChip(
+                          label: 'High',
+                          isSelected: tempSeverityFilter == 'HIGH',
+                          activeColor: const Color(0xFFCC5500),
+                          onTap: () => setSheetState(() => tempSeverityFilter = 'HIGH'),
+                        ),
+                        _FilterChip(
+                          label: 'Medium',
+                          isSelected: tempSeverityFilter == 'MEDIUM',
+                          activeColor: const Color(0xFFD9822B),
+                          onTap: () => setSheetState(() => tempSeverityFilter = 'MEDIUM'),
+                        ),
+                        _FilterChip(
+                          label: 'Low',
+                          isSelected: tempSeverityFilter == 'LOW',
+                          activeColor: const Color(0xFF2E7D5B),
+                          onTap: () => setSheetState(() => tempSeverityFilter = 'LOW'),
+                        ),
+                      ],
+                    ),
+
+                    const SizedBox(height: 20),
+
+                    // ─── 3. Incident Type Filter ───
+                    const Text(
+                      'Incident Type',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF4F453D),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        _FilterChip(
+                          label: 'All Types',
+                          isSelected: tempTypeFilter == 'ALL',
+                          onTap: () => setSheetState(() => tempTypeFilter = 'ALL'),
+                        ),
+                        _FilterChip(
+                          label: 'Intrusion',
+                          isSelected: tempTypeFilter == 'INTRUSION',
+                          onTap: () => setSheetState(() => tempTypeFilter = 'INTRUSION'),
+                        ),
+                        _FilterChip(
+                          label: 'Crowd Detection',
+                          isSelected: tempTypeFilter == 'CROWD',
+                          onTap: () => setSheetState(() => tempTypeFilter = 'CROWD'),
+                        ),
+                        _FilterChip(
+                          label: 'Person Detected',
+                          isSelected: tempTypeFilter == 'PERSON_DETECTED',
+                          onTap: () => setSheetState(() => tempTypeFilter = 'PERSON_DETECTED'),
+                        ),
+                        _FilterChip(
+                          label: 'Restricted Area',
+                          isSelected: tempTypeFilter == 'RESTRICTED_AREA',
+                          onTap: () => setSheetState(() => tempTypeFilter = 'RESTRICTED_AREA'),
+                        ),
+                      ],
+                    ),
+
+                    const SizedBox(height: 28),
+
+                    // ─── Apply Button ───
+                    SizedBox(
+                      width: double.infinity,
+                      height: 50,
+                      child: ElevatedButton(
+                        onPressed: () {
+                          setState(() {
+                            _dateFilter = tempDateFilter;
+                            _customDateRange = tempCustomDateRange;
+                            _severityFilter = tempSeverityFilter;
+                            _typeFilter = tempTypeFilter;
+                          });
+                          Navigator.pop(context);
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFCFAB8D),
+                          foregroundColor: const Color(0xFF593F28),
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                        ),
+                        child: const Text(
+                          'Apply Filters',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             );
           },

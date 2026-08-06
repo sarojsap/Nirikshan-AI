@@ -31,11 +31,13 @@ class IncidentService {
       'limit': limit.toString(),
     };
 
-    if (_deviceId != null) {
-      queryParams['deviceId'] = _deviceId!;
+    final deviceId = _deviceId;
+    if (deviceId != null) {
+      queryParams['deviceId'] = deviceId;
     }
-    if (_organizationId != null) {
-      queryParams['organizationId'] = _organizationId!;
+    final orgId = _organizationId;
+    if (orgId != null) {
+      queryParams['organizationId'] = orgId;
     }
 
     final uri = Uri.parse(ApiConfig.incidentsEndpoint).replace(

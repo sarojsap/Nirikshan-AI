@@ -32,7 +32,7 @@ export const sendPushNotification = async (incident) => {
   const userRepo = AppDataSource.getRepository(User);
   const users = await userRepo.find({ where: { isActive: true }, select: ['fcmTokens', 'id'] });
 
-  const tokens = users.flatMap(u => u.fcmTokens || []).filter(Boolean);
+  const tokens = [...new Set(users.flatMap(u => u.fcmTokens || []).filter(Boolean))];
   if (tokens.length === 0) {
     console.log('FCM: No registered device tokens. Skipping push notification.');
     return;
@@ -45,7 +45,7 @@ export const sendPushNotification = async (incident) => {
 
   const message = {
     notification: {
-      title: `🚨 ${incidentType.replace('_', ' ')} Alert`,
+      title: `${incidentType.replace('_', ' ')} Alert`,
       body: `${description} (${cameraName})`,
     },
     data: {

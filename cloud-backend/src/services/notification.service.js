@@ -54,7 +54,7 @@ export async function sendPushNotification(organizationId, { title, body, data =
     });
   }
 
-  const tokens = users.flatMap(u => u.fcmTokens || []).filter(Boolean);
+  const tokens = [...new Set(users.flatMap(u => u.fcmTokens || []).filter(Boolean))];
   if (tokens.length === 0) {
     console.warn(`[FCM Log ⚠️] No registered FCM device tokens found in database for Org ${organizationId || 'Global'}. Mobile devices must log in to register push tokens.`);
     return { successCount: 0, failureCount: 0, totalTokens: 0, reason: 'No registered device tokens in database' };

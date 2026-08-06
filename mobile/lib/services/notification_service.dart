@@ -188,15 +188,23 @@ class NotificationService {
 
   /// Handle a foreground FCM message by showing a local notification.
   void _handleForegroundMessage(RemoteMessage message) {
-    print('FCM: 🚨 Foreground message received: ${message.messageId}');
+    print('FCM: Foreground message received: ${message.messageId}');
 
-    final notification = message.notification;
-    if (notification == null) return;
+    final rawTitle = message.notification?.title ??
+        message.data['title'] ??
+        (message.data['type'] != null ? '${message.data['type']} Alert' : 'Incident Alert');
+    final title = rawTitle.replaceAll('🚨', '').trim();
+    final body = message.notification?.body ??
+        message.data['body'] ??
+        message.data['description'] ??
+        'An incident has been detected.';
+
+    final notificationId = DateTime.now().millisecondsSinceEpoch % 100000;
 
     _localNotifications.show(
-      notification.hashCode,
-      notification.title ?? '🚨 Alert',
-      notification.body ?? 'An incident has been detected.',
+      notificationId,
+      title,
+      body,
       const NotificationDetails(
         android: AndroidNotificationDetails(
           'nirikshan_alerts',
