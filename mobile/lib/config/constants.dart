@@ -1,6 +1,6 @@
 // API Configuration — points to production cloud backend
-const String apiBaseUrl = 'http://3.108.234.117/api';
-const String apiOrigin = 'http://3.108.234.117';
+const String apiBaseUrl = 'https://nirikshan.cloud/api';
+const String apiOrigin = 'https://nirikshan.cloud';
 
 const String loginEndpoint = '$apiBaseUrl/auth/login';
 const String logoutEndpoint = '$apiBaseUrl/auth/logout';
