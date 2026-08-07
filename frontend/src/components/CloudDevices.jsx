@@ -106,33 +106,29 @@ export default function CloudDevices({ token, onLogout }) {
           <h3 className="text-xs font-bold text-white uppercase tracking-wider mb-3">Register Device</h3>
 
           {regResult?.success && (
-            <div className="mb-4 p-5 bg-gradient-to-br from-emerald-950/40 via-[#0a1b14] to-[#07130e] border border-emerald-500/30 text-emerald-300 rounded-2xl shadow-xl space-y-3.5 animate-fade-in">
+            <div className="mb-5 p-4 bg-[#080e18] border border-[#1a2942] rounded-xl shadow-xl space-y-3.5 animate-fade-in">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <span className="text-base">🎉</span>
-                  <h4 className="text-xs font-bold text-emerald-400">
-                    Device "{regResult.deviceName}" Registered Successfully!
-                  </h4>
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                  <span className="text-xs font-bold text-white tracking-wide">
+                    Device Registered: <span className="text-slate-300 font-normal">{regResult.deviceName}</span>
+                  </span>
                 </div>
                 <button
                   type="button"
                   onClick={() => setRegResult(null)}
-                  className="text-[11px] text-slate-400 hover:text-white font-bold cursor-pointer"
+                  className="text-xs text-slate-400 hover:text-white transition-colors cursor-pointer"
                 >
-                  ✕ Close
+                  Close
                 </button>
               </div>
 
-              <p className="text-xs text-slate-300">
-                Share these configuration lines with your friend to paste into their <code className="bg-black/50 px-1.5 py-0.5 rounded text-emerald-300 font-mono">backend/.env</code> file:
-              </p>
-
-              <div className="bg-[#050a08] border border-emerald-900/50 rounded-xl p-3.5 space-y-2.5 font-mono text-xs">
+              <div className="bg-[#04070d] border border-[#131d2e] rounded-lg p-3 space-y-2 font-mono text-[11px]">
                 {/* EDGE_ID */}
-                <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center justify-between gap-3">
                   <div className="truncate">
                     <span className="text-slate-500 select-none">EDGE_ID=</span>
-                    <span className="text-emerald-300 font-semibold">{regResult.deviceId}</span>
+                    <span className="text-slate-200">{regResult.deviceId}</span>
                   </div>
                   <button
                     type="button"
@@ -141,17 +137,17 @@ export default function CloudDevices({ token, onLogout }) {
                       setCopiedField('id');
                       setTimeout(() => setCopiedField(null), 2000);
                     }}
-                    className="px-2 py-1 bg-emerald-900/40 hover:bg-emerald-800/60 border border-emerald-700/50 rounded text-[10px] text-emerald-300 font-sans transition-all cursor-pointer shrink-0"
+                    className="px-2.5 py-1 bg-[#121c2d] hover:bg-[#1a2942] border border-[#1c2c47] rounded text-[10px] text-slate-300 font-sans transition-all cursor-pointer shrink-0"
                   >
-                    {copiedField === 'id' ? '✓ Copied' : 'Copy ID'}
+                    {copiedField === 'id' ? 'Copied!' : 'Copy ID'}
                   </button>
                 </div>
 
                 {/* EDGE_API_KEY */}
-                <div className="flex items-center justify-between gap-2 border-t border-emerald-900/30 pt-2">
+                <div className="flex items-center justify-between gap-3 border-t border-[#0e1726] pt-2">
                   <div className="truncate">
                     <span className="text-slate-500 select-none">EDGE_API_KEY=</span>
-                    <span className="text-amber-300 font-semibold">{regResult.apiKey}</span>
+                    <span className="text-slate-200">{regResult.apiKey}</span>
                   </div>
                   <button
                     type="button"
@@ -160,17 +156,17 @@ export default function CloudDevices({ token, onLogout }) {
                       setCopiedField('key');
                       setTimeout(() => setCopiedField(null), 2000);
                     }}
-                    className="px-2 py-1 bg-emerald-900/40 hover:bg-emerald-800/60 border border-emerald-700/50 rounded text-[10px] text-emerald-300 font-sans transition-all cursor-pointer shrink-0"
+                    className="px-2 py-1 bg-[#121c2d] hover:bg-[#1a2942] border border-[#1c2c47] rounded text-[10px] text-slate-300 font-sans transition-all cursor-pointer shrink-0"
                   >
-                    {copiedField === 'key' ? '✓ Copied' : 'Copy Key'}
+                    {copiedField === 'key' ? 'Copied!' : 'Copy Key'}
                   </button>
                 </div>
 
                 {/* CLOUD_API_URL */}
-                <div className="flex items-center justify-between gap-2 border-t border-emerald-900/30 pt-2">
+                <div className="flex items-center justify-between gap-3 border-t border-[#0e1726] pt-2">
                   <div className="truncate">
                     <span className="text-slate-500 select-none">CLOUD_API_URL=</span>
-                    <span className="text-sky-300 font-semibold">https://nirikshan.cloud/api</span>
+                    <span className="text-slate-300">https://nirikshan.cloud/api</span>
                   </div>
                 </div>
               </div>
@@ -184,10 +180,12 @@ export default function CloudDevices({ token, onLogout }) {
                   setCopiedField('env');
                   setTimeout(() => setCopiedField(null), 2000);
                 }}
-                className="w-full py-2.5 bg-emerald-500 hover:bg-emerald-400 text-black font-bold rounded-xl text-xs transition-all shadow-md active:scale-95 cursor-pointer flex items-center justify-center gap-2"
+                className="w-full py-2 bg-[#121d30] hover:bg-[#182740] border border-[#1e3252] text-slate-200 hover:text-white rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center justify-center gap-2"
               >
-                <span>📋</span>
-                <span>{copiedField === 'env' ? '✓ Copied Full .env to Clipboard!' : 'Copy Full .env Configuration for Friend'}</span>
+                <svg className="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                </svg>
+                <span>{copiedField === 'env' ? 'Copied .env Configuration!' : 'Copy .env Configuration'}</span>
               </button>
             </div>
           )}

@@ -81,3 +81,5 @@ mediamtx.exe
 mediamtx.yml
 mediamtx.zip
 mediamtx.log
+fix_db.py
+test_cv.py
