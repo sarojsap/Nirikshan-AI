@@ -10,6 +10,8 @@ export default function CloudDevices({ token, onLogout }) {
   const [registering, setRegistering] = useState(false);
   const [regResult, setRegResult] = useState(null);
 
+  const [copiedField, setCopiedField] = useState(null);
+
   const fetchDevices = async () => {
     setLoading(true);
     setError('');
@@ -47,7 +49,17 @@ export default function CloudDevices({ token, onLogout }) {
       if (res.status === 401) { onLogout?.(); return; }
       const body = await res.json();
       if (res.ok) {
-        setRegResult({ success: true, data: body.data || body });
+        const payload = body.data || body;
+        const deviceObj = payload.device || payload;
+        const deviceId = deviceObj.id || payload.id;
+        const apiKey = payload.apiKey || deviceObj.apiKey;
+
+        setRegResult({
+          success: true,
+          deviceId,
+          apiKey,
+          deviceName: form.name,
+        });
         setForm({ name: '', location: '' });
         fetchDevices();
       } else {
@@ -88,14 +100,95 @@ export default function CloudDevices({ token, onLogout }) {
         </button>
       </div>
 
-      {/* Provision Form */}
+      {/* Provision Form & Generated Credentials Card */}
       {showRegister && (
         <form onSubmit={handleRegister} className="bg-[#0b1320] border border-[#16233b] rounded-2xl p-5 shadow-lg animate-fade-in">
           <h3 className="text-xs font-bold text-white uppercase tracking-wider mb-3">Register Device</h3>
 
           {regResult?.success && (
-            <div className="mb-4 p-3 bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-xs rounded-xl font-mono">
-              Device registered! ID: {regResult.data.id} | Key: {regResult.data.apiKey}
+            <div className="mb-4 p-5 bg-gradient-to-br from-emerald-950/40 via-[#0a1b14] to-[#07130e] border border-emerald-500/30 text-emerald-300 rounded-2xl shadow-xl space-y-3.5 animate-fade-in">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="text-base">🎉</span>
+                  <h4 className="text-xs font-bold text-emerald-400">
+                    Device "{regResult.deviceName}" Registered Successfully!
+                  </h4>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setRegResult(null)}
+                  className="text-[11px] text-slate-400 hover:text-white font-bold cursor-pointer"
+                >
+                  ✕ Close
+                </button>
+              </div>
+
+              <p className="text-xs text-slate-300">
+                Share these configuration lines with your friend to paste into their <code className="bg-black/50 px-1.5 py-0.5 rounded text-emerald-300 font-mono">backend/.env</code> file:
+              </p>
+
+              <div className="bg-[#050a08] border border-emerald-900/50 rounded-xl p-3.5 space-y-2.5 font-mono text-xs">
+                {/* EDGE_ID */}
+                <div className="flex items-center justify-between gap-2">
+                  <div className="truncate">
+                    <span className="text-slate-500 select-none">EDGE_ID=</span>
+                    <span className="text-emerald-300 font-semibold">{regResult.deviceId}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(regResult.deviceId);
+                      setCopiedField('id');
+                      setTimeout(() => setCopiedField(null), 2000);
+                    }}
+                    className="px-2 py-1 bg-emerald-900/40 hover:bg-emerald-800/60 border border-emerald-700/50 rounded text-[10px] text-emerald-300 font-sans transition-all cursor-pointer shrink-0"
+                  >
+                    {copiedField === 'id' ? '✓ Copied' : 'Copy ID'}
+                  </button>
+                </div>
+
+                {/* EDGE_API_KEY */}
+                <div className="flex items-center justify-between gap-2 border-t border-emerald-900/30 pt-2">
+                  <div className="truncate">
+                    <span className="text-slate-500 select-none">EDGE_API_KEY=</span>
+                    <span className="text-amber-300 font-semibold">{regResult.apiKey}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(regResult.apiKey);
+                      setCopiedField('key');
+                      setTimeout(() => setCopiedField(null), 2000);
+                    }}
+                    className="px-2 py-1 bg-emerald-900/40 hover:bg-emerald-800/60 border border-emerald-700/50 rounded text-[10px] text-emerald-300 font-sans transition-all cursor-pointer shrink-0"
+                  >
+                    {copiedField === 'key' ? '✓ Copied' : 'Copy Key'}
+                  </button>
+                </div>
+
+                {/* CLOUD_API_URL */}
+                <div className="flex items-center justify-between gap-2 border-t border-emerald-900/30 pt-2">
+                  <div className="truncate">
+                    <span className="text-slate-500 select-none">CLOUD_API_URL=</span>
+                    <span className="text-sky-300 font-semibold">https://nirikshan.cloud/api</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Copy Full .env Block Button */}
+              <button
+                type="button"
+                onClick={() => {
+                  const envBlock = `EDGE_ID=${regResult.deviceId}\nEDGE_API_KEY=${regResult.apiKey}\nCLOUD_API_URL=https://nirikshan.cloud/api`;
+                  navigator.clipboard.writeText(envBlock);
+                  setCopiedField('env');
+                  setTimeout(() => setCopiedField(null), 2000);
+                }}
+                className="w-full py-2.5 bg-emerald-500 hover:bg-emerald-400 text-black font-bold rounded-xl text-xs transition-all shadow-md active:scale-95 cursor-pointer flex items-center justify-center gap-2"
+              >
+                <span>📋</span>
+                <span>{copiedField === 'env' ? '✓ Copied Full .env to Clipboard!' : 'Copy Full .env Configuration for Friend'}</span>
+              </button>
             </div>
           )}
 
