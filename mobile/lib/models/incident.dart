@@ -12,6 +12,8 @@ class Incident extends Equatable {
   final String? videoUrl;
   final DateTime timestamp;
   final Camera? camera;
+  final String? location;
+  final String? cameraName;
 
   const Incident({
     required this.id,
@@ -22,11 +24,22 @@ class Incident extends Equatable {
     this.imageUrl,
     this.videoUrl,
     this.camera,
+    this.location,
+    this.cameraName,
   });
 
   factory Incident.fromJson(Map<String, dynamic> json) {
     final timestampValue = json['timestamp'] ?? json['createdAt'];
     final cameraJson = json['camera'];
+
+    final rawLocation = json['location'] ??
+        json['cameraLocation'] ??
+        json['edgeDevice']?['location'] ??
+        json['edgeDevice']?['name'] ??
+        (cameraJson is Map<String, dynamic> ? cameraJson['location'] : null);
+
+    final rawCameraName = json['cameraName'] ??
+        (cameraJson is Map<String, dynamic> ? cameraJson['name'] : null);
 
     return Incident(
       id: json['id'] ?? '',
@@ -40,14 +53,24 @@ class Incident extends Equatable {
       camera: cameraJson is Map<String, dynamic>
           ? Camera.fromJson(cameraJson)
           : null,
+      location: rawLocation?.toString(),
+      cameraName: rawCameraName?.toString(),
     );
   }
 
   String get displayType => type.replaceAll('_', ' ');
 
-  String get displayLocation => camera?.location ?? 'Surveillance area';
+  String get displayLocation {
+    if (location != null && location!.isNotEmpty) return location!;
+    if (camera?.location != null && camera!.location.isNotEmpty) return camera!.location;
+    return 'Main Area';
+  }
 
-  String get displayCamera => camera?.name ?? 'Unknown camera';
+  String get displayCamera {
+    if (cameraName != null && cameraName!.isNotEmpty) return cameraName!;
+    if (camera?.name != null && camera!.name.isNotEmpty) return camera!.name;
+    return 'Unknown camera';
+  }
 
   String? get resolvedImageUrl {
     final url = imageUrl;

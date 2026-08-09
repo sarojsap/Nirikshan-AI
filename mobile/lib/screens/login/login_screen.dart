@@ -16,7 +16,6 @@ class _LoginScreenState extends State<LoginScreen> {
   late TextEditingController _passwordController;
   bool _obscurePassword = true;
   bool _isLoading = false;
-  String _selectedMode = 'CLOUD'; // CLOUD vs EDGE
 
   @override
   void initState() {
@@ -204,24 +203,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              // ─── Environment Selector ───
-                              Container(
-                                padding: const EdgeInsets.all(4),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFD9DBCD),
-                                  borderRadius:
-                                      BorderRadius.circular(9999),
-                                ),
-                                child: Row(
-                                  children: [
-                                    _buildModeTab('CLOUD', 'Cloud',
-                                        Icons.cloud_outlined),
-                                    _buildModeTab('EDGE', 'Edge Hub',
-                                        Icons.developer_board_outlined),
-                                  ],
-                                ),
-                              ),
-                              const SizedBox(height: 28),
+
 
                               // ─── Email Field ───
                               Text(
@@ -384,60 +366,6 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
               ),
             ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildModeTab(String mode, String label, IconData icon) {
-    final isActive = _selectedMode == mode;
-
-    return Expanded(
-      child: GestureDetector(
-        onTap: () => setState(() => _selectedMode = mode),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 250),
-          curve: Curves.easeOutCubic,
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          decoration: BoxDecoration(
-            color: isActive
-                ? const Color(0xFFCFAB8D)
-                : Colors.transparent,
-            borderRadius: BorderRadius.circular(9999),
-            boxShadow: isActive
-                ? [
-                    BoxShadow(
-                      color: const Color(0xFFCFAB8D)
-                          .withValues(alpha: 0.25),
-                      blurRadius: 8,
-                      offset: const Offset(0, 2),
-                    ),
-                  ]
-                : [],
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                icon,
-                size: 16,
-                color: isActive
-                    ? const Color(0xFF593F28)
-                    : const Color(0xFF81756C),
-              ),
-              const SizedBox(width: 6),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: isActive
-                      ? const Color(0xFF593F28)
-                      : const Color(0xFF81756C),
-                ),
-              ),
-            ],
           ),
         ),
       ),

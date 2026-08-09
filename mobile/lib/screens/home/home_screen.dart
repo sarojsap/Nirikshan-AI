@@ -1,9 +1,13 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:http/http.dart' as http;
+import 'package:path_provider/path_provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:video_player/video_player.dart';
 
 import '../../bloc/auth/bloc.dart';
@@ -198,36 +202,26 @@ class _HomeScreenState extends State<HomeScreen> {
                 padding: const EdgeInsets.fromLTRB(24, 12, 24, 4),
                 child: Row(
                   children: [
-                    // Officer profile avatar circle (Stitch style)
+                    // Nirikshan AI Logo
                     Container(
                       width: 40,
                       height: 40,
+                      padding: const EdgeInsets.all(6),
                       decoration: BoxDecoration(
-                        shape: BoxShape.circle,
+                        color: const Color(0xFFECEEDF),
+                        borderRadius: BorderRadius.circular(12),
                         border: Border.all(
                           color: const Color(0xFFD3C4B9),
                           width: 1.0,
                         ),
                       ),
-                      child: ClipOval(
-                        child: Image.network(
-                          'https://lh3.googleusercontent.com/aida-public/AB6AXuAodZ47OvyrSS8LRNYSV2Py9eu5rsh8YaIutnflvOJY5Icezt1oHqkAdaQXj1RpFLs8xxiuJ6gj2XVqFh7rXe_taLAyDFXzLeifP9hSPFAzrvr8WP_bOpz1PKvnRrlT3Ji9b1OfKdN--SHSCYgod2E9xTbLIdAfNg91Z9yabcM6gV_RoHjFf-_d0pDhkF5dC5MddZowbW5VtxhClz_zaTkgBSJ0038WQuPHDcNP5riSwrHvZoHKo0VH',
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) =>
-                              Container(
-                            color: const Color(0xFFCFAB8D),
-                            child: Center(
-                              child: Text(
-                                widget.user.name.isNotEmpty
-                                    ? widget.user.name[0].toUpperCase()
-                                    : 'U',
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  color: Color(0xFF593F28),
-                                ),
-                              ),
-                            ),
-                          ),
+                      child: Image.asset(
+                        'assets/logo.png',
+                        fit: BoxFit.contain,
+                        errorBuilder: (context, error, stackTrace) => const Icon(
+                          Icons.shield_outlined,
+                          color: Color(0xFF75593F),
+                          size: 22,
                         ),
                       ),
                     ),
@@ -541,12 +535,19 @@ class IncidentCard extends StatelessWidget {
                               icon: Icons.videocam_outlined,
                               text: incident.displayCamera,
                             ),
-                            const Spacer(),
-                            MetaText(
-                              icon: Icons.schedule_outlined,
-                              text: formatDateTime(incident.timestamp),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: MetaText(
+                                icon: Icons.location_on_outlined,
+                                text: incident.displayLocation,
+                              ),
                             ),
                           ],
+                        ),
+                        const SizedBox(height: 6),
+                        MetaText(
+                          icon: Icons.schedule_outlined,
+                          text: formatDateTime(incident.timestamp),
                         ),
                       ],
                     ),
@@ -577,6 +578,71 @@ class _IncidentDetailsSheetState extends State<_IncidentDetailsSheet> {
   void initState() {
     super.initState();
     _showVideo = false;
+  }
+
+  Future<void> _downloadMedia(
+    BuildContext context, {
+    required String url,
+    required String fileName,
+    required String mediaType,
+  }) async {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Downloading $mediaType...'),
+        duration: const Duration(seconds: 2),
+        backgroundColor: const Color(0xFF593F28),
+      ),
+    );
+
+    try {
+      final uri = Uri.parse(url);
+      final response = await http.get(uri);
+      if (response.statusCode == 200) {
+        Directory? dir;
+        if (Platform.isAndroid) {
+          dir = Directory('/storage/emulated/0/Download');
+          if (!await dir.exists()) {
+            dir = await getExternalStorageDirectory();
+          }
+        } else {
+          dir = await getApplicationDocumentsDirectory();
+        }
+
+        if (dir != null) {
+          final file = File('${dir.path}/$fileName');
+          await file.writeAsBytes(response.bodyBytes);
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('✓ $mediaType saved to Downloads ($fileName)'),
+                backgroundColor: const Color(0xFF2E7D5B),
+                duration: const Duration(seconds: 3),
+              ),
+            );
+            return;
+          }
+        }
+      }
+
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      }
+    } catch (e) {
+      if (context.mounted) {
+        try {
+          final uri = Uri.parse(url);
+          await launchUrl(uri, mode: LaunchMode.externalApplication);
+        } catch (_) {
+          if (!context.mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to download $mediaType'),
+              backgroundColor: const Color(0xFFBA1A1A),
+            ),
+          );
+        }
+      }
+    }
   }
 
   @override
@@ -705,6 +771,75 @@ class _IncidentDetailsSheetState extends State<_IncidentDetailsSheet> {
                   child: SnapshotImage(url: widget.incident.resolvedImageUrl),
                 ),
               ),
+            const SizedBox(height: 12),
+
+            // Download Media Actions Row
+            Row(
+              children: [
+                if (widget.incident.resolvedImageUrl != null)
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        side: BorderSide(
+                          color: const Color(0xFFCFAB8D).withValues(alpha: 0.5),
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        backgroundColor:
+                            const Color(0xFFECEEDF).withValues(alpha: 0.6),
+                      ),
+                      onPressed: () => _downloadMedia(
+                        context,
+                        url: widget.incident.resolvedImageUrl!,
+                        fileName: 'snapshot_${widget.incident.id}.jpg',
+                        mediaType: 'Snapshot',
+                      ),
+                      icon: const Icon(Icons.image_outlined,
+                          size: 16, color: Color(0xFF593F28)),
+                      label: const Text(
+                        'Save Snapshot',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF593F28),
+                        ),
+                      ),
+                    ),
+                  ),
+                if (widget.incident.resolvedImageUrl != null && videoUrl != null)
+                  const SizedBox(width: 10),
+                if (videoUrl != null)
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        backgroundColor: const Color(0xFFCFAB8D),
+                        foregroundColor: const Color(0xFF593F28),
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
+                      onPressed: () => _downloadMedia(
+                        context,
+                        url: videoUrl,
+                        fileName: 'video_${widget.incident.id}.mp4',
+                        mediaType: 'Video',
+                      ),
+                      icon: const Icon(Icons.file_download_outlined, size: 18),
+                      label: const Text(
+                        'Download Video',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
             const SizedBox(height: 20),
 
             Row(

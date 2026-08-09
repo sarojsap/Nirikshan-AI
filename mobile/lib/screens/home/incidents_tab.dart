@@ -878,12 +878,19 @@ class _IncidentEventCard extends StatelessWidget {
                               icon: Icons.videocam_outlined,
                               text: incident.displayCamera,
                             ),
-                            const Spacer(),
-                            MetaText(
-                              icon: Icons.schedule_outlined,
-                              text: formatDateTime(incident.timestamp),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: MetaText(
+                                icon: Icons.location_on_outlined,
+                                text: incident.displayLocation,
+                              ),
                             ),
                           ],
+                        ),
+                        const SizedBox(height: 6),
+                        MetaText(
+                          icon: Icons.schedule_outlined,
+                          text: formatDateTime(incident.timestamp),
                         ),
                       ],
                     ),

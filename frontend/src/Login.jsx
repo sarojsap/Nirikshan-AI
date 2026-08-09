@@ -174,9 +174,7 @@ export default function Login({ onAuthSuccess, onModeSelect, currentMode = 'edge
           <>
             <div className="text-center mb-8">
               <div className="flex justify-center items-center gap-3 mb-4">
-                <div className="w-10 h-10 bg-primary/10 border border-primary/20 rounded-xl flex items-center justify-center text-primary">
-                  <span className="material-symbols-outlined text-lg">visibility</span>
-                </div>
+                <img src="/logo.png" alt="Nirikshan AI Logo" className="w-10 h-10 object-contain rounded-xl" />
                 <span className="text-lg font-extrabold text-soc-textPrimary tracking-wider uppercase font-sans">Nirikshan AI</span>
               </div>
               <h2 className="text-xl font-bold text-soc-textPrimary tracking-tight mb-2">

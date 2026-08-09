@@ -617,9 +617,7 @@ export default function Dashboard({ token, user, onLogout, mode: initialMode, on
     <div className="h-screen w-screen overflow-hidden text-soc-textSecondary antialiased flex bg-soc-bg relative font-sans select-none">
       <aside className="w-72 bg-soc-sidebar border-r border-soc-border flex flex-col p-6 shrink-0 h-full">
         <div className="flex items-center gap-3 mb-8">
-          <div className="w-10 h-10 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary">
-            <span className="material-symbols-outlined text-xl">visibility</span>
-          </div>
+          <img src="/logo.png" alt="Nirikshan AI Logo" className="w-10 h-10 object-contain rounded-xl" />
           <div>
             <h1 className="text-sm font-bold tracking-wider text-soc-textPrimary uppercase font-sans">Nirikshan AI</h1>
             <p className="text-[10px] text-soc-textMuted uppercase tracking-widest font-semibold font-sans">Command Console</p>
