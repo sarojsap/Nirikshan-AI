@@ -7,8 +7,8 @@ import json
 import logging
 import asyncio
 import collections
+import queue
 import subprocess
-import concurrent.futures
 from datetime import datetime, timezone, timedelta
 from urllib.parse import urlparse, parse_qs
 from flask import Flask, request, Response, jsonify, send_from_directory
@@ -30,12 +30,16 @@ if not os.path.isabs(MEDIA_DIR):
 _api_url = os.getenv('API_URL', 'http://localhost:5000/api').rstrip('/')
 BACKEND_BASE = _api_url[:-4] if _api_url.endswith('/api') else _api_url
 
-TARGET_FPS = 24
-FRAME_INTERVAL = 1.0 / TARGET_FPS
+INFERENCE_FPS = int(os.getenv('INFERENCE_FPS', 10))
+INFERENCE_INTERVAL = 1.0 / INFERENCE_FPS
+
+STREAM_FPS = int(os.getenv('STREAM_FPS', 30))
+STREAM_INTERVAL = 1.0 / STREAM_FPS
 
 # 30-second clip buffer: stores the last 30 seconds of processed frames
 CLIP_DURATION_SECONDS = 30
-CLIP_BUFFER_SIZE = TARGET_FPS * CLIP_DURATION_SECONDS  # 150 frames @ 5fps
+CLIP_BUFFER_SIZE = INFERENCE_FPS * CLIP_DURATION_SECONDS  # 150 frames @ 5fps
+CLIP_MAX_WIDTH = int(os.getenv('CLIP_MAX_WIDTH', 960))
 
 logging.basicConfig(
     level=logging.INFO,
@@ -101,11 +105,15 @@ _frame_cache = {}
 _last_frame_time = {}
 _frame_cache_lock = threading.Lock()
 
+_inference_lock = threading.Lock()
+
 INCIDENT_SNAPSHOT_DIR = os.path.join(os.path.dirname(__file__), 'snapshots')
 os.makedirs(INCIDENT_SNAPSHOT_DIR, exist_ok=True)
 os.makedirs(MEDIA_DIR, exist_ok=True)
 
-_alert_executor = concurrent.futures.ThreadPoolExecutor(max_workers=2)
+_alert_queue = queue.Queue(maxsize=2)
+_alert_pending = set()
+_alert_pending_lock = threading.Lock()
 
 
 def _handle_alert_background(camera_id, alert_type, description, severity, frame, clip_frames):
@@ -123,6 +131,38 @@ def _handle_alert_background(camera_id, alert_type, description, severity, frame
         local_snapshot_path=snapshot_path,
         local_clip_path=clip_path,
     )
+
+
+def _submit_alert(camera_id, alert_type, description, severity, frame, clip_frames):
+    key = f"{camera_id}:{alert_type}"
+    with _alert_pending_lock:
+        if key in _alert_pending:
+            logger.info(f"Alert {alert_type} on camera {camera_id} already pending, skipping")
+            return
+        _alert_pending.add(key)
+    try:
+        _alert_queue.put_nowait((camera_id, alert_type, description, severity, frame, clip_frames))
+    except queue.Full:
+        with _alert_pending_lock:
+            _alert_pending.discard(key)
+        logger.warning(f"Alert queue full, dropping {alert_type} alert for camera {camera_id}")
+
+
+def _alert_worker():
+    while True:
+        camera_id, alert_type, description, severity, frame, clip_frames = _alert_queue.get()
+        try:
+            _handle_alert_background(camera_id, alert_type, description, severity, frame, clip_frames)
+        except Exception as e:
+            logger.error(f"Alert worker failed for {alert_type} on camera {camera_id}: {e}")
+        finally:
+            with _alert_pending_lock:
+                _alert_pending.discard(f"{camera_id}:{alert_type}")
+            _alert_queue.task_done()
+
+
+for _ in range(2):
+    threading.Thread(target=_alert_worker, daemon=True, name="alert-worker").start()
 
 
 def _cleanup_stale_cooldowns():
@@ -162,7 +202,6 @@ def is_within_time_window(start_time_str, end_time_str):
             res = start <= now <= end
         else:
             res = start <= now or now <= end
-        logger.info(f"Time window check: start={start}, end={end}, now={now} -> within={res}")
         return res
     except Exception as e:
         logger.warning(f"Error parsing time window '{start_time_str}-{end_time_str}': {e}")
@@ -178,6 +217,25 @@ def _save_snapshot(frame, camera_id, alert_type):
     with open(filepath, 'wb') as f:
         f.write(buffer.tobytes())
     return filepath
+
+
+def _cleanup_old_files(days=7):
+    cutoff = time.time() - days * 86400
+    removed = 0
+    for d in (INCIDENT_SNAPSHOT_DIR, MEDIA_DIR):
+        try:
+            for name in os.listdir(d):
+                path = os.path.join(d, name)
+                try:
+                    if os.path.isfile(path) and os.path.getmtime(path) < cutoff:
+                        os.remove(path)
+                        removed += 1
+                except OSError:
+                    pass
+        except OSError:
+            pass
+    if removed:
+        logger.info(f"Cleaned up {removed} old media/snapshot files (older than {days}d)")
 
 
 def _save_clip(frames, camera_id, alert_type):
@@ -197,7 +255,7 @@ def _save_clip(frames, camera_id, alert_type):
             '-vcodec', 'rawvideo',
             '-s', f'{width}x{height}',
             '-pix_fmt', 'bgr24',
-            '-r', str(TARGET_FPS),
+            '-r', str(INFERENCE_FPS),
             '-i', '-',
             '-c:v', 'libx264',
             '-pix_fmt', 'yuv420p',
@@ -228,7 +286,7 @@ def _save_clip(frames, camera_id, alert_type):
         for codec in fourcc_options:
             try:
                 fcc = cv2.VideoWriter_fourcc(*codec)
-                test_out = cv2.VideoWriter(filepath, fcc, TARGET_FPS, (width, height))
+                test_out = cv2.VideoWriter(filepath, fcc, INFERENCE_FPS, (width, height))
                 if test_out.isOpened():
                     out = test_out
                     used_fourcc = codec
@@ -389,7 +447,7 @@ class CameraThread(threading.Thread):
                         self._rtsp_url_changed = True
                 except Exception:
                     pass
-                time.sleep(5)
+                time.sleep(15)
         t = threading.Thread(target=updater, daemon=True)
         t.start()
 
@@ -467,18 +525,19 @@ class CameraThread(threading.Thread):
                     if now < next_frame_time:
                         continue
 
-                    next_frame_time = now + FRAME_INTERVAL
+                    next_frame_time = now + INFERENCE_INTERVAL
                     if next_frame_time < now:
-                        next_frame_time = now + FRAME_INTERVAL
+                        next_frame_time = now + INFERENCE_INTERVAL
 
                     frame_count += 1
                     if frame_count % 300 == 0:
-                        logger.info(f"Camera {self.camera_id} Thread: Processed {frame_count} frames at {TARGET_FPS} FPS")
+                        logger.info(f"Camera {self.camera_id} Thread: Processed {frame_count} frames at {INFERENCE_FPS} FPS")
 
                     with self._config_lock:
                         cfg = self._cached_config or cfg
 
-                    results = model(frame, conf=cfg['confidence_threshold'], classes=[0], verbose=False)
+                    with _inference_lock:
+                        results = model(frame, conf=cfg['confidence_threshold'], classes=[0], verbose=False)
                     person_count = 0
                     intrusion_detected = False
                     current_snapshot = None
@@ -507,14 +566,16 @@ class CameraThread(threading.Thread):
 
                     cv2.putText(frame, f"People Count: {person_count}", (20, 40), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 0), 2)
 
-                    # ── Add processed frame to clip buffer ──
-                    clip_buffer.append(frame)
+                    # ── Add processed (resized) frame to clip buffer ──
+                    h, w = frame.shape[:2]
+                    clip_w = CLIP_MAX_WIDTH
+                    clip_h = max(1, int(h * clip_w / w))
+                    clip_buffer.append(cv2.resize(frame, (clip_w, clip_h)))
 
                     if cfg['alerts_enabled'] and is_within_time_window(cfg['start_time_str'], cfg['end_time_str']):
                         if cfg['intrusion_enabled'] and intrusion_detected:
                             if check_cooldown(self.camera_id, "INTRUSION", cfg['cooldown_seconds']):
-                                _alert_executor.submit(
-                                    _handle_alert_background,
+                                _submit_alert(
                                     self.camera_id, "INTRUSION",
                                     "Perimeter breached during restricted hours.",
                                     "CRITICAL",
@@ -524,8 +585,7 @@ class CameraThread(threading.Thread):
 
                         if cfg['crowd_enabled'] and person_count >= cfg['crowd_threshold']:
                             if check_cooldown(self.camera_id, "CROWD", cfg['cooldown_seconds']):
-                                _alert_executor.submit(
-                                    _handle_alert_background,
+                                _submit_alert(
                                     self.camera_id, "CROWD",
                                     f"Crowd threshold exceeded. {person_count} people detected.",
                                     "MEDIUM",
@@ -533,9 +593,10 @@ class CameraThread(threading.Thread):
                                     list(clip_buffer),
                                 )
 
-                    # Store raw frame for streaming (lazy JPEG encoding in handlers)
+                    # Cache the JPEG for streaming (encoded once per processed frame)
+                    jpeg_bytes = _encode_jpeg(frame)
                     with _frame_cache_lock:
-                        _frame_cache[self.camera_id] = frame
+                        _frame_cache[self.camera_id] = (frame, jpeg_bytes)
                         _last_frame_time[self.camera_id] = now
 
             except Exception as e:
@@ -585,14 +646,13 @@ async def ws_video_feed(websocket):
             await websocket.close(1011, "Camera feed unavailable")
             return
 
-        last_send_time = 0
         stale_cycles = 0
 
         while True:
             mark_camera_accessed(camera_id)
 
             with _frame_cache_lock:
-                raw_frame = _frame_cache.get(camera_id)
+                cached = _frame_cache.get(camera_id)
                 last_time = _last_frame_time.get(camera_id, 0)
 
             fresh = time.time() - last_time <= 8.0
@@ -601,21 +661,18 @@ async def ws_video_feed(websocket):
                 if stale_cycles > 20:
                     logger.warning(f"WS: Closing stream for {camera_id} due to feed loss")
                     break
-                await asyncio.sleep(FRAME_INTERVAL)
+                await asyncio.sleep(STREAM_INTERVAL)
                 continue
 
             stale_cycles = 0
 
-            if raw_frame is not None and last_time != last_send_time:
-                jpeg_bytes = _encode_jpeg(raw_frame)
-                if jpeg_bytes:
-                    try:
-                        await websocket.send(jpeg_bytes)
-                        last_send_time = last_time
-                    except websockets.ConnectionClosed:
-                        break
+            if cached is not None and cached[1]:
+                try:
+                    await websocket.send(cached[1])
+                except websockets.ConnectionClosed:
+                    break
 
-            await asyncio.sleep(FRAME_INTERVAL)
+            await asyncio.sleep(STREAM_INTERVAL)
 
     except asyncio.CancelledError:
         pass
@@ -700,7 +757,6 @@ def video_feed():
         return Response("Camera offline", status=503)
 
     def stream_cached_frames():
-        last_frame_time = 0
         consecutive_missing = 0
         try:
             while True:
@@ -708,24 +764,21 @@ def video_feed():
 
                 with _frame_cache_lock:
                     last_time = _last_frame_time.get(cid, 0)
-                    raw_frame = _frame_cache.get(cid)
+                    cached = _frame_cache.get(cid)
 
                 if time.time() - last_time > 8.0:
                     logger.warning(f"Closing stream connection for camera {cid} due to feed loss")
                     break
 
-                if raw_frame is not None and last_time != last_frame_time:
-                    jpeg_bytes = _encode_jpeg(raw_frame)
-                    if jpeg_bytes:
-                        last_frame_time = last_time
-                        yield (b'--frame\r\n'
-                               b'Content-Type: image/jpeg\r\n\r\n' + jpeg_bytes + b'\r\n')
-                        consecutive_missing = 0
+                if cached is not None and cached[1]:
+                    yield (b'--frame\r\n'
+                           b'Content-Type: image/jpeg\r\n\r\n' + cached[1] + b'\r\n')
+                    consecutive_missing = 0
                 else:
                     consecutive_missing += 1
                     if consecutive_missing > 100:
                         break
-                time.sleep(0.05)
+                time.sleep(STREAM_INTERVAL)
         except GeneratorExit:
             pass
 
@@ -746,13 +799,11 @@ def snapshot():
     for _ in range(10):
         with _frame_cache_lock:
             last_time = _last_frame_time.get(cid, 0)
-            raw_frame = _frame_cache.get(cid)
+            cached = _frame_cache.get(cid)
             is_valid = time.time() - last_time < 8.0
-        if raw_frame is not None and is_valid:
-            jpeg_bytes = _encode_jpeg(raw_frame)
-            if jpeg_bytes:
-                return Response(jpeg_bytes, mimetype='image/jpeg',
-                                headers={'Cache-Control': 'no-cache, no-store, must-revalidate'})
+        if cached is not None and cached[1] and is_valid:
+            return Response(cached[1], mimetype='image/jpeg',
+                            headers={'Cache-Control': 'no-cache, no-store, must-revalidate'})
         time.sleep(0.1)
 
     return Response(status=503)
@@ -785,5 +836,6 @@ def health():
 if __name__ == '__main__':
     logger.info(f"Starting Nirikshan AI server on port {STREAM_PORT}")
     logger.info(f"Media directory: {MEDIA_DIR}")
-    logger.info(f"30-second clip buffer: {CLIP_BUFFER_SIZE} frames")
+    logger.info(f"30-second clip buffer: {CLIP_BUFFER_SIZE} frames at {INFERENCE_FPS} FPS")
+    _cleanup_old_files()
     app.run(host='0.0.0.0', port=STREAM_PORT, threaded=True)
